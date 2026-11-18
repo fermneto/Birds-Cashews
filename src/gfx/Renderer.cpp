@@ -2,6 +2,7 @@
 #include "shared/BirdFactory.h"
 #include <array>
 #include <cmath>
+#include <unordered_set>
 #include <opencv2/imgproc.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -132,13 +133,7 @@ Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, g
       waterShader_(kWorldVertex, kWaterFragment), previewShader_(kPreviewVertex, kPreviewFragment),
       worldMesh_(worldMesh.vertices()), cloudMesh_(cloudMesh.vertices()), waterMesh_(waterQuad()),
       spawnPoint_(spawnPoint) {
-    for (const auto& bird : kIslandBirds) {
-        const auto parts = buildBirdFlightParts(bird.seed);
-        islandBirds_.push_back({std::make_unique<Mesh>(parts.body.vertices()),
-                                std::make_unique<Mesh>(parts.leftWing.vertices()),
-                                std::make_unique<Mesh>(parts.rightWing.vertices()),
-                                parts.rightShoulder, 24.0f / std::sqrt(parts.wingspan)});
-    }
+    for (const auto& bird : kIslandBirds) cacheBird(bird.seed);
     glGenVertexArrays(1, &emptyVao_);
     glGenTextures(1, &previewTexture_);
     glBindTexture(GL_TEXTURE_2D, previewTexture_);
@@ -192,31 +187,69 @@ void Renderer::drawWorld(const Camera3D& camera) {
     worldShader_.set("uGlow", 0.0f);
 }
 
+void Renderer::cacheBird(uint32_t seed) {
+    if (birdMeshes_.count(seed)) return;
+    const auto parts = buildBirdFlightParts(seed);
+    birdMeshes_.emplace(seed, FlyingBird{std::make_unique<Mesh>(parts.body.vertices()),
+                                        std::make_unique<Mesh>(parts.leftWing.vertices()),
+                                        std::make_unique<Mesh>(parts.rightWing.vertices()),
+                                        parts.rightShoulder, 24.0f / std::sqrt(parts.wingspan)});
+}
+
+void Renderer::setBirdInstances(std::vector<BirdInstance> birds) {
+    demoBirds_ = false;
+    if (birds.empty() && birds_.empty() && birdMeshes_.empty()) return;
+    std::unordered_set<uint32_t> active;
+    for (const auto& bird : birds) {
+        if (active.insert(bird.seed).second) cacheBird(bird.seed);
+    }
+    for (auto it = birdMeshes_.begin(); it != birdMeshes_.end();) {
+        if (active.count(it->first)) ++it;
+        else it = birdMeshes_.erase(it);
+    }
+    birds_ = std::move(birds);
+}
+
+void Renderer::drawBird(const BirdInstance& bird, float angle) {
+    auto model = glm::translate(glm::mat4(1.0f), bird.position);
+    model = glm::rotate(model, -bird.yaw, glm::vec3(0, 1, 0));
+    model = glm::rotate(model, bird.pitch, glm::vec3(1, 0, 0));
+    model = glm::rotate(model, -bird.roll, glm::vec3(0, 0, 1));
+    model = glm::scale(model, glm::vec3(bird.scale));
+    worldShader_.set("uModel", model);
+    const auto& flyer = birdMeshes_.at(bird.seed);
+    flyer.body->draw();
+    for (float side : {-1.0f, 1.0f}) {
+        auto shoulder = flyer.rightShoulder;
+        shoulder.x *= side;
+        auto wing = glm::translate(model, shoulder);
+        wing = glm::rotate(wing, side * angle, glm::vec3(0, 0, 1));
+        worldShader_.set("uModel", glm::translate(wing, -shoulder));
+        (side < 0 ? flyer.leftWing : flyer.rightWing)->draw();
+    }
+}
+
 void Renderer::drawBirds(float time) {
+    if (!demoBirds_) {
+        for (const auto& bird : birds_) {
+            const auto& flyer = birdMeshes_.at(bird.seed);
+            float angle = 0.08f;
+            if (bird.mode == FlightMode::Flap)
+                angle += 0.78f * std::sin(time * flyer.beatRate + static_cast<float>(bird.seed % 31));
+            if (bird.mode == FlightMode::Dive) angle = 0.42f;
+            drawBird(bird, angle);
+        }
+        return;
+    }
     for (size_t i = 0; i < kIslandBirds.size(); ++i) {
         const auto& bird = kIslandBirds[i];
         const float phase = time * (0.62f + 0.04f * i) + 0.7f * i;
         const glm::vec3 drift(12.0f * std::sin(phase), 2.5f * std::sin(2.0f * phase),
                               12.0f * std::cos(phase));
-        const glm::vec3 position = spawnPoint_ + bird.offset + drift;
-        auto model = glm::translate(glm::mat4(1.0f), position);
-        model = glm::rotate(model, phase - glm::radians(90.0f), glm::vec3(0, 1, 0));
-        model = glm::rotate(model, -0.20f, glm::vec3(0, 0, 1));
-        model = glm::scale(model, glm::vec3(bird.scale));
-        worldShader_.set("uModel", model);
-        const auto& flyer = islandBirds_[i];
-        flyer.body->draw();
         const float activity = glm::smoothstep(-0.4f, 0.4f, std::sin(time * 1.3f + i * 2.0f));
-        const float beat = std::sin(time * flyer.beatRate + i * 1.7f);
-        const float angle = 0.08f + activity * (0.17f + 0.78f * beat);
-        for (float side : {-1.0f, 1.0f}) {
-            auto shoulder = flyer.rightShoulder;
-            shoulder.x *= side;
-            auto wing = glm::translate(model, shoulder);
-            wing = glm::rotate(wing, side * angle, glm::vec3(0, 0, 1));
-            worldShader_.set("uModel", glm::translate(wing, -shoulder));
-            (side < 0 ? flyer.leftWing : flyer.rightWing)->draw();
-        }
+        const float beat = std::sin(time * birdMeshes_.at(bird.seed).beatRate + i * 1.7f);
+        drawBird({bird.seed, spawnPoint_ + bird.offset + drift, glm::radians(90.0f) - phase,
+                  0.0f, 0.20f, bird.scale}, 0.08f + activity * (0.17f + 0.78f * beat));
     }
 }
 

@@ -4,9 +4,19 @@
 #include "gfx/Mesh.h"
 #include "gfx/Shader.h"
 #include <opencv2/core.hpp>
+#include "entity/FlightControls.h"
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 #include <vector>
+
+struct BirdInstance {
+    uint32_t seed;
+    glm::vec3 position;
+    float yaw = 0, pitch = 0, roll = 0, scale = 2.2f;
+    FlightMode mode = FlightMode::Glide;
+};
 
 // Desenha ceu, mundo, mar, passaro em primeira pessoa e a imagem da webcam.
 class Renderer {
@@ -16,6 +26,7 @@ public:
 
     void resize(int width, int height);
     void render(const Camera3D& camera, const BirdAnimation& animation, float time);
+    void setBirdInstances(std::vector<BirdInstance> birds);
     void setPreview(const cv::Mat& bgrImage);
     void setCashewMeshes(const MeshBuilder& fruit, const MeshBuilder& farFruit, const MeshBuilder& stems);
     void setCashewInstances(std::vector<glm::mat4> nearby, std::vector<glm::mat4> distant);
@@ -42,7 +53,11 @@ private:
         glm::vec3 rightShoulder;
         float beatRate;
     };
-    std::vector<FlyingBird> islandBirds_;
+    void cacheBird(uint32_t seed);
+    void drawBird(const BirdInstance& bird, float angle);
+    std::unordered_map<uint32_t, FlyingBird> birdMeshes_;
+    std::vector<BirdInstance> birds_;
+    bool demoBirds_ = true;
     GLuint emptyVao_ = 0, previewTexture_ = 0;
     GLuint targetFbo_ = 0, targetColor_ = 0, targetDepth_ = 0;
     int width_ = 1280, height_ = 720;
