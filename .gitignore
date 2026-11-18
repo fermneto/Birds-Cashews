@@ -1,0 +1,5 @@
+build/
+birds
+*.o
+saves/
+record.txt

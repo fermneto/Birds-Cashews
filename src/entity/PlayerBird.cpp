@@ -1,0 +1,68 @@
+#include "entity/PlayerBird.h"
+#include <algorithm>
+#include <cmath>
+
+namespace {
+constexpr float kFlapDuration = 0.45f;
+constexpr float kBaseFov = 72.0f, kMinFov = 64.0f, kMaxFov = 112.0f;
+constexpr float kFovPerSpeed = 0.85f, kDiveFovBonus = 6.0f;
+constexpr float kFovOpenRate = 7.0f, kFovCloseRate = 3.5f;
+}
+
+void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, yaw, FlightModel::kCruiseSpeed); }
+
+void PlayerBird::applyControls(const FlightControls& controls) {
+    controls_ = controls;
+    for (uint32_t i = 0; i < controls.flaps; i++) {
+        flight_.flap(controls.flapStrength);
+        flapTimer_ = kFlapDuration;
+        animation_.kick = controls.flapStrength;
+    }
+}
+
+// Alem do limite, o vento vira o passaro de volta para a ilha.
+void PlayerBird::enforceBoundary(float dt) {
+    const glm::vec3 p = flight_.position();
+    const float radius = glm::length(glm::vec2(p.x, p.z));
+    nearBoundary_ = radius > World::kWarningRadius;
+    if (radius <= World::kBoundaryRadius) return;
+    const float strength = std::clamp((radius - World::kBoundaryRadius) / 120.0f, 0.15f, 1.0f);
+    flight_.steerToward(std::atan2(-p.x, p.z), 2.5f * strength, dt);
+}
+
+void PlayerBird::step(const World& world, float dt) {
+    flight_.step(controls_, dt);
+    enforceBoundary(dt);
+    const Contact contact = world.resolve(flight_.position(), kRadius);
+    if (!contact.hit()) {
+        flight_.leaveGround();
+        return;
+    }
+    const float impact = flight_.applyContact(contact);
+    if (contact.surface == Surface::Solid) animation_.shake = std::max(animation_.shake, std::min(impact / 30.0f, 1.0f));
+}
+
+// Usa a velocidade total, entao a queda do mergulho tambem abre o campo de visao.
+float PlayerBird::targetFov() const {
+    const float excess = glm::length(flight_.velocity()) - FlightModel::kCruiseSpeed;
+    const float bonus = controls_.mode == FlightMode::Dive ? kDiveFovBonus : 0.0f;
+    return std::clamp(kBaseFov + excess * kFovPerSpeed + bonus, kMinFov, kMaxFov);
+}
+
+void PlayerBird::animate(float dt) {
+    flapTimer_ = std::max(0.0f, flapTimer_ - dt);
+    float angle = -4.0f, sweep = 0.0f;
+    if (controls_.mode == FlightMode::Dive) {
+        angle = -68.0f;
+        sweep = 40.0f;
+    }
+    if (flapTimer_ > 0) angle = -4.0f + 36.0f * std::cos(6.2831853f * (1.0f - flapTimer_ / kFlapDuration));
+    const float blend = 1.0f - std::exp(-18.0f * dt);
+    animation_.wingAngle += (angle - animation_.wingAngle) * blend;
+    animation_.wingSweep += (sweep - animation_.wingSweep) * blend;
+    animation_.shake *= std::exp(-5.0f * dt);
+    animation_.kick *= std::exp(-6.0f * dt);
+    const float target = targetFov();
+    const float rate = target > animation_.fov ? kFovOpenRate : kFovCloseRate;
+    animation_.fov += (target - animation_.fov) * (1.0f - std::exp(-rate * dt));
+}
