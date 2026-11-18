@@ -220,6 +220,34 @@ void Renderer::drawBirds(float time) {
     }
 }
 
+void Renderer::setCashewMeshes(const MeshBuilder& fruit, const MeshBuilder& farFruit, const MeshBuilder& stems) {
+    cashewFruit_ = std::make_unique<Mesh>(fruit.vertices());
+    cashewFarFruit_ = std::make_unique<Mesh>(farFruit.vertices());
+    cashewStems_ = std::make_unique<Mesh>(stems.vertices());
+}
+
+void Renderer::setCashewInstances(std::vector<glm::mat4> nearby, std::vector<glm::mat4> distant) {
+    nearbyCashews_ = std::move(nearby);
+    distantCashews_ = std::move(distant);
+}
+
+// Um leve brilho destaca os cajus contra a sombra das copas.
+void Renderer::drawCashews() {
+    if (!cashewFruit_) return;
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    cashewStems_->draw();
+    worldShader_.set("uGlow", 0.2f);
+    for (const glm::mat4& transform : nearbyCashews_) {
+        worldShader_.set("uModel", transform);
+        cashewFruit_->draw();
+    }
+    for (const glm::mat4& transform : distantCashews_) {
+        worldShader_.set("uModel", transform);
+        cashewFarFruit_->draw();
+    }
+    worldShader_.set("uGlow", 0.0f);
+}
+
 // O mar acompanha a camera para nunca mostrar a borda.
 void Renderer::drawWater(const Camera3D& camera, float time) {
     glEnable(GL_BLEND);
@@ -275,6 +303,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawSky(camera, time);
     drawWorld(camera);
     drawBirds(time);
+    drawCashews();
     drawWater(camera, time);
     drawViewModel(camera, animation);
     drawPreview();

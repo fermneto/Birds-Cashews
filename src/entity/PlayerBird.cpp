@@ -1,12 +1,14 @@
 #include "entity/PlayerBird.h"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace {
 constexpr float kFlapDuration = 0.45f;
 constexpr float kBaseFov = 72.0f, kMinFov = 64.0f, kMaxFov = 112.0f;
 constexpr float kFovPerSpeed = 0.85f, kDiveFovBonus = 6.0f;
 constexpr float kFovOpenRate = 7.0f, kFovCloseRate = 3.5f;
+constexpr float kBeakOpenRate = 12.0f, kBeakCloseRate = 5.0f;
 }
 
 void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, yaw, FlightModel::kCruiseSpeed); }
@@ -49,7 +51,18 @@ float PlayerBird::targetFov() const {
     return std::clamp(kBaseFov + excess * kFovPerSpeed + bonus, kMinFov, kMaxFov);
 }
 
+void PlayerBird::setBeakTarget(BeakSource source, float openness) {
+    beakTargets_[static_cast<int>(source)] = std::clamp(openness, 0.0f, 1.0f);
+}
+
+void PlayerBird::animateBeak(float dt) {
+    const float target = *std::max_element(std::begin(beakTargets_), std::end(beakTargets_));
+    const float rate = target > animation_.beakOpen ? kBeakOpenRate : kBeakCloseRate;
+    animation_.beakOpen += (target - animation_.beakOpen) * (1.0f - std::exp(-rate * dt));
+}
+
 void PlayerBird::animate(float dt) {
+    animateBeak(dt);
     flapTimer_ = std::max(0.0f, flapTimer_ - dt);
     float angle = -4.0f, sweep = 0.0f;
     if (controls_.mode == FlightMode::Dive) {

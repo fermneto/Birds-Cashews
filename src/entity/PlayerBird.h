@@ -11,6 +11,9 @@ struct BirdAnimation {
     float fov = 72.0f;         // Campo de visao, que abre com a velocidade.
 };
 
+// Motivos independentes para abrir o bico. Vale o maior pedido entre eles.
+enum class BeakSource { Cashew, Voice, Count };
+
 // Liga o modelo de voo ao mundo: colisao, limites do mapa e animacao.
 class PlayerBird {
 public:
@@ -20,6 +23,7 @@ public:
     void applyControls(const FlightControls& controls);
     void step(const World& world, float dt);
     void animate(float dt);
+    void setBeakTarget(BeakSource source, float openness);
 
     FlightModel& flight() { return flight_; }
     const FlightModel& flight() const { return flight_; }
@@ -29,10 +33,12 @@ public:
 private:
     void enforceBoundary(float dt);
     float targetFov() const;
+    void animateBeak(float dt);
 
     FlightModel flight_;
     FlightControls controls_;
     BirdAnimation animation_;
+    float beakTargets_[static_cast<int>(BeakSource::Count)] = {};
     float flapTimer_ = 0;
     bool nearBoundary_ = false;
 };
