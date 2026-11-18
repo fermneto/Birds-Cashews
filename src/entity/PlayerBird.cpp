@@ -15,6 +15,7 @@ void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, 
 
 void PlayerBird::applyControls(const FlightControls& controls) {
     controls_ = controls;
+    if (controls.bodyControlled) return;
     for (uint32_t i = 0; i < controls.flaps; i++) {
         flight_.flap(controls.flapStrength);
         flapTimer_ = kFlapDuration;
@@ -47,7 +48,7 @@ void PlayerBird::step(const World& world, float dt) {
 // Usa a velocidade total, entao a queda do mergulho tambem abre o campo de visao.
 float PlayerBird::targetFov() const {
     const float excess = glm::length(flight_.velocity()) - FlightModel::kCruiseSpeed;
-    const float bonus = controls_.mode == FlightMode::Dive ? kDiveFovBonus : 0.0f;
+    const float bonus = controls_.diveAmount() * kDiveFovBonus;
     return std::clamp(kBaseFov + excess * kFovPerSpeed + bonus, kMinFov, kMaxFov);
 }
 
@@ -64,17 +65,24 @@ void PlayerBird::animateBeak(float dt) {
 void PlayerBird::animate(float dt) {
     animateBeak(dt);
     flapTimer_ = std::max(0.0f, flapTimer_ - dt);
-    float angle = -4.0f, sweep = 0.0f;
-    if (controls_.mode == FlightMode::Dive) {
-        angle = -68.0f;
-        sweep = 40.0f;
-    }
-    if (flapTimer_ > 0) angle = -4.0f + 36.0f * std::cos(6.2831853f * (1.0f - flapTimer_ / kFlapDuration));
+    float angle = -4.0f - 64.0f * controls_.diveAmount() + 28.0f * controls_.pullUp;
+    const float sweep = 40.0f * controls_.diveAmount();
+    if (flapTimer_ > 0)
+        angle += 36.0f * std::sin(6.2831853f * (1.0f - flapTimer_ / kFlapDuration)) * controls_.flapStrength;
     const float blend = 1.0f - std::exp(-18.0f * dt);
-    animation_.wingAngle += (angle - animation_.wingAngle) * blend;
+    const float left = controls_.bodyControlled ? -4.0f + controls_.leftWingHeight * 57.0f : angle;
+    const float right = controls_.bodyControlled ? -4.0f + controls_.rightWingHeight * 57.0f : angle;
+    animation_.leftWingAngle += (left - animation_.leftWingAngle) * blend;
+    animation_.rightWingAngle += (right - animation_.rightWingAngle) * blend;
     animation_.wingSweep += (sweep - animation_.wingSweep) * blend;
     animation_.shake *= std::exp(-5.0f * dt);
     animation_.kick *= std::exp(-6.0f * dt);
+    const float speed = glm::length(flight_.velocity());
+    const float vibrationTarget = glm::smoothstep(0.90f, 1.0f, speed / flight_.fullDiveSpeed());
+    animation_.speedVibration += (vibrationTarget - animation_.speedVibration) * (1.0f - std::exp(-3.5f * dt));
+    const float windTarget = glm::smoothstep(FlightModel::kCruiseSpeed, 48.0f, speed);
+    animation_.wind += (windTarget - animation_.wind) * (1.0f - std::exp(-5.0f * dt));
+    animation_.windPhase += dt * (0.48f + animation_.wind);
     const float target = targetFov();
     const float rate = target > animation_.fov ? kFovOpenRate : kFovCloseRate;
     animation_.fov += (target - animation_.fov) * (1.0f - std::exp(-rate * dt));

@@ -39,10 +39,11 @@ private:
     void drawCashews();
     void drawWater(const Camera3D& camera, float time);
     void drawViewModel(const Camera3D& camera, const BirdAnimation& animation);
+    void drawWind(const BirdAnimation& animation);
     void drawPreview();
     void createTarget();
 
-    Shader worldShader_, skyShader_, waterShader_, previewShader_;
+    Shader worldShader_, skyShader_, waterShader_, previewShader_, windShader_;
     Mesh worldMesh_, cloudMesh_, waterMesh_;
     std::unique_ptr<Mesh> cashewFruit_, cashewFarFruit_, cashewStems_;
     std::vector<glm::mat4> nearbyCashews_, distantCashews_;

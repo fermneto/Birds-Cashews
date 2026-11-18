@@ -127,6 +127,9 @@ Camera3D Game::buildCamera() const {
     camera.yaw = flight.yaw();
     camera.pitch = flight.pitch() + kick * 0.05f + shake * 0.04f * std::sin(time_ * 47.0f);
     camera.roll = flight.roll() + shake * 0.05f * std::sin(time_ * 61.0f);
+    const float vibration = player_.animation().speedVibration;
+    camera.pitch += vibration * 0.0020f * std::sin(time_ * 16.0f);
+    camera.roll += vibration * 0.0030f * std::sin(time_ * 12.0f);
     camera.fovDegrees = player_.animation().fov;
     camera.aspect = static_cast<float>(width_) / static_cast<float>(std::max(height_, 1));
     return camera;
