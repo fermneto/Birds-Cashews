@@ -1,8 +1,10 @@
 #pragma once
 #include "entity/PlayerBird.h"
+#include "game/CashewCollector.h"
 #include "gfx/Renderer.h"
 #include "gfx/Window.h"
 #include "input/FlightInput.h"
+#include "shared/LocalAuthority.h"
 #include <memory>
 #include <string>
 
@@ -27,17 +29,26 @@ private:
     void createInput();
     bool handleEvents();
     void advance(float frameSeconds);
+    void updateCashews(float frameSeconds);
     void refreshPreview();
     void drawTelemetry(cv::Mat& image) const;
     Camera3D buildCamera() const;
+    void prepareCashews(const Camera3D& camera);
     void renderFrame();
+    cv::Mat captureFrame(float time);
     void captureDiveShot(const std::string& outputDir);
+    void captureCashewShots(const std::string& outputDir);
+    void aimAt(glm::vec3 eye, glm::vec3 target);
+    void measureFrames(const std::string& label);
 
     GameOptions options_;
     Window window_;
     World world_;
     Renderer renderer_;
     PlayerBird player_;
+    LocalAuthority authority_;
+    CashewField cashews_;
+    CashewCollector collector_;
     std::unique_ptr<FlightInput> input_;
     cv::Mat previewBase_;
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;

@@ -1,5 +1,6 @@
 #include "core/FlightTests.h"
 #include "core/Game.h"
+#include "game/CashewTests.h"
 #include "shared/ContractTests.h"
 #include "vision/GestureLab.h"
 #include <SDL.h>
@@ -31,7 +32,7 @@ std::string modelPath() {
 }
 
 int runSelfTests() {
-    const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest();
+    const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }

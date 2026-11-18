@@ -5,6 +5,8 @@
 #include "gfx/Shader.h"
 #include <opencv2/core.hpp>
 #include <memory>
+#include <utility>
+#include <vector>
 
 // Desenha ceu, mundo, mar, passaro em primeira pessoa e a imagem da webcam.
 class Renderer {
@@ -15,11 +17,14 @@ public:
     void resize(int width, int height);
     void render(const Camera3D& camera, const BirdAnimation& animation, float time);
     void setPreview(const cv::Mat& bgrImage);
+    void setCashewMeshes(const MeshBuilder& fruit, const MeshBuilder& farFruit, const MeshBuilder& stems);
+    void setCashewInstances(std::vector<glm::mat4> nearby, std::vector<glm::mat4> distant);
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
 
 private:
     void drawSky(const Camera3D& camera, float time);
     void drawWorld(const Camera3D& camera);
+    void drawCashews();
     void drawWater(const Camera3D& camera, float time);
     void drawViewModel(const Camera3D& camera, const BirdAnimation& animation);
     void drawPreview();
@@ -27,6 +32,8 @@ private:
 
     Shader worldShader_, skyShader_, waterShader_, previewShader_;
     Mesh worldMesh_, cloudMesh_, waterMesh_;
+    std::unique_ptr<Mesh> cashewFruit_, cashewFarFruit_, cashewStems_;
+    std::vector<glm::mat4> nearbyCashews_, distantCashews_;
     BirdViewModel viewModel_;
     GLuint emptyVao_ = 0, previewTexture_ = 0;
     GLuint targetFbo_ = 0, targetColor_ = 0, targetDepth_ = 0;
