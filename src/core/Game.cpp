@@ -24,7 +24,7 @@ constexpr PlayerId kLocalPlayer = 0;
 Game::Game(const GameOptions& options)
     : options_(options), window_("Birds&Cashews", 1280, 720, options.hidden), world_(options.seed),
       renderer_(world_.buildMesh(), world_.buildCloudMesh(), world_.spawnPoint()), cashews_(world_, options.seed),
-      collector_(cashews_, authority_, kLocalPlayer) {
+      collector_(cashews_, authority_, kLocalPlayer), npcs_(world_, options.seed) {
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     player_.spawn(world_.spawnPoint(), 0.0f);
     window_.drawableSize(width_, height_);
@@ -60,10 +60,25 @@ bool Game::handleEvents() {
 
 // Todo evento confirmado passa por aqui, porque pollEvents entrega cada um uma unica vez.
 void Game::updateCashews(float frameSeconds) {
-    for (const GameEvent& event : authority_.pollEvents()) collector_.handle(event);
+    for (const GameEvent& event : authority_.pollEvents()) {
+        const int before = collector_.carried();
+        collector_.handle(event);
+        if (event.type == GameEventType::CashewDropped && event.actor == kNoPlayer
+            && collector_.carried() < before)
+            hunterWarningUntil_ = time_ + 3.0f;
+    }
     const glm::vec3 position = player_.flight().position();
     collector_.update(frameSeconds, position);
     player_.setBeakTarget(BeakSource::Cashew, collector_.beakTarget(position));
+}
+
+void Game::updateNpcs(float frameSeconds) {
+    PlayerPublicState local;
+    local.id = kLocalPlayer;
+    local.position = player_.flight().position();
+    local.carried = static_cast<uint8_t>(collector_.carried());
+    authority_.publishLocalPlayer(local);
+    npcs_.advance(frameSeconds, authority_.players(), cashews_, authority_);
 }
 
 // A fisica usa passo fixo para se comportar igual em qualquer taxa de quadros.
@@ -75,6 +90,7 @@ void Game::advance(float frameSeconds) {
         accumulator_ -= kFixedStep;
     }
     updateCashews(frameSeconds);
+    updateNpcs(frameSeconds);
     player_.animate(frameSeconds);
     time_ += frameSeconds;
     telemetryTimer_ += frameSeconds;
@@ -88,6 +104,8 @@ void Game::drawTelemetry(cv::Mat& image) const {
     drawOutlinedText(image, text, {10, image.rows - 12}, 0.5, cv::Scalar(255, 255, 255));
     const std::string cargo = "CAJUS " + std::to_string(collector_.carried()) + "/" + std::to_string(collector_.stats().capacity);
     drawOutlinedText(image, cargo, {10, image.rows - 36}, 0.6, cv::Scalar(90, 210, 255));
+    if (time_ < hunterWarningUntil_)
+        drawOutlinedText(image, "CACADOR DERRUBOU A CARGA", {10, image.rows - 60}, 0.55, cv::Scalar(70, 140, 255));
     if (player_.nearBoundary()) drawOutlinedText(image, "VOLTE PARA A ILHA", {10, 28}, 0.7, cv::Scalar(70, 90, 255));
 }
 
@@ -120,9 +138,18 @@ void Game::prepareCashews(const Camera3D& camera) {
                                  visibleCashews(cashews_, viewProjection, camera.position, kCashewDetailDistance, kCashewDrawDistance));
 }
 
+void Game::prepareBirds() {
+    std::vector<BirdInstance> birds;
+    birds.reserve(npcs_.birds().size());
+    for (const auto& npc : npcs_.birds())
+        birds.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, 2.2f, npc.mode});
+    renderer_.setBirdInstances(std::move(birds));
+}
+
 void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
+    prepareBirds();
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -130,6 +157,7 @@ void Game::renderFrame() {
 cv::Mat Game::captureFrame(float time) {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
+    prepareBirds();
     return renderer_.capture(camera, player_.animation(), time);
 }
 

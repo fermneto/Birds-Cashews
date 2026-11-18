@@ -1,4 +1,5 @@
 #pragma once
+#include "ai/NpcEcosystem.h"
 #include "entity/PlayerBird.h"
 #include "game/CashewCollector.h"
 #include "gfx/Renderer.h"
@@ -30,6 +31,8 @@ private:
     bool handleEvents();
     void advance(float frameSeconds);
     void updateCashews(float frameSeconds);
+    void updateNpcs(float frameSeconds);
+    void prepareBirds();
     void refreshPreview();
     void drawTelemetry(cv::Mat& image) const;
     Camera3D buildCamera() const;
@@ -49,8 +52,10 @@ private:
     LocalAuthority authority_;
     CashewField cashews_;
     CashewCollector collector_;
+    NpcEcosystem npcs_;
     std::unique_ptr<FlightInput> input_;
     cv::Mat previewBase_;
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;
+    float hunterWarningUntil_ = 0;
     int width_ = 1280, height_ = 720;
 };
