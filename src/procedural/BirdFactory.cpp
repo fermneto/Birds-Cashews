@@ -11,6 +11,21 @@ enum class Beak { Short, Long, Hooked };
 enum class Crest { Low, Upright, Swept };
 enum class Tail { Fan, Forked, Narrow };
 enum class Wing { Broad, Pointed, Rounded };
+enum class Plumage { Plain, Hood, Saddle };
+
+enum class Family { Macaw, Pelican, Kiskadee };
+struct FamilyTraits {
+    float length, width, height, span;
+    Beak beak;
+    Tail tail;
+    Wing wing;
+    Body body;
+};
+constexpr std::array<FamilyTraits, 3> families = {{
+    {2.3f, .19f, .22f, 1.25f, Beak::Hooked, Tail::Narrow, Wing::Pointed, Body::Streamlined},
+    {3.5f, .25f, .28f, 1.55f, Beak::Long, Tail::Fan, Wing::Broad, Body::Full},
+    {1.12f, .23f, .28f, 1.05f, Beak::Short, Tail::Narrow, Wing::Rounded, Body::Compact}
+}};
 
 struct Genome {
     float length, width, height, span, hue;
@@ -19,16 +34,25 @@ struct Genome {
     Tail tail;
     Wing wing;
     Body body;
+    Plumage plumage;
+    Family colors;
 };
 
 Genome makeGenome(uint32_t seed) {
     Rng rng(seed);
-    const float length = rng.range(1.5f, 2.6f);
-    return {length, length * rng.range(0.17f, 0.26f), length * rng.range(0.20f, 0.29f),
-            length * rng.range(0.85f, 1.45f), rng.unit(),
-            static_cast<Beak>(rng.range(0, 2)), static_cast<Crest>(rng.range(0, 2)),
-            static_cast<Tail>(rng.range(0, 2)), static_cast<Wing>(rng.range(0, 2)),
-            static_cast<Body>(rng.range(0, 2))};
+    const unsigned family = seed % families.size();
+    // Cada par de bits combina um traco independente com o porte de origem.
+    const auto donor = [&](unsigned shift) {
+        const unsigned gene = (seed >> shift) & 3u;
+        return (family + (gene < 2 ? 0 : gene - 1)) % families.size();
+    };
+    const auto& shape = families[family];
+    const float length = shape.length * rng.range(.90f, 1.12f);
+    return {length, length * shape.width, length * shape.height,
+            length * families[donor(4)].span, rng.unit(),
+            families[donor(2)].beak, static_cast<Crest>(rng.range(0, 2)),
+            families[donor(6)].tail, families[donor(4)].wing, shape.body,
+            static_cast<Plumage>(rng.range(0, 2)), static_cast<Family>(donor(8))};
 }
 
 glm::vec3 hsv(float hue, float saturation, float value) {
@@ -46,7 +70,12 @@ struct Palette {
     glm::vec3 body, belly, feathers, accent, beak;
 };
 
-Palette makePalette(float hue) {
+Palette makePalette(const Genome& bird) {
+    if (bird.colors == Family::Pelican)
+        return {{.88f,.86f,.79f}, {1,.98f,.91f}, {.21f,.23f,.25f}, {.82f,.76f,.65f}, {1,.56f,.18f}};
+    if (bird.colors == Family::Kiskadee)
+        return {{.34f,.24f,.13f}, {1,.85f,.08f}, {.23f,.18f,.12f}, {.96f,.95f,.85f}, {.09f,.08f,.07f}};
+    const float hue = .52f + .10f * bird.hue;
     return {hsv(hue, 0.72f, 0.69f), hsv(hue + 0.06f, 0.29f, 0.94f),
             hsv(hue - 0.05f, 0.65f, 0.42f), hsv(hue + 0.44f, 0.72f, 0.93f),
             hsv(hue + 0.48f, 0.61f, 0.70f)};
@@ -100,7 +129,14 @@ void appendBody(MeshBuilder& mesh, const Genome& bird, const Palette& palette) {
         const glm::vec3 inside = (sections[i - 1].center + sections[i].center) * 0.5f;
         for (std::size_t j = 0; j < front.size(); ++j) {
             const auto next = (j + 1) % front.size();
-            const auto color = j < 4 ? palette.body : palette.belly;
+            auto color = j < 4 ? palette.body : palette.belly;
+            if (bird.plumage == Plumage::Hood && i <= 2) color = palette.accent;
+            if (bird.plumage == Plumage::Saddle && i >= 3 && i <= 4 && (j == 1 || j == 2))
+                color = palette.feathers;
+            if (bird.colors == Family::Kiskadee && i <= 2) {
+                if (j == 0 || j == 3) color = glm::vec3(.09f,.07f,.05f);
+                if (j == 1 || j == 2) color = palette.accent;
+            }
             outwardFace(mesh, front[j], back[j], back[next], inside, color);
             outwardFace(mesh, front[j], back[next], front[next], inside, color);
         }
@@ -125,7 +161,7 @@ void appendBeak(MeshBuilder& mesh, const Genome& bird, const Palette& color) {
     float reach = 0.22f, height = 0.28f, drop = 0.03f;
     switch (bird.beak) {
         case Beak::Short: reach = 0.15f; height = 0.40f; break;
-        case Beak::Long: reach = 0.34f; height = 0.18f; break;
+        case Beak::Long: reach = 0.73f; height = 0.18f; break;
         case Beak::Hooked: drop = 0.65f; break;
     }
     const glm::vec3 left = base + glm::vec3(-0.39f * bird.width, 0, 0);
@@ -133,7 +169,8 @@ void appendBeak(MeshBuilder& mesh, const Genome& bird, const Palette& color) {
     const glm::vec3 tip = base + glm::vec3(0, -drop * bird.height, -reach * bird.length);
     appendPlume(mesh, {left, tip, right, base + glm::vec3(0, 0, 0.12f * bird.length)},
                 base + glm::vec3(0, height * bird.height, -0.04f * bird.length),
-                base + glm::vec3(0, -0.19f * bird.height, -0.04f * bird.length),
+                base + (bird.beak == Beak::Long ? glm::vec3(0, -0.85f * bird.height, -0.34f * bird.length)
+                                               : glm::vec3(0, -0.19f * bird.height, -0.04f * bird.length)),
                 color.beak, color.beak * 0.73f);
 }
 
@@ -158,7 +195,7 @@ void appendTail(MeshBuilder& mesh, const Genome& bird, const Palette& color) {
     switch (bird.tail) {
         case Tail::Fan: spread = 1.45f; break;
         case Tail::Forked: middle = 0.30f; outer = 0.78f; break;
-        case Tail::Narrow: spread = 0.64f; middle = 0.86f; break;
+        case Tail::Narrow: spread = 0.64f; middle = 1.18f; break;
     }
     const auto point = [&](float x, float y, float z) {
         return base + glm::vec3(x * bird.width, y * bird.height, z * bird.length);
@@ -207,19 +244,34 @@ void appendEye(MeshBuilder& mesh, const Genome& bird, Rng& rng, float side) {
 }
 }
 
-MeshBuilder buildBirdMesh(uint32_t seed) {
+static MeshBuilder assembleBird(uint32_t seed, BirdFlightParts* parts) {
     const Genome bird = makeGenome(seed);
-    const Palette palette = makePalette(bird.hue);
+    const Palette palette = makePalette(bird);
     MeshBuilder mesh;
     appendBody(mesh, bird, palette);
     appendBeak(mesh, bird, palette);
     appendCrest(mesh, bird, palette);
     appendTail(mesh, bird, palette);
     for (float side : {-1.0f, 1.0f}) {
-        appendWing(mesh, bird, palette, side);
+        auto& wing = parts ? (side < 0 ? parts->leftWing : parts->rightWing) : mesh;
+        appendWing(wing, bird, palette, side);
         appendLeg(mesh, bird, palette, side);
         Rng eyeRng(seed);
         appendEye(mesh, bird, eyeRng, side);
     }
+    if (parts) {
+        parts->rightShoulder = {0.72f * bird.width, 0.17f * bird.height, -0.13f * bird.length};
+        parts->wingspan = 2 * (bird.span + parts->rightShoulder.x);
+    }
     return mesh;
+}
+
+MeshBuilder buildBirdMesh(uint32_t seed) {
+    return assembleBird(seed, nullptr);
+}
+
+BirdFlightParts buildBirdFlightParts(uint32_t seed) {
+    BirdFlightParts parts;
+    parts.body = assembleBird(seed, &parts);
+    return parts;
 }

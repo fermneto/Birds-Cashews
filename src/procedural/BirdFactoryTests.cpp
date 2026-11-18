@@ -47,7 +47,7 @@ int runBirdFactorySelfTest() {
                    && std::all_of(vertices.begin(), vertices.end(), validVertex);
         const auto bounds = boundsOf(vertices);
         symmetric &= std::abs(bounds.min.x + bounds.max.x) < 1e-5f
-                     && bounds.max.x > 1.0f && bounds.min.z < -1.0f && bounds.max.z > 1.0f;
+                     && bounds.max.x > 0.5f && bounds.min.z < -0.5f && bounds.max.z > 0.5f;
     }
     const auto first = buildBirdMesh(17), second = buildBirdMesh(42);
     const auto a = boundsOf(first.vertices()), b = boundsOf(second.vertices());

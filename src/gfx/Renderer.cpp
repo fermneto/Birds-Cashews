@@ -1,10 +1,26 @@
 #include "gfx/Renderer.h"
+#include "shared/BirdFactory.h"
+#include <array>
+#include <cmath>
 #include <opencv2/imgproc.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace {
 const glm::vec3 kSunDirection = glm::normalize(glm::vec3(0.45f, 0.75f, 0.35f));
 const glm::vec3 kHorizon(0.76f, 0.87f, 0.93f);
+
+struct IslandBird {
+    uint32_t seed;
+    glm::vec3 offset;
+    float scale;
+};
+
+constexpr std::array<IslandBird, 4> kIslandBirds = {{
+    {0, {-48, 10, -112}, 2.1f},
+    {1, {-15, -8, -93}, 2.5f},
+    {2, {21, 6, -103}, 2.2f},
+    {264, {53, -5, -128}, 2.9f},
+}};
 
 const char* const kWorldVertex = R"(#version 330 core
 layout(location = 0) in vec3 aPosition;
@@ -111,10 +127,18 @@ std::vector<Vertex> waterQuad() {
 }
 }
 
-Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh)
+Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, glm::vec3 spawnPoint)
     : worldShader_(kWorldVertex, kWorldFragment), skyShader_(kSkyVertex, kSkyFragment),
       waterShader_(kWorldVertex, kWaterFragment), previewShader_(kPreviewVertex, kPreviewFragment),
-      worldMesh_(worldMesh.vertices()), cloudMesh_(cloudMesh.vertices()), waterMesh_(waterQuad()) {
+      worldMesh_(worldMesh.vertices()), cloudMesh_(cloudMesh.vertices()), waterMesh_(waterQuad()),
+      spawnPoint_(spawnPoint) {
+    for (const auto& bird : kIslandBirds) {
+        const auto parts = buildBirdFlightParts(bird.seed);
+        islandBirds_.push_back({std::make_unique<Mesh>(parts.body.vertices()),
+                                std::make_unique<Mesh>(parts.leftWing.vertices()),
+                                std::make_unique<Mesh>(parts.rightWing.vertices()),
+                                parts.rightShoulder, 24.0f / std::sqrt(parts.wingspan)});
+    }
     glGenVertexArrays(1, &emptyVao_);
     glGenTextures(1, &previewTexture_);
     glBindTexture(GL_TEXTURE_2D, previewTexture_);
@@ -166,6 +190,34 @@ void Renderer::drawWorld(const Camera3D& camera) {
     worldShader_.set("uGlow", 0.72f);
     cloudMesh_.draw();
     worldShader_.set("uGlow", 0.0f);
+}
+
+void Renderer::drawBirds(float time) {
+    for (size_t i = 0; i < kIslandBirds.size(); ++i) {
+        const auto& bird = kIslandBirds[i];
+        const float phase = time * (0.62f + 0.04f * i) + 0.7f * i;
+        const glm::vec3 drift(12.0f * std::sin(phase), 2.5f * std::sin(2.0f * phase),
+                              12.0f * std::cos(phase));
+        const glm::vec3 position = spawnPoint_ + bird.offset + drift;
+        auto model = glm::translate(glm::mat4(1.0f), position);
+        model = glm::rotate(model, phase - glm::radians(90.0f), glm::vec3(0, 1, 0));
+        model = glm::rotate(model, -0.20f, glm::vec3(0, 0, 1));
+        model = glm::scale(model, glm::vec3(bird.scale));
+        worldShader_.set("uModel", model);
+        const auto& flyer = islandBirds_[i];
+        flyer.body->draw();
+        const float activity = glm::smoothstep(-0.4f, 0.4f, std::sin(time * 1.3f + i * 2.0f));
+        const float beat = std::sin(time * flyer.beatRate + i * 1.7f);
+        const float angle = 0.08f + activity * (0.17f + 0.78f * beat);
+        for (float side : {-1.0f, 1.0f}) {
+            auto shoulder = flyer.rightShoulder;
+            shoulder.x *= side;
+            auto wing = glm::translate(model, shoulder);
+            wing = glm::rotate(wing, side * angle, glm::vec3(0, 0, 1));
+            worldShader_.set("uModel", glm::translate(wing, -shoulder));
+            (side < 0 ? flyer.leftWing : flyer.rightWing)->draw();
+        }
+    }
 }
 
 // O mar acompanha a camera para nunca mostrar a borda.
@@ -222,6 +274,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     drawSky(camera, time);
     drawWorld(camera);
+    drawBirds(time);
     drawWater(camera, time);
     drawViewModel(camera, animation);
     drawPreview();
