@@ -20,6 +20,13 @@ FlightControls KeyboardInput::poll() {
     bank_ += (target - bank_) * 0.12f;
     controls.bank = bank_;
 
+    // Q e E equivalem a erguer o braco esquerdo e o direito nos menus.
+    const bool left = keys[SDL_SCANCODE_Q], right = keys[SDL_SCANCODE_E];
+    if (left && !leftHeld_) controls.menuPressed = ArmSide::Left;
+    else if (right && !rightHeld_) controls.menuPressed = ArmSide::Right;
+    leftHeld_ = left;
+    rightHeld_ = right;
+
     if (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN]) controls.mode = FlightMode::Dive;
     else if (lastFlapTicks_ != 0 && now - lastFlapTicks_ < 700) controls.mode = FlightMode::Flap;
     return controls;
@@ -33,5 +40,6 @@ bool KeyboardInput::preview(cv::Mat& image) {
     drawOutlinedText(image, "Espaco: bater", {30, 170}, 1.0, cv::Scalar(255, 255, 255));
     drawOutlinedText(image, "S: mergulhar", {30, 230}, 1.0, cv::Scalar(255, 255, 255));
     drawOutlinedText(image, "A / D: curvar", {30, 290}, 1.0, cv::Scalar(255, 255, 255));
+    drawOutlinedText(image, "Q / E: menus", {30, 350}, 1.0, cv::Scalar(255, 255, 255));
     return true;
 }

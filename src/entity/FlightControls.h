@@ -8,4 +8,7 @@ struct FlightControls {
     float bank = 0;
     uint32_t flaps = 0;
     float flapStrength = 0;
+    ArmSide menuPressed = ArmSide::None;   // Lado confirmado neste quadro.
+    ArmSide raisedArm = ArmSide::None;
+    float menuProgress = 0;
 };
