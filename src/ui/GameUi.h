@@ -1,7 +1,7 @@
 #pragma once
 #include "shared/GameplayView.h"
+#include "shared/NetSession.h"
 #include "ui/CalibrationTracker.h"
-#include "ui/FakeNetSession.h"
 #include "ui/MenuNav.h"
 #include "ui/PoseSource.h"
 #include "ui/RecordBanner.h"
@@ -17,6 +17,7 @@
 struct UiConfig {
     std::filesystem::path assetsDir, savesDir;
     SoundManager::Output sound = SoundManager::Output::Device;
+    NetSession* net = nullptr;   // Sala em uso no jogo. Sem ela, hospedar e entrar falham com aviso.
 };
 
 // Liga as telas, a navegacao, o HUD e os sons. O Game so repassa eventos e desenha o resultado.
@@ -25,6 +26,8 @@ public:
     GameUi(const UiConfig& config, GameplaySource& gameplay);
 
     void attachPoseSource(PoseSource* source) { poseSource_ = source; }
+    // O Game recria a sessao ao entrar ou sair de uma sala; a interface passa a mostrar a nova.
+    void setGameplay(GameplaySource& gameplay) { gameplay_ = &gameplay; }
 
     void handleEvent(const SDL_Event& event);
     void closeWindow();
@@ -86,7 +89,7 @@ private:
     UiKit kit_;
     SoundManager sound_;
     GameplaySource* gameplay_;
-    FakeNetSession net_;   // A integracao com a rede real e da tarefa D3.
+    NetSession* net_;
     PoseSource* poseSource_ = nullptr;
     std::filesystem::path savesDir_;
 
@@ -95,7 +98,7 @@ private:
     MenuCursor cursor_;
     ProfilePicker profiles_;
     RoomsModel rooms_;
-    TextField profileName_{32}, roomName_{32}, hostAddress_{15};
+    TextField profileName_{32}, roomName_{32}, hostAddress_{21};
     CalibrationTracker tracker_;
     RecordBanner banner_;
     cv::Mat calibrationFrame_;

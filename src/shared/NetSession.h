@@ -16,4 +16,6 @@ public:
     virtual bool join(const std::string& address) = 0;
     virtual std::vector<RoomInfo> discoverRooms() = 0;
     virtual void leave() = 0;
+    // Motivo da ultima falha de host ou join, pronto para a tela. Vazio se nao houver.
+    virtual std::string lastError() const { return ""; }
 };

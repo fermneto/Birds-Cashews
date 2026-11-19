@@ -31,6 +31,7 @@ public:
     void advance(float dt);
     bool markCollected(CashewId id);   // Retorna false se o caju ja nao estava disponivel.
     bool markRespawned(CashewId id);   // So aceita depois de vencido o tempo do caju.
+    bool forceRespawn(CashewId id);    // Para quando outro computador ja decidiu que o caju voltou.
     std::vector<CashewId> dueForRespawn() const;
 
 private:

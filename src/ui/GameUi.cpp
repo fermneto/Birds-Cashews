@@ -1,12 +1,27 @@
 #include "ui/GameUi.h"
 #include "save/RecordManager.h"
+#include "shared/GameTypes.h"
 #include <cmath>
 #include <sstream>
 
 namespace {
 constexpr float kCoinsVisibleSeconds = 3.5f, kCoinsFadeSeconds = 0.5f;
 constexpr float kMinComposeSeconds = 1.0f / 30.0f;
-const char* const kMultiplayerNotice = "O multiplayer ainda não está ativo: a partida começa com você sozinho.";
+ 
+// Usada so quando ninguem informa a rede, como em ferramentas que nao jogam em sala.
+class OfflineNetSession : public NetSession {
+public:
+    bool host(const std::string&) override { return false; }
+    bool join(const std::string&) override { return false; }
+    std::vector<RoomInfo> discoverRooms() override { return {}; }
+    void leave() override {}
+    std::string lastError() const override { return "A rede não está disponível neste modo."; }
+};
+
+NetSession& offlineSession() {
+    static OfflineNetSession session;
+    return session;
+}
 
 int quantized(float value, float steps) {
     return static_cast<int>(std::lround(value * steps));
@@ -14,8 +29,9 @@ int quantized(float value, float steps) {
 }
 
 GameUi::GameUi(const UiConfig& config, GameplaySource& gameplay)
-    : kit_(config.assetsDir), sound_(config.sound), gameplay_(&gameplay), savesDir_(config.savesDir),
-      profiles_(config.savesDir), rooms_(net_) {
+    : kit_(config.assetsDir), sound_(config.sound), gameplay_(&gameplay),
+      net_(config.net ? config.net : &offlineSession()), savesDir_(config.savesDir), profiles_(config.savesDir),
+      rooms_(*net_) {
     enterScreen(UiScreen::MainMenu);
 }
 
@@ -32,6 +48,8 @@ void GameUi::syncScreen() {
     const UiScreen next = flow_.current();
     if (next == shown_) return;
     saveIfNeeded(shown_, next);
+    // Voltar ao menu principal ou fechar o jogo sai da sala, se houver uma.
+    if (next == UiScreen::MainMenu || next == UiScreen::Closed) rooms_.leave();
     shown_ = next;
     enterScreen(next);
 }
@@ -91,7 +109,7 @@ std::vector<MenuRow> GameUi::roomRows() const {
         rows.push_back({"Criar sala", "", false});
     } else {
         for (const RoomInfo& room : rooms_.rooms())
-            rows.push_back({room.name, room.address + "  " + std::to_string(room.players) + "/4", false});
+            rows.push_back({room.name, room.address + "  " + std::to_string(room.players) + "/" + std::to_string(kMaxPlayers), false});
         rows.push_back({"IP do host", hostAddress_.text(), true});
         rows.push_back({"Atualizar lista", "", false});
     }
@@ -331,7 +349,6 @@ MenuScene GameUi::menuScene() const {
     scene.rows = rows();
     scene.selected = cursor_.index();
     scene.error = error_;
-    if (flow_.current() == UiScreen::Rooms) scene.notice = kMultiplayerNotice;
     if (flow_.current() == UiScreen::MainMenu) scene.footer = mainFooter();
     if (flow_.current() == UiScreen::Pause) scene.footer = pauseFooter();
     scene.hero = flow_.current() == UiScreen::MainMenu;

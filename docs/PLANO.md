@@ -5,7 +5,7 @@ Projeto de Linguagem de Programação I, semestre 2026.2, prof. Derzu Omaia. **E
 ## 1. Resumo do jogo
 
 Você é um pássaro em primeira pessoa, controlado pelo próprio corpo diante da webcam, em uma ilha de cajueiros gigantes.
-Você coleta cajus, leva ao seu ninho e decide entre comer (melhora o pássaro) ou investir (melhora o ninho). Até 4
+Você coleta cajus, leva ao seu ninho e decide entre comer (melhora o pássaro) ou investir (melhora o ninho). Até 6
 jogadores dividem o mundo pela rede local, conversam por voz de proximidade e podem roubar cajus uns dos outros.
 
 ## 2. Decisões fechadas
@@ -13,7 +13,7 @@ jogadores dividem o mundo pela rede local, conversam por voz de proximidade e po
 | Tema | Decisão |
 |---|---|
 | Plataforma | App desktop Linux em C++17, com OpenGL, SDL2 e OpenCV DNN |
-| Rede | Um jogador hospeda, os outros encontram a sala na LAN. De 1 a 4 jogadores |
+| Rede | Um jogador hospeda, os outros encontram a sala na LAN. De 1 a 6 jogadores (host e até 5 clientes) |
 | Estrutura | Mundo aberto contínuo, sem fim de partida |
 | Interação | Roubo de cajus de ninhos rivais e colisão em mergulho derruba a carga |
 | Coleta | Automática por proximidade, com o bico abrindo sozinho |
@@ -114,15 +114,27 @@ Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 
 ### 3.6 Voz por proximidade
 
-O áudio é capturado em 48 kHz, passa por detecção de fala, recebe o filtro de voz de pássaro e é comprimido com Opus. O
-host repassa cada pacote apenas aos jogadores dentro do alcance. Quem recebe aplica:
+O áudio é capturado em 48 kHz e tratado antes de qualquer envio:
 
-1. **Volume por distância:** voz cheia até 15 m e silêncio a partir de 80 m.
+- **Passa-alta de 100 Hz:** remove zumbidos e batidas graves.
+- **Redução de ruído espectral:** a cada 10 ms, a FFT separa o som em frequências. O ruído de fundo de cada frequência é
+  estimado nos momentos sem voz, e um ganho de Wiener atenua o que é ruído, em até 20 dB, sem apagar a voz.
+- **Reconhecimento de voz humana:** a transmissão só começa quando há energia na faixa da fala, entre 300 e 3400 Hz, e o
+  som é periódico, como a vibração das cordas vocais. Ventilador, teclado, cliques e portas batendo não abrem o microfone.
+
+Depois disso vem a detecção de fala. Um ganho automático leva a voz a um volume alvo, mesmo com
+microfone baixo. Depois a voz recebe o filtro de pássaro, 8 semitons acima, e é comprimida com Opus. O host repassa cada
+pacote apenas aos jogadores a até 300 m. Quem recebe guarda a voz em um buffer que cresce sozinho quando a rede fica
+irregular, para não cortar, e aplica:
+
+1. **Volume por distância:** voz cheia até 70 m, ainda bem audível a 150 m e silêncio a partir de 300 m, porque os
+   pássaros voam rápido.
 2. **Posição estéreo:** a voz vem do lado em que o outro pássaro está.
 3. **Efeito Doppler:** a voz fica mais aguda quando os pássaros se aproximam e mais grave quando se afastam, calculada pela
    velocidade relativa entre quem fala e quem ouve.
 
-O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
+Microfone, codificação, mixagem e saída rodam em uma thread de áudio própria, separada do jogo, para um quadro lento não
+cortar a voz. O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
 
 ## 4. Arquitetura
 
@@ -145,10 +157,10 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
 | `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
 | `ai/` | `NpcEcosystem` |
-| `net/` | `UdpSession` (implementa `NetSession`) |
+| `net/` | `UdpSession`, `Protocol`, `HostAuthority`, `ClientAuthority`, `RemoteTrack` e `NetMatch` (implementa `NetSession`) |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
-| `voice/` | Planejado para a D5 |
+| `voice/` | `VoiceChat`, `SpeechDetector`, `PitchShifter`, `VoiceEncoder`, `VoiceDecoder`, `VoiceMixer` |
 
 **Rede:** o host decide cajus, NPCs, roubos e colisões. Cada cliente simula o próprio voo para responder sem atraso. O
 host envia o estado 20 vezes por segundo e os clientes interpolam os outros pássaros.
@@ -178,9 +190,9 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Conexão UDP na `main`, replicação em andamento | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
-| **M4** Pássaros | Gerador e ecossistema na `main` | Sincronizar os NPCs em rede (D6) |
-| **M5** Voz | Em andamento | Voz por proximidade com Doppler (D5) |
+| **M3** Multiplayer | Salas de até 6 jogadores, testadas entre dois computadores | Roubo (N5) e teste completo no hotspot |
+| **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
+| **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
 | **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
@@ -205,6 +217,6 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Implementar D3, D5, D6 e N5, agora todas com o Neto.
+3. Implementar a N5.
 4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
 5. Fazer o teste integrado e ensaiar a apresentação.

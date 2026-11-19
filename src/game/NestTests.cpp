@@ -164,7 +164,7 @@ void testNestSite(TestRun& run, const World& world) {
     for (uint32_t seed : {kSeed, 1u, 2u, 77u, 4242u, 900001u}) {
         const World generated(seed);
         std::set<size_t> trees;
-        for (PlayerId player = 0; player < 4; player++) {
+        for (PlayerId player = 0; player < kMaxPlayers; player++) {
             const NestSite site = chooseNestSite(generated, seed, player);
             allOnTree = allOnTree && site.tree < generated.trees().size();
             if (site.tree >= generated.trees().size()) continue;
@@ -174,11 +174,11 @@ void testNestSite(TestRun& run, const World& world) {
             allReachable = allReachable && siteIsReachable(generated, site);
             trees.insert(site.tree);
         }
-        allDistinct = allDistinct && trees.size() == 4;
+        allDistinct = allDistinct && trees.size() == kMaxPlayers;
     }
     run.check("ninho: fica sobre um cajueiro em todas as sementes", allOnTree);
     run.check("ninho: poleiro livre e acessivel segundo World::resolve", allReachable);
-    run.check("ninho: cada jogador tem o proprio cajueiro", allDistinct);
+    run.check("ninho: cada um dos 6 jogadores tem o proprio cajueiro", allDistinct);
 }
 
 void testVisualGrowth(TestRun& run) {

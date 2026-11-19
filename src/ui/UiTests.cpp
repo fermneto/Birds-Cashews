@@ -1,6 +1,7 @@
 #include "ui/UiTests.h"
 #include "ui/UiTheme.h"
 #include "core/TestRun.h"
+#include "ui/FakeNetSession.h"
 #include "ui/UiShowcase.h"
 #include <opencv2/imgcodecs.hpp>
 #include <unistd.h>
@@ -30,7 +31,8 @@ private:
 };
 
 UiConfig testConfig(const TempDir& dir) {
-    return {assetsDirectory(), dir.path(), SoundManager::Output::Silent};
+    static FakeNetSession net;
+    return {assetsDirectory(), dir.path(), SoundManager::Output::Silent, &net};
 }
 
 FlightControls pressed(ArmSide side, bool gesture = true) {
@@ -106,7 +108,7 @@ void testFlowExit(TestRun& t) {
     ScreenFlow room;
     room.chooseMain(MainOption::JoinRoom);
     room.roomReady();
-    t.check("telas: entrar na sala segue para o jogo sozinho", room.current() == UiScreen::Profile);
+    t.check("telas: entrar na sala segue para o perfil", room.current() == UiScreen::Profile);
 }
 
 void testNavigationMapping(TestRun& t) {
@@ -341,6 +343,31 @@ void testRooms(TestRun& t) {
     t.check("salas: hospeda", rooms.hostRoom("Ilha") && net.hosted() == "Ilha");
     net.setAccept(false);
     t.check("salas: falha da rede vira mensagem", !rooms.joinAddress("10.0.0.2") && !rooms.error().empty());
+    net.setAccept(false, "A sala está cheia.");
+    t.check("salas: mostra o motivo dado pela rede", !rooms.joinAddress("10.0.0.2") && rooms.error() == "A sala está cheia.");
+}
+
+// A descoberta real devolve o endereco com a porta, como "10.0.0.5:42917".
+class DiscoveredRoomSession : public NetSession {
+public:
+    bool host(const std::string&) override { return true; }
+    bool join(const std::string& address) override { joined = address; return true; }
+    std::vector<RoomInfo> discoverRooms() override { return {{"Sala real", "10.204.155.210:42917", 1}}; }
+    void leave() override {}
+    std::string joined;
+};
+
+void testRoomAddresses(TestRun& t) {
+    t.check("salas: endereco com porta e valido", RoomsModel::isValidAddress("10.204.155.210:42917"));
+    t.check("salas: virgula do teclado numerico vira ponto", RoomsModel::isValidAddress("127,0,0,1"));
+    for (const char* bad : {"10.0.0.5:", "10.0.0.5:0", "10.0.0.5:70000", "10.0.0.5:abc", ":42917"})
+        t.check(std::string("salas: endereco invalido '") + bad + "'", !RoomsModel::isValidAddress(bad));
+
+    DiscoveredRoomSession net;
+    RoomsModel rooms(net);
+    rooms.refresh();
+    t.check("salas: entra na sala descoberta na rede", rooms.joinRoom(0) && net.joined == "10.204.155.210:42917");
+    t.check("salas: IP digitado com virgula entra", rooms.joinAddress("127,0,0,1") && net.joined == "127.0.0.1");
 }
 
 void testRoomScreen(TestRun& t) {
@@ -357,7 +384,7 @@ void testRoomScreen(TestRun& t) {
     for (int i = 0; i < 9; i++) sendKey(ui, SDLK_BACKSPACE);
     sendText(ui, "192.168.0.10");
     sendKey(ui, SDLK_RETURN);
-    t.check("salas: entrar segue para o jogo sozinho", ui.screen() == UiScreen::Profile);
+    t.check("salas: entrar segue para o perfil", ui.screen() == UiScreen::Profile);
 }
 
 void testAlphaComposition(TestRun& t) {
@@ -575,6 +602,7 @@ int runUiSelfTest() {
     testProfiles(t);
     testProfileScreen(t);
     testRooms(t);
+    testRoomAddresses(t);
     testRoomScreen(t);
     testAlphaComposition(t);
     testCleanHud(t);

@@ -1,14 +1,18 @@
 #include "ai/NpcTests.h"
 #include "core/FlightTests.h"
 #include "core/Game.h"
+#include "core/NetRehearsal.h"
 #include "game/CashewTests.h"
 #include "game/NestTests.h"
+#include "net/MatchTests.h"
 #include "net/NetTests.h"
 #include "procedural/BirdFactoryTests.h"
 #include "save/SaveTests.h"
 #include "shared/ContractTests.h"
 #include "ui/UiTests.h"
 #include "vision/GestureLab.h"
+#include "voice/VoiceDemo.h"
+#include "voice/VoiceTests.h"
 #include <SDL.h>
 #include <unistd.h>
 #include <exception>
@@ -29,7 +33,11 @@ void printUsage() {
               << "  ./birds --benchmark        mede a inferencia da pose\n"
               << "  ./birds --camera-test [segundos] [camera]\n"
               << "  ./birds --render-test PASTA\n"
-              << "  ./birds --soak [segundos]\n";
+              << "  ./birds --soak [segundos]\n"
+              << "  ./birds --rede-teste host [segundos]       hospeda uma sala sem janela\n"
+              << "  ./birds --rede-teste entrar IP [semente]   entra, coleta e entrega 2 cajus\n"
+              << "  ./birds --voz-teste        voz de passaro com um falante virtual (Ctrl+C sai)\n"
+              << "  ./birds --voz-teste arquivo SAIDA.wav\n";
 }
 
 // O modelo fica ao lado do executavel, entao o jogo abre de qualquer pasta.
@@ -57,7 +65,7 @@ private:
 int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
                        + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest() + runNpcSelfTest()
-                       + runNetworkSelfTest() + runBirdFactorySelfTest();
+                       + runNetworkSelfTest() + runMatchSelfTest() + runBirdFactorySelfTest() + runVoiceSelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }
@@ -76,11 +84,13 @@ int main(int argc, char** argv) {
         if (command == "--benchmark") return runInferenceBenchmark(options.modelPath);
         if (command == "--camera-test") return runCameraTest(number(2, 0), options.modelPath, number(1, 10));
         if (command == "--gestos") return runGestureLab(number(1, 0), options.modelPath);
+        if (command == "--voz-teste") return args.size() == 3 && args[1] == "arquivo" ? runVoiceFileDemo(args[2]) : runVoiceDemo();
         if (command == "--teclado") { options.keyboard = true; return Game(options).run(); }
         if (command == "--camera") { options.cameraIndex = number(1, 0); return Game(options).run(); }
         ScratchSaves scratch;
         options.saveDir = scratch.path();
         if (command == "--render-test" && args.size() == 2) { options.hidden = true; return Game(options).renderTest(args[1]); }
+        if (command == "--rede-teste") return runNetworkRehearsal(args, scratch.path());
         if (command == "--soak") { options.hidden = true; return Game(options).soakTest(number(1, 15)); }
         printUsage();
         return 1;
