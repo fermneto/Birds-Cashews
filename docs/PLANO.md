@@ -148,7 +148,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `net/` | `UdpSession`, `Protocol`, `HostAuthority`, `ClientAuthority`, `RemoteTrack` e `NetMatch` (implementa `NetSession`) |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
-| `voice/` | Planejado para a D5 |
+| `voice/` | `VoiceChat`, `SpeechDetector`, `PitchShifter`, `VoiceEncoder`, `VoiceDecoder`, `VoiceMixer` |
 
 **Rede:** o host decide cajus, NPCs, roubos e colisões. Cada cliente simula o próprio voo para responder sem atraso. O
 host envia o estado 20 vezes por segundo e os clientes interpolam os outros pássaros.
@@ -178,9 +178,9 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Conexão UDP na `main`, replicação em andamento | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
-| **M4** Pássaros | Gerador e ecossistema na `main` | Sincronizar os NPCs em rede (D6) |
-| **M5** Voz | Em andamento | Voz por proximidade com Doppler (D5) |
+| **M3** Multiplayer | Salas de até 6 jogadores, em validação | Roubo (N5) e testes no hotspot |
+| **M4** Pássaros | Gerador, ecossistema e NPCs em rede, em validação | Validar no jogo real |
+| **M5** Voz | Voz por proximidade com Doppler, em validação | Ouvir com microfone e fones |
 | **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
@@ -205,6 +205,6 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Implementar D3, D5, D6 e N5, agora todas com o Neto.
+3. Validar D3, D5 e D6 e implementar a N5.
 4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
 5. Fazer o teste integrado e ensaiar a apresentação.

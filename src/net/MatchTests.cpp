@@ -6,6 +6,7 @@
 #include "net/NetMatch.h"
 #include "net/Protocol.h"
 #include "net/RemoteTrack.h"
+#include "voice/VoiceChat.h"
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -714,6 +715,61 @@ void testSimulatedMatch(TestRun& t) {
 }
 } // namespace
 
+// Voz de ponta a ponta: microfone simulado no host, rede real em loopback e o som saindo no cliente.
+float voiceEnergy(Room& room, Client& client, VoiceChat& speaker, VoiceChat& listener, glm::vec3 listenerAt, int frames) {
+    const glm::vec3 speakerAt(0, 100, 0);
+    std::vector<float> stereo(2 * kVoiceFrame);
+    double energy = 0;
+    size_t sample = 0;
+    uint32_t noise = 12345;
+    for (int i = 0; i < frames; i++) {
+        std::vector<float> mic(kVoiceFrame);
+        // Meio segundo de ruido baixo para a deteccao aprender o fundo, e depois a fala.
+        for (float& value : mic) {
+            noise = noise * 1664525u + 1013904223u;
+            value = 0.002f * (static_cast<float>(noise >> 8) / 8388608.0f - 1.0f);
+            if (i >= 25) value += 0.3f * static_cast<float>(std::sin(2.0 * M_PI * 300.0 * sample / kVoiceRate));
+            sample++;
+        }
+        speaker.feedMicrophone(mic.data(), mic.size());
+        room.host.authority->publishLocalPlayer(stateAt(0, speakerAt));
+        client.authority->publishLocalPlayer(stateAt(client.authority->localPlayer(), listenerAt));
+        std::vector<PlayerPublicState> heardFrom;
+        for (const auto& player : client.authority->players())
+            if (player.id != client.authority->localPlayer()) heardFrom.push_back(player);
+        speaker.update(0.02f, {speakerAt, glm::vec3(0), 0.0f}, {});
+        listener.update(0.02f, {listenerAt, glm::vec3(0), 0.0f}, heardFrom);
+        listener.renderOutput(stereo.data());
+        if (i >= frames / 2)
+            for (float value : stereo) energy += value * value;
+        room.step(0.02f);
+    }
+    return static_cast<float>(std::sqrt(energy / (frames / 2 * stereo.size())));
+}
+
+void testVoiceOverNetwork(TestRun& t) {
+    Room room;
+    Client& client = room.join({kWorld, "Ouvinte", 9});
+    if (!ready(client)) {
+        t.check("voz em rede: cliente entra na sala", false);
+        return;
+    }
+    VoiceSettings settings;
+    settings.useDevices = false;
+    VoiceChat speaker(settings), listener(settings);
+    speaker.start();
+    listener.start();
+    speaker.attach(room.host.authority.get(), 0);
+    listener.attach(client.authority.get(), client.authority->localPlayer());
+
+    const float near = voiceEnergy(room, client, speaker, listener, {10, 100, 0}, 150);
+    const bool heardSpeaking = listener.speaking(0);
+    t.check("voz em rede: quem esta perto ouve o host", near > 0.02f && heardSpeaking);
+    t.check("voz em rede: falar marca o host como falando", speaker.localSpeaking() && speaker.stats().framesSent > 50);
+    const float far = voiceEnergy(room, client, speaker, listener, {300, 100, 0}, 150);
+    t.check("voz em rede: longe a voz some", far < near * 0.05f);
+}
+
 int runMatchSelfTest() {
     TestRun test;
     testProtocol(test);
@@ -724,6 +780,7 @@ int runMatchSelfTest() {
     testSnapshotFlow(test);
     testPlayerLeft(test);
     testVoiceRelay(test);
+    testVoiceOverNetwork(test);
     testSimulatedMatch(test);
     return test.failures;
 }

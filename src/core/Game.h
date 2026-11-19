@@ -6,6 +6,7 @@
 #include "gfx/Window.h"
 #include "input/FlightInput.h"
 #include "net/NetMatch.h"
+#include "voice/VoiceChat.h"
 #include "ui/DemoGameplaySource.h"
 #include "ui/GameUi.h"
 #include <filesystem>
@@ -43,6 +44,8 @@ private:
     void advance(float frameSeconds);
     void updateCashews(float frameSeconds);
     void updateNpcs(float frameSeconds);
+    void startVoice();
+    void updateVoice(float frameSeconds);
     void syncMatch(float frameSeconds);
     void rebuildSession();
     void prepareBirds();
@@ -72,6 +75,8 @@ private:
     NpcEcosystem npcs_;
     std::unique_ptr<FlightInput> input_;
     std::unique_ptr<GameUi> ui_;
+    std::unique_ptr<VoiceChat> voice_;   // So existe no jogo de verdade; os testes rodam sem audio.
+    VoiceLink* voiceLink_ = nullptr;
     PoseSource* poseSource_ = nullptr;
     cv::Mat previewBase_;
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;

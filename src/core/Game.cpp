@@ -99,6 +99,34 @@ void Game::updateNpcs(float frameSeconds) {
 }
 
 // A rede roda a todo quadro, ate nos menus, para a conexao nao cair por falta de resposta.
+// A voz so funciona em sala: jogando sozinho o microfone fica sem destino.
+void Game::startVoice() {
+    voice_ = std::make_unique<VoiceChat>();
+    if (!voice_->start()) std::cerr << "Voz indisponivel: sem microfone ou saida de audio\n";
+}
+
+void Game::updateVoice(float frameSeconds) {
+    if (!voice_) return;
+    VoiceLink* link = match_.voice();
+    if (link != voiceLink_) {
+        voiceLink_ = link;
+        voice_->attach(link, link ? match_.localPlayer() : kNoPlayer);
+    }
+    const FlightModel& flight = player_.flight();
+    VoiceListener me;
+    me.position = flight.position();
+    me.velocity = flight.velocity();
+    me.yaw = flight.yaw();
+    std::vector<PlayerPublicState> others;
+    if (const auto authority = match_.authority())
+        for (const PlayerPublicState& player : authority->players())
+            if (player.id != match_.localPlayer()) others.push_back(player);
+    voice_->update(frameSeconds, me, others);
+    // Falar abre o bico, mais ou menos conforme o volume da voz.
+    const float beak = voice_->localSpeaking() ? std::min(1.0f, 0.45f + voice_->localLevel()) : 0.0f;
+    player_.setBeakTarget(BeakSource::Voice, beak);
+}
+
 void Game::syncMatch(float frameSeconds) {
     if (const Profile* profile = session_->profile()) match_.setLocalIdentity(profile->name(), profile->birdSeed());
     match_.update(frameSeconds);
@@ -238,6 +266,7 @@ cv::Mat Game::captureFrame(float time) {
 int Game::run() {
     createInput();
     createUi(saveDirFor(options_), SoundManager::Output::Device);
+    startVoice();
     double last = nowSeconds();
     while (handleEvents()) {
         const double now = nowSeconds();
@@ -245,12 +274,14 @@ int Game::run() {
         last = now;
         syncMatch(frameSeconds);
         updateScreens(frameSeconds);
+        updateVoice(frameSeconds);
         if (ui_->closed()) break;
         refreshPreview();
         presentUi(frameSeconds);
         renderFrame();
     }
     session_->saveNow();
+    if (voice_) voice_->attach(nullptr, kNoPlayer);
     match_.leave();
     return 0;
 }
