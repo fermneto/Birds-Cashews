@@ -1,17 +1,20 @@
 #pragma once
 #include <opencv2/core.hpp>
 
-// Cores da interface, em BGR.
+// Paleta da interface, em BGR: tons de mata ao entardecer com o amarelo do caju como destaque.
 namespace theme {
-const cv::Scalar kInk(38, 26, 20);
-const cv::Scalar kPanel(48, 36, 28);
-const cv::Scalar kAccent(36, 116, 226);
-const cv::Scalar kGold(70, 200, 250);
-const cv::Scalar kGreen(110, 214, 112);
-const cv::Scalar kRed(84, 92, 240);
-const cv::Scalar kWhite(245, 245, 245);
-const cv::Scalar kMuted(196, 204, 208);
+const cv::Scalar kInk(26, 32, 18);
+const cv::Scalar kPanel(32, 40, 24);
+const cv::Scalar kAccent(58, 104, 232);
+const cv::Scalar kGold(84, 200, 255);
+const cv::Scalar kGreen(140, 220, 150);
+const cv::Scalar kRed(92, 106, 244);
+const cv::Scalar kWhite(236, 248, 255);
+const cv::Scalar kMuted(198, 216, 208);
 }
 
+// Margem externa da interface, dentro da area segura da tela.
+constexpr int kUiMargin = 40;
+
 // Posicao da imagem da webcam no canto da tela, na resolucao logica.
-const cv::Rect kPreviewArea(948, 12, 320, 240);
+const cv::Rect kPreviewArea(1036, 28, 204, 153);

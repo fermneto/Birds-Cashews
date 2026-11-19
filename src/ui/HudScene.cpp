@@ -1,79 +1,79 @@
-#include "ui/UiScenes.h"
-#include "ui/UiTheme.h"
+#include "ui/UiWidgets.h"
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
 #include <cmath>
 
 namespace {
-const cv::Rect kStats(16, 16, 348, 142);
-const cv::Point kCompass(640, 72);
-const cv::Rect kNestPanel(900, 264, 368, 444);
-const cv::Point kBannerCenter(640, 286);
+constexpr float kHalfTurn = 3.14159265f;
+constexpr int kCargoIcon = 34, kCargoStep = 36;
+constexpr int kCompassHalf = 170, kCompassY = 42;
+const cv::Point kBannerCenter(640, 184);
+const cv::Rect kNestColumn(884, 200, 356, 484);
 
-TextStyle style(int size, cv::Scalar color = theme::kWhite, TextAlign align = TextAlign::Left) {
-    TextStyle s;
-    s.size = size;
-    s.color = color;
-    s.align = align;
-    return s;
+void drawCargo(UiKit& kit, const GameplayView& view) {
+    const int y = kUiMargin - 12;
+    for (int i = 0; i < view.capacity; i++)
+        kit.canvas.image(kit.assets.icon(UiIcon::Cashew, kCargoIcon), {kUiMargin + i * kCargoStep, y}, i < view.carried ? 1.0f : 0.28f);
+    if (view.carried >= view.capacity)
+        kit.text.draw(kit.canvas, "Carga cheia", {kUiMargin + view.capacity * kCargoStep + 8, y + 24}, uiStyle(16, theme::kGold));
 }
 
-void drawStats(UiKit& kit, const GameplayView& view) {
-    kit.canvas.fill(kStats, theme::kInk, 0.68f, 14);
-    const bool full = view.carried >= view.capacity;
-    kit.canvas.image(kit.assets.icon(UiIcon::Cashew, 44), {kStats.x + 12, kStats.y + 8});
-    kit.text.draw(kit.canvas, std::to_string(view.carried) + "/" + std::to_string(view.capacity),
-                  {kStats.x + 64, kStats.y + 43}, style(32, full ? theme::kGold : theme::kWhite));
-    kit.canvas.image(kit.assets.icon(UiIcon::Coin, 40), {kStats.x + 190, kStats.y + 10});
-    kit.text.drawFit(kit.canvas, std::to_string(view.coins), {kStats.x + 238, kStats.y + 43}, 100, style(32, theme::kGold));
-
-    const int right = kStats.x + kStats.width - 14;
-    kit.text.draw(kit.canvas, "Pontuação", {kStats.x + 14, kStats.y + 88}, style(20, theme::kMuted));
-    kit.text.draw(kit.canvas, std::to_string(view.totalDelivered), {right, kStats.y + 90}, style(30, theme::kWhite, TextAlign::Right));
-    kit.text.draw(kit.canvas, "Record", {kStats.x + 14, kStats.y + 126}, style(20, theme::kMuted));
-    const std::string record = std::to_string(view.record);
-    kit.text.draw(kit.canvas, record, {right, kStats.y + 128}, style(30, theme::kGold, TextAlign::Right));
-    const int holderRoom = kStats.width - 112 - kit.text.width(record, 30) - 26;
-    if (!view.recordHolder.empty() && holderRoom > 30)
-        kit.text.drawFit(kit.canvas, view.recordHolder, {kStats.x + 112, kStats.y + 126}, holderRoom, style(18, theme::kMuted));
+// Pontuacao e record ficam em uma unica linha discreta. O destaque do record e so a notificacao.
+void drawScore(UiKit& kit, const GameplayView& view) {
+    const std::string score = std::to_string(view.totalDelivered);
+    kit.text.draw(kit.canvas, score, {kUiMargin, 100}, uiStyle(30));
+    kit.text.draw(kit.canvas, "record " + std::to_string(view.record), {kUiMargin + kit.text.width(score, 30) + 12, 100},
+                  uiStyle(15, theme::kMuted));
 }
 
-void drawRecordSeal(UiKit& kit) {
-    const cv::Rect chip(kStats.x, kStats.y + kStats.height + 8, 196, 60);
-    kit.canvas.fill(chip, theme::kAccent, 0.94f, 14);
-    kit.canvas.outline(chip, theme::kGold, 2, 14);
-    kit.canvas.image(kit.assets.icon(UiIcon::RecordBadge, 52), {chip.x + 6, chip.y + 4});
-    kit.text.draw(kit.canvas, "RECORD", {chip.x + 62, chip.y + 40}, style(27, theme::kWhite));
+void drawCoins(UiKit& kit, const GameplayView& view, float opacity) {
+    if (opacity <= 0.0f) return;
+    kit.canvas.image(kit.assets.icon(UiIcon::Coin, 24), {kUiMargin - 1, 112}, opacity);
+    kit.text.draw(kit.canvas, std::to_string(view.coins), {kUiMargin + 30, 131}, uiStyle(19, theme::kGold), opacity);
 }
 
-std::string distanceText(float meters) {
-    return std::to_string(static_cast<int>(std::lround(std::max(meters, 0.0f)))) + " m";
-}
-
+// Barra de rumo: o ninho desliza sobre ela e, se ficar para tras, encosta na ponta indicando o lado.
 void drawCompass(UiKit& kit, const GameplayView& view) {
-    const cv::Rect disk(kCompass.x - 56, kCompass.y - 56, 112, 112);
-    kit.canvas.fill(disk, theme::kInk, 0.68f, 56);
-    kit.canvas.outline(disk, theme::kGold, 2, 56);
-    if (view.perchedOnNest) kit.canvas.imageCentered(kit.assets.icon(UiIcon::Nest, 76), kCompass);
-    else kit.canvas.imageCentered(rotatedClockwise(kit.assets.icon(UiIcon::CompassArrow, 84), view.nestBearing), kCompass);
+    if (view.perchedOnNest) return;
+    const float opacity = view.carried > 0 ? 1.0f : 0.62f;
+    const int center = kUiWidth / 2;
+    kit.canvas.gradient({center - kCompassHalf, kCompassY, kCompassHalf, 2}, theme::kWhite, 0.0f, 0.75f * opacity, true);
+    kit.canvas.gradient({center, kCompassY, kCompassHalf, 2}, theme::kWhite, 0.75f * opacity, 0.0f, true);
+    for (int tick : {-2, -1, 1, 2})
+        kit.canvas.fill({center + tick * kCompassHalf / 3 - 1, kCompassY - 4, 2, 10}, theme::kWhite, 0.42f * opacity);
+    kit.canvas.fill({center - 1, kCompassY - 9, 3, 20}, theme::kGold, opacity);
 
-    const std::string label = view.perchedOnNest ? "No ninho" : distanceText(view.nestDistance);
-    const int width = kit.text.width(label, 24) + 62;
-    const cv::Rect chip(kCompass.x - width / 2, kCompass.y + 62, width, 40);
-    kit.canvas.fill(chip, theme::kInk, 0.72f, 12);
-    kit.canvas.image(kit.assets.icon(UiIcon::Nest, 32), {chip.x + 8, chip.y + 4});
-    kit.text.draw(kit.canvas, label, {chip.x + 48, chip.y + 29}, style(24));
+    const float limited = std::clamp(view.nestBearing / (kHalfTurn * 0.5f), -1.0f, 1.0f);
+    const int x = center + static_cast<int>(limited * (kCompassHalf - 14));
+    kit.canvas.imageCentered(kit.assets.icon(UiIcon::Nest, 38), {x, kCompassY - 2}, opacity);
+    if (std::abs(limited) >= 1.0f) {
+        const float side = limited > 0.0f ? kHalfTurn * 0.5f : -kHalfTurn * 0.5f;
+        kit.canvas.imageCentered(rotatedClockwise(kit.assets.icon(UiIcon::CompassArrow, 26), side),
+                                 {x + (limited > 0.0f ? 30 : -30), kCompassY - 2}, opacity);
+    }
+    const std::string distance = std::to_string(static_cast<int>(std::lround(std::max(view.nestDistance, 0.0f)))) + " m";
+    kit.text.draw(kit.canvas, distance, {center, kCompassY + 36}, uiStyle(17, theme::kWhite, TextAlign::Center), opacity);
 }
 
-// O aviso e montado uma vez em tamanho real e so depois ampliado pela animacao.
+void drawWarning(UiKit& kit, const std::string& text) {
+    const int width = kit.text.width(text, 18) + 58;
+    const cv::Rect pill((kUiWidth - width) / 2, 96, width, 40);
+    kit.canvas.fill(pill, theme::kInk, 0.78f, 20);
+    kit.canvas.fill({pill.x + 16, pill.y + 14, 12, 12}, theme::kRed, 1.0f, 6);
+    TextStyle label = uiStyle(18);
+    label.outline = false;
+    kit.text.draw(kit.canvas, text, {pill.x + 40, pill.y + 27}, label);
+}
+
+// Notificacao curta: aparece quando o record e batido e some sozinha.
 cv::Mat bannerArt(UiKit& kit, int total) {
-    Canvas art(640, 150);
-    const cv::Rect area(8, 8, 624, 134);
-    art.fill(area, theme::kAccent, 0.96f, 22);
-    art.outline(area, theme::kGold, 4, 22);
-    art.image(kit.assets.icon(UiIcon::RecordBadge, 112), {22, 19});
-    kit.text.draw(art, "Novo record!", {150, 80}, style(56, theme::kWhite));
-    kit.text.draw(art, std::to_string(total) + " cajus entregues", {152, 122}, style(26, theme::kGold));
+    Canvas art(336, 72);
+    art.fill({0, 0, 336, 72}, theme::kInk, 0.86f, 36);
+    art.image(kit.assets.icon(UiIcon::RecordBadge, 52), {12, 10});
+    TextStyle title = uiStyle(22, theme::kGold), detail = uiStyle(14, theme::kMuted);
+    title.outline = detail.outline = false;
+    kit.text.draw(art, "Novo record!", {76, 34}, title);
+    kit.text.draw(art, std::to_string(total) + " cajus entregues", {76, 56}, detail);
     return art.pixels();
 }
 
@@ -85,114 +85,107 @@ void drawBanner(UiKit& kit, const HudScene& scene) {
     kit.canvas.imageCentered(scaled, kBannerCenter, scene.bannerOpacity);
 }
 
-void drawLevelPips(UiKit& kit, cv::Point origin, int level, int maxLevel) {
-    for (int i = 0; i < maxLevel; i++) {
-        const cv::Rect pip(origin.x + i * 19, origin.y, 15, 9);
-        kit.canvas.fill(pip, i < level ? theme::kGold : theme::kInk, i < level ? 1.0f : 0.8f, 3);
-        kit.canvas.outline(pip, theme::kMuted, 1, 3);
-    }
+void drawLevelDots(UiKit& kit, cv::Point origin, int level, int maxLevel) {
+    for (int i = 0; i < maxLevel; i++)
+        kit.canvas.fill({origin.x + i * 14, origin.y, 9, 5}, i < level ? theme::kGold : theme::kWhite, i < level ? 1.0f : 0.24f, 2);
 }
 
 void drawPrice(UiKit& kit, const UpgradeOptionView& option, cv::Point rightCenter, bool selected) {
     if (option.maxLevel > 0 && option.level >= option.maxLevel) {
-        kit.text.draw(kit.canvas, "MÁX", rightCenter + cv::Point(0, 8), style(20, theme::kGreen, TextAlign::Right));
+        kit.text.draw(kit.canvas, "MÁX", rightCenter + cv::Point(0, 7), uiStyle(17, theme::kGreen, TextAlign::Right));
     } else if (option.price > 0) {
         const std::string price = std::to_string(option.price);
-        // O vermelho perde contraste sobre a linha destacada, que ja explica a falta de moedas.
-        const cv::Scalar color = selected ? theme::kWhite : option.affordable ? theme::kGold : theme::kRed;
-        kit.text.draw(kit.canvas, price, rightCenter + cv::Point(0, 9), style(24, color, TextAlign::Right));
-        const int x = rightCenter.x - kit.text.width(price, 24) - 32;
-        kit.canvas.image(kit.assets.icon(UiIcon::Coin, 26), {x, rightCenter.y - 13});
+        const cv::Scalar color = option.affordable || selected ? theme::kGold : theme::kMuted;
+        kit.text.draw(kit.canvas, price, rightCenter + cv::Point(0, 8), uiStyle(21, color, TextAlign::Right));
+        const int x = rightCenter.x - kit.text.width(price, 21) - 27;
+        kit.canvas.image(kit.assets.icon(UiIcon::Coin, 22), {x, rightCenter.y - 11}, option.affordable ? 1.0f : 0.5f);
     }
 }
 
 void drawNestOption(UiKit& kit, const UpgradeOptionView& option, const cv::Rect& area, bool selected) {
-    kit.canvas.fill(area, selected ? theme::kAccent : theme::kInk, selected ? 0.95f : 0.6f, 10);
-    if (selected) kit.canvas.outline(area, theme::kGold, 2, 10);
-    const int iconSize = std::min(area.height - 8, 46);
+    if (selected) {
+        kit.canvas.gradient(area, theme::kAccent, 0.9f, 0.18f, true);
+        kit.canvas.fill({area.x, area.y, 4, area.height}, theme::kGold, 1.0f);
+    }
     const auto icon = iconForOption(option.name);
-    if (icon) kit.canvas.image(kit.assets.icon(*icon, iconSize), {area.x + 6, area.y + (area.height - iconSize) / 2});
-
-    const int textX = area.x + 60, textRoom = area.width - 150;
-    const bool twoLines = option.maxLevel > 0;
-    const int baseline = twoLines ? area.y + 21 : area.y + area.height / 2 + 8;
-    kit.text.drawFit(kit.canvas, option.name, {textX, baseline}, textRoom, style(20));
-    if (twoLines) drawLevelPips(kit, {textX, area.y + area.height - 16}, option.level, option.maxLevel);
-    drawPrice(kit, option, {area.x + area.width - 12, area.y + area.height / 2}, selected);
+    if (icon) kit.canvas.image(kit.assets.icon(*icon, 36), {area.x + 12, area.y + (area.height - 36) / 2}, selected ? 1.0f : 0.8f);
+    const int textX = area.x + 58, room = area.width - 138;
+    const bool upgrade = option.maxLevel > 0;
+    const int baseline = upgrade ? area.y + 25 : area.y + area.height / 2 + 7;
+    kit.text.drawFit(kit.canvas, option.name, {textX, baseline}, room, uiStyle(19, selected ? theme::kWhite : theme::kMuted));
+    if (upgrade) drawLevelDots(kit, {textX, area.y + area.height - 15}, option.level, option.maxLevel);
+    drawPrice(kit, option, {area.x + area.width - 10, area.y + area.height / 2}, selected);
 }
 
-void drawArmCard(UiKit& kit, const cv::Rect& area, const std::string& arm, const std::string& action, bool active, float progress) {
-    kit.canvas.fill(area, theme::kInk, 0.72f, 10);
-    if (active) kit.canvas.outline(area, theme::kGold, 2, 10);
-    kit.text.draw(kit.canvas, arm, {area.x + 12, area.y + 24}, style(16, theme::kMuted));
-    kit.text.drawFit(kit.canvas, action, {area.x + 112, area.y + 25}, area.width - 124, style(20));
-    kit.canvas.progressBar({area.x + 12, area.y + 36, area.width - 24, 10}, active ? progress : 0.0f, theme::kGold);
-}
-
-// Na raiz, cada braco abre uma das duas listas.
-void drawNestChoice(UiKit& kit, const cv::Rect& area, UiIcon icon, const std::string& label, const std::string& arm) {
-    kit.canvas.fill(area, theme::kInk, 0.6f, 12);
-    kit.canvas.imageCentered(kit.assets.icon(icon, 84), {area.x + area.width / 2, area.y + 58});
-    kit.text.drawFit(kit.canvas, label, {area.x + area.width / 2, area.y + 134}, area.width - 16, style(26, theme::kGold, TextAlign::Center));
-    kit.text.drawFit(kit.canvas, arm, {area.x + area.width / 2, area.y + 164}, area.width - 16, style(17, theme::kMuted, TextAlign::Center));
+void drawNestChoice(UiKit& kit, cv::Point center, UiIcon icon, const std::string& label, const std::string& arm) {
+    kit.canvas.imageCentered(kit.assets.icon(icon, 84), center);
+    kit.text.draw(kit.canvas, label, center + cv::Point(0, 76), uiStyle(25, theme::kGold, TextAlign::Center));
+    kit.text.draw(kit.canvas, arm, center + cv::Point(0, 102), uiStyle(14, theme::kMuted, TextAlign::Center));
 }
 
 void drawNestRoot(UiKit& kit, const NestMenuView& menu, int top) {
-    const int width = (kNestPanel.width - 34) / 2;
-    drawNestChoice(kit, {kNestPanel.x + 12, top, width, 180}, UiIcon::Cashew, menu.leftLabel, "Braço esquerdo");
-    drawNestChoice(kit, {kNestPanel.x + 22 + width, top, width, 180}, UiIcon::Nest, menu.rightLabel, "Braço direito");
-    kit.text.drawFit(kit.canvas, "Bata as asas (Espaço) para decolar", {kNestPanel.x + kNestPanel.width / 2, top + 212},
-                     kNestPanel.width - 32, style(19, theme::kWhite, TextAlign::Center));
+    const int quarter = kNestColumn.width / 4;
+    drawNestChoice(kit, {kNestColumn.x + quarter, top + 62}, UiIcon::Cashew, menu.leftLabel, "Braço esquerdo");
+    drawNestChoice(kit, {kNestColumn.x + 3 * quarter, top + 62}, UiIcon::Nest, menu.rightLabel, "Braço direito");
+    kit.canvas.fill({kNestColumn.x + 2 * quarter, top + 18, 1, 150}, theme::kWhite, 0.2f);
+    kit.text.draw(kit.canvas, "Bata as asas (Espaço) para decolar", {kNestColumn.x + 2 * quarter, top + 222},
+                  uiStyle(16, theme::kWhite, TextAlign::Center));
 }
 
 std::string nestTitle(NestMenuPage page) {
     switch (page) {
-        case NestMenuPage::Eat: return "Comer: melhora o pássaro";
-        case NestMenuPage::Invest: return "Investir: melhora o ninho";
+        case NestMenuPage::Eat: return "Comer";
+        case NestMenuPage::Invest: return "Investir";
         default: return "Ninho";
+    }
+}
+
+std::string nestSubtitle(NestMenuPage page) {
+    switch (page) {
+        case NestMenuPage::Eat: return "Melhora o pássaro";
+        case NestMenuPage::Invest: return "Melhora o ninho";
+        default: return "Use as moedas dos cajus entregues";
     }
 }
 
 void drawNestMenu(UiKit& kit, const GameplayView& view) {
     const NestMenuView& menu = view.menu;
-    kit.canvas.fill(kNestPanel, theme::kPanel, 0.9f, 16);
-    kit.canvas.outline(kNestPanel, theme::kGold, 2, 16);
-    kit.text.drawFit(kit.canvas, nestTitle(menu.page), {kNestPanel.x + 16, kNestPanel.y + 36}, kNestPanel.width - 32, style(25, theme::kGold));
+    kit.canvas.gradient({600, 0, 270, kUiHeight}, theme::kInk, 0.0f, 0.9f, true);
+    kit.canvas.fill({870, 0, kUiWidth - 870, kUiHeight}, theme::kInk, 0.9f);
 
-    constexpr int kArmCards = 2 * 54 + 8, kHeader = 50, kGap = 6;
+    const int right = kNestColumn.x + kNestColumn.width;
+    kit.text.draw(kit.canvas, nestTitle(menu.page), {kNestColumn.x, kNestColumn.y + 30}, uiStyle(32));
+    kit.text.draw(kit.canvas, nestSubtitle(menu.page), {kNestColumn.x, kNestColumn.y + 54}, uiStyle(15, theme::kMuted));
+    const std::string coins = std::to_string(view.coins);
+    kit.text.draw(kit.canvas, coins, {right, kNestColumn.y + 30}, uiStyle(26, theme::kGold, TextAlign::Right));
+    kit.canvas.image(kit.assets.icon(UiIcon::Coin, 28), {right - kit.text.width(coins, 26) - 34, kNestColumn.y + 7});
+
+    constexpr int kListTop = 70, kPromptHeight = 48, kPromptGap = 6;
+    const int promptsY = kNestColumn.y + kNestColumn.height - 2 * kPromptHeight - kPromptGap;
+    const int top = kNestColumn.y + kListTop;
+    if (menu.page == NestMenuPage::Root) drawNestRoot(kit, menu, top);
     const int count = std::max(static_cast<int>(menu.options.size()), 1);
-    const int room = kNestPanel.height - kHeader - kArmCards - 24;
-    const int rowHeight = std::min((room - (count - 1) * kGap) / count, 64);
-    if (menu.page == NestMenuPage::Root) drawNestRoot(kit, menu, kNestPanel.y + kHeader);
-    for (int i = 0; i < static_cast<int>(menu.options.size()); i++) {
-        const cv::Rect area(kNestPanel.x + 12, kNestPanel.y + kHeader + i * (rowHeight + kGap), kNestPanel.width - 24, rowHeight);
-        drawNestOption(kit, menu.options[i], area, i == menu.selected);
-    }
+    const int rowHeight = std::min((promptsY - top - 8) / count, 58);
+    for (int i = 0; i < static_cast<int>(menu.options.size()); i++)
+        drawNestOption(kit, menu.options[i], {kNestColumn.x, top + i * rowHeight, kNestColumn.width, rowHeight - 3}, i == menu.selected);
 
-    const int cardWidth = kNestPanel.width - 24;
-    const int cardsY = kNestPanel.y + kNestPanel.height - kArmCards - 12;
-    drawArmCard(kit, {kNestPanel.x + 12, cardsY, cardWidth, 54}, "Braço esq.", menu.leftLabel,
-                menu.raisedArm == ArmSide::Left, menu.holdProgress);
-    drawArmCard(kit, {kNestPanel.x + 12, cardsY + 62, cardWidth, 54}, "Braço dir.", menu.rightLabel,
-                menu.raisedArm == ArmSide::Right, menu.holdProgress);
-}
-
-void drawWarning(UiKit& kit, const std::string& text) {
-    const int width = kit.text.width(text, 22) + 40;
-    const cv::Rect chip((kUiWidth - width) / 2, kUiHeight - 62, width, 44);
-    kit.canvas.fill(chip, theme::kRed, 0.9f, 12);
-    kit.text.draw(kit.canvas, text, {kUiWidth / 2, chip.y + 30}, style(22, theme::kWhite, TextAlign::Center));
+    drawArmPrompt(kit, {kNestColumn.x, promptsY, kNestColumn.width, kPromptHeight}, ArmSide::Left, menu.leftLabel,
+                  menu.raisedArm == ArmSide::Left, menu.holdProgress);
+    drawArmPrompt(kit, {kNestColumn.x, promptsY + kPromptHeight + kPromptGap, kNestColumn.width, kPromptHeight}, ArmSide::Right,
+                  menu.rightLabel, menu.raisedArm == ArmSide::Right, menu.holdProgress);
 }
 }
 
 void drawHudScene(UiKit& kit, const HudScene& scene) {
     const GameplayView& view = *scene.view;
-    drawStats(kit, view);
-    if (view.leadingRecord) drawRecordSeal(kit);
-    drawCompass(kit, view);
-    kit.canvas.outline(kPreviewArea, theme::kGold, 2, 4);
     if (view.menu.page != NestMenuPage::Closed) drawNestMenu(kit, view);
+    drawCargo(kit, view);
+    drawScore(kit, view);
+    drawCoins(kit, view, view.menu.page != NestMenuPage::Closed ? 0.0f : scene.coinsOpacity);
+    drawCompass(kit, view);
+    if (scene.showPreview) drawPreviewFrame(kit);
     if (scene.bodyLost) drawWarning(kit, "Corpo fora do quadro: o pássaro plana nivelado");
+    else if (view.nearBoundary) drawWarning(kit, "Volte para a ilha");
     else if (view.cargoLostNow) drawWarning(kit, "Um caçador derrubou a sua carga!");
     drawBanner(kit, scene);
 }

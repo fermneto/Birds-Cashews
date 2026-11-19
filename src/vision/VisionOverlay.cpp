@@ -46,6 +46,8 @@ void drawGesture(cv::Mat& image, const GestureState& g, double fps) {
 }
 }
 
+void drawVisionSkeleton(cv::Mat& image, const Pose& pose) { drawSkeleton(image, pose); }
+
 void drawVisionOverlay(cv::Mat& image, const Pose& pose, const GestureState& gesture, double fps) {
     drawSkeleton(image, pose);
     drawGesture(image, gesture, fps);

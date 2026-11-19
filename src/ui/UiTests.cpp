@@ -1,4 +1,5 @@
 #include "ui/UiTests.h"
+#include "ui/UiTheme.h"
 #include "core/TestRun.h"
 #include "ui/UiShowcase.h"
 #include <opencv2/imgcodecs.hpp>
@@ -401,6 +402,47 @@ void testAlphaComposition(TestRun& t) {
     t.check("alfa: giro positivo e horario", pixel(turned, 4, 2)[3] > 200 && pixel(turned, 0, 2)[3] < 40);
 }
 
+bool sameImage(const cv::Mat& a, const cv::Mat& b) { return cv::norm(a, b, cv::NORM_INF) == 0; }
+
+cv::Mat hudImage(UiKit& kit, const HudScene& scene) {
+    kit.canvas.clear();
+    drawHudScene(kit, scene);
+    return kit.canvas.pixels().clone();
+}
+
+void testCleanHud(TestRun& t) {
+    Canvas shade(10, 4);
+    shade.gradient({0, 0, 10, 4}, cv::Scalar(100, 100, 100), 1.0f, 0.0f, true);
+    t.check("degrade: comeca opaco e termina transparente",
+            pixel(shade.pixels(), 0, 1)[3] == 255 && pixel(shade.pixels(), 9, 1)[3] == 0);
+
+    UiKit kit(assetsDirectory());
+    GameplayView view = DemoGameplaySource::flightSample();
+    HudScene scene;
+    scene.view = &view;
+    view.leadingRecord = false;
+    const cv::Mat following = hudImage(kit, scene);
+    t.check("hud: em voo nada escurece o topo da tela",
+            pixel(following, 420, 4)[3] == 0 && pixel(following, 900, 60)[3] == 0 && pixel(following, 640, 150)[3] == 0);
+    view.leadingRecord = true;
+    t.check("hud: liderar o record nao deixa mensagem fixa na tela", sameImage(following, hudImage(kit, scene)));
+
+    scene.bannerOpacity = 1.0f;
+    t.check("hud: bater o record mostra a notificacao", !sameImage(following, hudImage(kit, scene)));
+    scene.bannerOpacity = 0.0f;
+    t.check("hud: a notificacao some sozinha", sameImage(following, hudImage(kit, scene)));
+
+    scene.coinsOpacity = 1.0f;
+    t.check("hud: moedas aparecem quando mudam", !sameImage(following, hudImage(kit, scene)));
+    scene.coinsOpacity = 0.0f;
+
+    view.menu = DemoGameplaySource::nestRootSample().menu;
+    scene.showPreview = true;
+    const cv::Mat nest = hudImage(kit, scene);
+    t.check("hud: o menu do ninho nao escurece a webcam",
+            pixel(nest, kPreviewArea.x + 20, kPreviewArea.y + 20)[3] == 0);
+}
+
 void testAssets(TestRun& t) {
     UiAssets assets(assetsDirectory());
     for (int i = 0; i < static_cast<int>(UiIcon::Count); i++) {
@@ -535,6 +577,7 @@ int runUiSelfTest() {
     testRooms(t);
     testRoomScreen(t);
     testAlphaComposition(t);
+    testCleanHud(t);
     testAssets(t);
     testText(t);
     testRecordBanner(t);

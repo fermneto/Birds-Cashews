@@ -1,9 +1,9 @@
 Creditos dos arquivos desta pasta
 
 font.ttf
-  DejaVu Sans Bold, versao 2.37, do projeto DejaVu Fonts (https://dejavu-fonts.github.io).
-  Derivada da Bitstream Vera. Licenca livre da DejaVu/Bitstream Vera, que permite usar,
-  copiar e redistribuir a fonte junto com o programa.
+  Poppins Bold, versao 4.004. Copyright 2020 The Poppins Project Authors
+  (https://github.com/itfoundry/Poppins). Distribuida sob a SIL Open Font License 1.1,
+  cujo texto completo esta em OFL-Poppins.txt.
 
 *.png
   Imagens originais do Birds&Cashews, geradas por tools/gerar_assets.py.
