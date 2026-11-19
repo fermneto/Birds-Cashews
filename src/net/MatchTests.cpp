@@ -19,6 +19,7 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <thread>
@@ -780,6 +781,80 @@ void testRivalNestsOverNetwork(TestRun& t) {
 }
 } // namespace
 
+// Codifica uma amostra fixa de cada mensagem e resume os bytes. Se o formato mudar, o resumo muda.
+uint32_t wireFingerprint() {
+    PlayerPublicState player;
+    player.id = 2;
+    player.position = {1.5f, 2.25f, -3.0f};
+    player.velocity = {4.0f, -0.5f, 0.25f};
+    player.yaw = 0.5f;
+    player.pitch = -0.25f;
+    player.roll = 0.125f;
+    player.mode = FlightMode::Flap;
+    player.carried = 3;
+    player.speaking = true;
+    player.birdSeed = 123456789u;
+    player.nestLevel = 2;
+    NpcPublicState npc;
+    npc.seed = 987654321u;
+    npc.position = {10.0f, 20.0f, 30.0f};
+    npc.yaw = 1.0f;
+    npc.mode = FlightMode::Dive;
+    npc.role = 3;
+    npc.perched = true;
+    SnapshotMessage snapshot;
+    snapshot.time = 12.5f;
+    snapshot.players = {player};
+    snapshot.npcs = {npc};
+    GameEvent event = eventOf(GameEventType::CashewDelivered, 1, 40, 3);
+    event.target = 2;
+    event.position = {5.0f, 6.0f, 7.0f};
+    std::vector<Bytes> all = {encodeHello({kProtocolVersion, kWorld, "Ana", 99}), encodeWelcome({kProtocolVersion, kWorld, 3}),
+                              encodeRefuse(RefuseReason::Full), encodeEvents(MessageType::EventConfirmed, {event}),
+                              encodeState({2.0f, player}), encodeSnapshot(snapshot), encodeVoice({2, 7, Bytes(5, 9)})};
+    uint32_t hash = 2166136261u;
+    for (const Bytes& bytes : all)
+        for (uint8_t b : bytes) hash = (hash ^ b) * 16777619u;
+    return hash;
+}
+
+void testWireFormatLocked(TestRun& t) {
+    constexpr uint32_t kVersion2Fingerprint = 1173541394u;
+    const uint32_t fingerprint = wireFingerprint();
+    if (fingerprint != kVersion2Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
+    t.check("protocolo: formato fixo da versao 2 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
+            kProtocolVersion == 2 && fingerprint == kVersion2Fingerprint);
+}
+
+// Um host de outra versao que conecta, mas manda um estado que o cliente nao consegue ler.
+void testUnreadableHost(TestRun& t) {
+    const uint16_t port = freePort();
+    UdpSession hostUdp(port), clientUdp(port);
+    hostUdp.host("Host antigo");
+    clientUdp.startJoin("127.0.0.1:" + std::to_string(port));
+    for (int i = 0; i < 300 && clientUdp.joinStatus() == JoinStatus::Pending; i++) {
+        hostUdp.poll();
+        clientUdp.poll();
+        std::this_thread::sleep_for(1ms);
+    }
+    ClientAuthority client(clientUdp, {kWorld, "Novo", 1});
+    bool welcomed = false;
+    Bytes oldSnapshot = {kProtocolVersion, static_cast<uint8_t>(MessageType::Snapshot), 1, 2, 3};
+    for (int i = 0; i < 400 && client.status() != ClientStatus::Refused; i++) {
+        hostUdp.poll();
+        for (const auto& message : hostUdp.pollMessages())
+            if (!welcomed && decodeHello(message.payload)) {
+                hostUdp.sendReliable(message.from, encodeWelcome({kProtocolVersion, kWorld, 1}));
+                welcomed = true;
+            }
+        if (welcomed) hostUdp.sendUnreliable(1, oldSnapshot);
+        client.update(kDt);
+        std::this_thread::sleep_for(1ms);
+    }
+    t.check("rede: host com estado ilegivel e recusado com aviso de versao",
+            welcomed && client.status() == ClientStatus::Refused && client.error().find("versão") != std::string::npos);
+}
+
 // O host desta maquina responde pelo broadcast e pelo loopback; a lista deve mostrar uma sala so.
 void testDiscoveryDedup(TestRun& t) {
     Room room;
@@ -854,6 +929,8 @@ void testVoiceOverNetwork(TestRun& t) {
 int runMatchSelfTest() {
     TestRun test;
     testProtocol(test);
+    testWireFormatLocked(test);
+    testUnreadableHost(test);
     testInterpolation(test);
     testJoinAndCapacity(test);
     testRefusals(test);

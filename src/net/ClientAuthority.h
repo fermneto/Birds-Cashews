@@ -68,6 +68,8 @@ private:
     std::vector<RemoteTrack> npcs_;
     std::vector<NpcPublicState> lastNpcs_;
     float lastSnapshotTime_ = -1;
+    int unreadableSnapshots_ = 0;
+    bool readSnapshot_ = false;
     std::vector<GameEvent> pending_, requests_;
     std::deque<VoiceFrame> voice_;
 };
