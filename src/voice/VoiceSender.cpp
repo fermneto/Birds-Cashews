@@ -5,7 +5,7 @@ constexpr size_t kPreRollFrames = 3;
 }
 
 VoiceSender::VoiceSender(const SpeechSettings& speech, bool birdVoice, float semitones, int bitrate)
-    : detector_(speech), shifter_(semitones), encoder_(bitrate), birdVoice_(birdVoice), shifted_(kVoiceFrame), boosted_(kVoiceFrame) {}
+    : detector_(speech), shifter_(semitones), encoder_(bitrate), birdVoice_(birdVoice), shifted_(kVoiceFrame), boosted_(kVoiceFrame), cleaned_(kVoiceFrame) {}
 
 void VoiceSender::setBirdVoice(bool enabled, float semitones) {
     if (enabled && !birdVoice_) shifter_.reset();
@@ -14,8 +14,16 @@ void VoiceSender::setBirdVoice(bool enabled, float semitones) {
 }
 
 std::vector<VoiceFrame> VoiceSender::process(const float* frame, PlayerId speaker, bool muted) {
-    const bool voiced = detector_.process(frame, kVoiceFrame);
-    std::copy(frame, frame + kVoiceFrame, boosted_.begin());
+    std::copy(frame, frame + kVoiceFrame, cleaned_.begin());
+    bool voiceLike = true;
+    if (denoise_) {
+        highPass_.process(cleaned_.data(), kVoiceFrame);
+        suppressor_.process(cleaned_.data(), cleaned_.data(), kVoiceFrame);
+        voiceLike = suppressor_.voiceLikely();
+    }
+    const bool voiced = detector_.process(cleaned_.data(), kVoiceFrame, voiceLike);
+    if (denoise_) suppressor_.setSpeaking(voiced);
+    std::copy(cleaned_.begin(), cleaned_.end(), boosted_.begin());
     gain_.process(boosted_.data(), kVoiceFrame, voiced);
     const float* source = boosted_.data();
     if (birdVoice_) {

@@ -114,7 +114,15 @@ Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 
 ### 3.6 Voz por proximidade
 
-O áudio é capturado em 48 kHz e passa por detecção de fala. Um ganho automático leva a voz a um volume alvo, mesmo com
+O áudio é capturado em 48 kHz e tratado antes de qualquer envio:
+
+- **Passa-alta de 100 Hz:** remove zumbidos e batidas graves.
+- **Redução de ruído espectral:** a cada 10 ms, a FFT separa o som em frequências. O ruído de fundo de cada frequência é
+  estimado nos momentos sem voz, e um ganho de Wiener atenua o que é ruído, em até 20 dB, sem apagar a voz.
+- **Reconhecimento de voz humana:** a transmissão só começa quando há energia na faixa da fala, entre 300 e 3400 Hz, e o
+  som é periódico, como a vibração das cordas vocais. Ventilador, teclado, cliques e portas batendo não abrem o microfone.
+
+Depois disso vem a detecção de fala. Um ganho automático leva a voz a um volume alvo, mesmo com
 microfone baixo. Depois a voz recebe o filtro de pássaro, 8 semitons acima, e é comprimida com Opus. O host repassa cada
 pacote apenas aos jogadores a até 300 m. Quem recebe guarda a voz em um buffer que cresce sozinho quando a rede fica
 irregular, para não cortar, e aplica:

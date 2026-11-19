@@ -35,7 +35,7 @@ float SpeechDetector::level() const {
     return std::clamp((levelDb_ - thresholdDb()) / 20.0f, 0.0f, 1.0f);
 }
 
-bool SpeechDetector::process(const float* frame, int count) {
+bool SpeechDetector::process(const float* frame, int count, bool allowOnset) {
     levelDb_ = frameDb(frame, count);
     if (!started_) {
         // O primeiro quadro calibra o ruido de fundo: comecar com ruido nao conta como fala.
@@ -49,7 +49,7 @@ bool SpeechDetector::process(const float* frame, int count) {
     }
     const int hangoverFrames = static_cast<int>(std::lround(settings_.hangoverSeconds / kFrameSeconds));
     const float threshold = speaking_ ? thresholdDb() - settings_.releaseDb : thresholdDb();
-    if (levelDb_ > threshold) {
+    if (levelDb_ > threshold && (speaking_ || allowOnset)) {
         speaking_ = true;
         hangover_ = hangoverFrames;
     } else if (hangover_ > 0) {

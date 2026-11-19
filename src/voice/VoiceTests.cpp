@@ -2,6 +2,8 @@
 #include "core/TestRun.h"
 #include "voice/JitterBuffer.h"
 #include "voice/LoopbackVoiceLink.h"
+#include "voice/NoiseSuppressor.h"
+#include "voice/VoiceSender.h"
 #include <thread>
 #include <SDL.h>
 #include "voice/OpusCodec.h"
@@ -529,6 +531,128 @@ void testLongSpeech(TestRun& run) {
     run.check(describe("Voz: 12 s de fala continua sem cortes (quadros cortados)", silent), silent == 0);
 }
 
+// ---- Ruido de fora x voz do jogador ----
+
+// Voz sintetica: pulsos glotais de 140 Hz com vibrato, harmonicos ate 3,5 kHz e formantes,
+// falada em silabas de 200 ms com pausas de 100 ms.
+std::vector<float> syntheticVoice(size_t count, float amplitude, std::vector<bool>* voicedFrames = nullptr) {
+    std::vector<float> out(count, 0.0f);
+    double phase = 0;
+    for (size_t i = 0; i < count; i++) {
+        const double t = static_cast<double>(i) / kVoiceRate;
+        const double f0 = 140.0 + 10.0 * std::sin(2.0 * M_PI * 4.0 * t);
+        phase += 2.0 * M_PI * f0 / kVoiceRate;
+        double v = 0;
+        for (int k = 1; k * f0 < 3500.0; k++) {
+            const double hz = k * f0;
+            const double formants = 1.0 / (1.0 + std::pow((hz - 600.0) / 250.0, 2)) + 0.6 / (1.0 + std::pow((hz - 1700.0) / 300.0, 2));
+            v += (0.25 + formants) / k * std::sin(k * phase);
+        }
+        const double cycle = std::fmod(t, 0.3);
+        const double envelope = cycle < 0.2 ? std::sin(M_PI * cycle / 0.2) : 0.0;
+        out[i] = static_cast<float>(amplitude * envelope * v);
+    }
+    if (voicedFrames)
+        for (size_t f = 0; f * kVoiceFrame < count; f++) {
+            const double cycle = std::fmod(static_cast<double>(f * kVoiceFrame) / kVoiceRate, 0.3);
+            voicedFrames->push_back(cycle > 0.03 && cycle < 0.17);
+        }
+    return out;
+}
+
+// Ventilador: ruido branco mais um ronco grave filtrado.
+std::vector<float> fanNoise(size_t count, float amplitude, uint32_t seed) {
+    std::vector<float> white = whiteNoise(count, amplitude, seed), out(count);
+    float rumble = 0;
+    for (size_t i = 0; i < count; i++) {
+        rumble += 0.01f * (white[i] * 6.0f - rumble);
+        out[i] = white[i] * 0.6f + rumble * 3.0f;
+    }
+    return out;
+}
+
+int speakingFrames(VoiceSender& sender, const std::vector<float>& signal, size_t skipFrames, std::vector<bool>* trace = nullptr) {
+    int speaking = 0;
+    for (size_t f = 0; (f + 1) * kVoiceFrame <= signal.size(); f++) {
+        sender.process(signal.data() + f * kVoiceFrame, 0, false);
+        if (trace) trace->push_back(sender.speaking());
+        if (f >= skipFrames) speaking += sender.speaking();
+    }
+    return speaking;
+}
+
+void testNoiseRejection(TestRun& run) {
+    const size_t tenSeconds = 500 * kVoiceFrame;
+    VoiceSender fan(SpeechSettings{}, false, 0.0f, 24000);
+    run.check("Voz: ventilador ligado nao abre o microfone", speakingFrames(fan, fanNoise(tenSeconds, 0.05f, 21), 0) == 0);
+
+    std::vector<float> typing = fanNoise(tenSeconds, 0.004f, 22);
+    for (size_t at = 4000; at + 200 < typing.size(); at += 6720)
+        for (int i = 0; i < 200; i++) typing[at + i] += 0.6f * std::exp(-i / 40.0f) * (i % 2 ? 1.0f : -1.0f);
+    VoiceSender keys(SpeechSettings{}, false, 0.0f, 24000);
+    run.check("Voz: cliques de teclado nao abrem o microfone", speakingFrames(keys, typing, 0) == 0);
+
+    std::vector<float> slam = fanNoise(150 * kVoiceFrame, 0.004f, 23);
+    const std::vector<float> burst = whiteNoise(5 * kVoiceFrame, 0.5f, 24);
+    for (size_t i = 0; i < burst.size(); i++) slam[60 * kVoiceFrame + i] += burst[i] * std::exp(-static_cast<float>(i) / 2000.0f);
+    VoiceSender door(SpeechSettings{}, false, 0.0f, 24000);
+    run.check("Voz: uma porta batendo nao abre o microfone", speakingFrames(door, slam, 0) == 0);
+
+    // Sem o tratamento, os mesmos ruidos abriam o microfone: prova de que os testes acima medem o filtro.
+    VoiceSender rawKeys(SpeechSettings{}, false, 0.0f, 24000), rawDoor(SpeechSettings{}, false, 0.0f, 24000);
+    rawKeys.setNoiseSuppression(false);
+    rawDoor.setNoiseSuppression(false);
+    const int keysWithout = speakingFrames(rawKeys, typing, 0), doorWithout = speakingFrames(rawDoor, slam, 0);
+    run.check(describe("Voz: sem o filtro, teclado e porta abriam o microfone (quadros)", keysWithout + doorWithout),
+              keysWithout > 0 && doorWithout > 0);
+}
+
+void testVoiceKept(TestRun& run) {
+    const size_t count = 400 * kVoiceFrame;
+    std::vector<bool> voiced;
+    const std::vector<float> clean = syntheticVoice(count, 0.08f, &voiced);
+    const std::vector<float> noise = fanNoise(count, 0.012f, 31);
+    std::vector<float> mixed(count);
+    for (size_t i = 0; i < count; i++) mixed[i] = clean[i] + noise[i];
+    std::vector<float> silenceFirst(50 * kVoiceFrame);
+    for (size_t i = 0; i < silenceFirst.size(); i++) silenceFirst[i] = noise[i];
+    silenceFirst.insert(silenceFirst.end(), mixed.begin(), mixed.end());
+
+    VoiceSender sender(SpeechSettings{}, false, 0.0f, 24000);
+    std::vector<bool> trace;
+    speakingFrames(sender, silenceFirst, 0, &trace);
+    int spoken = 0, wanted = 0;
+    for (size_t f = 25; f < voiced.size(); f++) {
+        if (!voiced[f]) continue;
+        wanted++;
+        spoken += trace[50 + f];
+    }
+    const double share = static_cast<double>(spoken) / std::max(wanted, 1);
+    run.check(describe("Voz: a voz do jogador e reconhecida no meio do ruido (fracao)", share), share > 0.9);
+
+    NoiseSuppressor onlyNoise;
+    const std::vector<float> fan = fanNoise(200 * kVoiceFrame, 0.03f, 32);
+    std::vector<float> quieter(fan.size());
+    for (size_t f = 0; f < 200; f++) onlyNoise.process(fan.data() + f * kVoiceFrame, quieter.data() + f * kVoiceFrame, kVoiceFrame);
+    const float reduction = 20.0f * std::log10(rms(quieter.data() + 100 * kVoiceFrame, 100 * kVoiceFrame) /
+                                               rms(fan.data() + 100 * kVoiceFrame, 100 * kVoiceFrame));
+    run.check(describe("Voz: o ruido de fundo cai bastante (dB)", reduction), reduction < -12.0f);
+
+    NoiseSuppressor keep;
+    std::vector<float> cleaned(mixed.size());
+    for (size_t f = 0; f < 400; f++) keep.process(mixed.data() + f * kVoiceFrame, cleaned.data() + f * kVoiceFrame, kVoiceFrame);
+    const size_t from = 100 * kVoiceFrame, length = 200 * kVoiceFrame;
+    const float kept = 20.0f * std::log10(rms(cleaned.data() + from + NoiseSuppressor::latency(), length) / rms(clean.data() + from, length));
+    run.check(describe("Voz: a voz passa pelo filtro quase sem perder volume (dB)", kept), kept > -3.0f && kept < 2.0f);
+
+    const auto start = std::chrono::steady_clock::now();
+    NoiseSuppressor timing;
+    std::vector<float> scratch(kVoiceFrame);
+    for (int f = 0; f < 500; f++) timing.process(mixed.data() + (f % 400) * kVoiceFrame, scratch.data(), kVoiceFrame);
+    const double perFrameMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / 500.0;
+    run.check(describe("Voz: o filtro custa pouco por quadro de 20 ms (ms)", perFrameMs), perFrameMs < 1.0);
+}
+
 // Com um driver de audio falso, a thread de audio roda de verdade enquanto a principal troca quadros.
 void testAudioThread(TestRun& run) {
     const char* previous = SDL_getenv("SDL_AUDIODRIVER");
@@ -562,6 +686,8 @@ int runVoiceSelfTest() {
     testOpus(run);
     testJitterBuffer(run);
     testAutoGain(run);
+    testNoiseRejection(run);
+    testVoiceKept(run);
     testBurstyNetwork(run);
     testLongSpeech(run);
     testAudioThread(run);

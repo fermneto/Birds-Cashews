@@ -22,7 +22,8 @@ struct SpeechSettings {
 class SpeechDetector {
 public:
     explicit SpeechDetector(SpeechSettings settings = SpeechSettings{});
-    bool process(const float* frame, int count);   // Devolve se ha fala neste quadro.
+    // Devolve se ha fala neste quadro. Sem allowOnset a fala pode continuar, mas nao comecar.
+    bool process(const float* frame, int count, bool allowOnset = true);
     void reset();
 
     bool speaking() const { return speaking_; }

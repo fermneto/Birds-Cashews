@@ -15,6 +15,7 @@ struct VoiceSettings {
     bool useDevices = true;      // false: sem SDL, o audio entra por feedMicrophone e sai por renderOutput (testes).
     bool audioThread = true;     // Com dispositivos, microfone e saida rodam numa thread propria.
     bool birdVoice = true;
+    bool noiseSuppression = true;   // Reducao de ruido e reconhecimento de voz humana antes de transmitir.
     float pitchSemitones = 8.0f;   // Bem mais aguda que a voz original.
     int bitrate = 24000;
     int jitterFrames = 4;        // 80 ms de partida; cresce sozinho se a rede ficar irregular.

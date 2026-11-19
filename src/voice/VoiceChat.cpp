@@ -13,6 +13,7 @@ VoiceChat::VoiceChat(VoiceSettings settings)
       mixer_(settings.jitterFrames),
       block_(2 * kVoiceFrame, 0.0f) {
     mixer_.setVolume(settings.volume);
+    sender_.setNoiseSuppression(settings.noiseSuppression);
 }
 
 VoiceChat::~VoiceChat() { stopAudioThread(); }
