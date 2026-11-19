@@ -5,8 +5,10 @@ A entrega é em **07/12/2026**. As regras do jogo estão em [`PLANO.md`](PLANO.m
 
 ## Situação atual
 
-Atualizado em 18/11/2026. A `main` reúne todas as tarefas concluídas, compila e passa nas 619 verificações de
-`./birds --selftest`.
+Atualizado em 19/11/2026. **Daniel pausou a participação no projeto**, e as tarefas que eram dele passaram para o Neto.
+A `main` reúne todas as tarefas concluídas, compila e passa nas 626 verificações de `./birds --selftest`.
+
+As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida como histórico.
 
 | Tarefa | Dono | Situação | Onde está | O que falta |
 |---|---|---|---|---|
@@ -14,17 +16,17 @@ Atualizado em 18/11/2026. A `main` reúne todas as tarefas concluídas, compila 
 | N1 Cajus e carga | Neto | **Concluída** | PR #3 | Nada |
 | N2 Perfil e record | Neto | **Concluída** | PR #2 | Nada |
 | N3 Ninho e upgrades | Neto | **Concluída** | PR #4 | Nada |
-| N4 Menus, HUD e sons | Neto | **Concluída** | PR #7 | Validar no teste integrado |
-| N5 Roubo e colisões | Neto | Não iniciada, **destravada em parte** | Nenhum | Pode começar com o substituto da D3 |
+| N4 Menus, HUD e sons | Neto | **Concluída** | PRs #7 e #10 | Validar no teste integrado |
+| N5 Roubo e colisões | Neto | Não iniciada | Nenhum | Depende da D3 |
 | D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver `RESULTADOS_TESTE_REDE.md` |
 | D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
-| D3 Replicação de jogadores | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
+| D3 Replicação de jogadores | **Neto** | **Em andamento** | Nenhum | Implementar |
 | D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
-| D5 Voz por proximidade | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
-| D6 NPCs em rede | Daniel | Bloqueada | Nenhum | Depende da D3 |
-| F1 Teste integrado | Ambos | Bloqueada | Nenhum | Depende de N5, D5 e D6 |
-| F2 Documentos | Neto | Não iniciada, **destravada** | Nenhum | README, UML, uso de IA e créditos |
-| F3 Apresentação | Ambos | Bloqueada | Nenhum | Depende da F1 |
+| D5 Voz por proximidade | **Neto** | **Em andamento** | Nenhum | Implementar, incluindo o efeito Doppler |
+| D6 NPCs em rede | **Neto** | **Em andamento** | Nenhum | Feita junto com a D3 |
+| F1 Teste integrado | Neto | Bloqueada | Nenhum | Depende de N5, D3, D5 e D6, com dois computadores |
+| F2 Documentos | Neto | Não iniciada | Nenhum | README, UML, uso de IA e créditos |
+| F3 Apresentação | Neto | Bloqueada | Nenhum | Depende da F1 |
 
 ### O que validar no jogo integrado
 
@@ -39,14 +41,12 @@ Os testes automáticos não cobrem a experiência real. Ainda precisam ser confe
 
 ### Próximos passos
 
-**Neto**
-1. Fazer a validação acima e registrar o que precisa de ajuste.
-2. Iniciar a N5 e a F2 em paralelo, como prevê a Onda 3.
-
-**Daniel**
-1. Atualizar o computador com a `main` e abandonar a branch `daniel/d4-npcs`, que já foi integrada.
-2. Iniciar a D3 e a D5 em paralelo.
-3. Fazer a D6 depois da D3.
+1. **D3 e D6:** levar a rede para dentro do jogo, com jogadores e NPCs sincronizados e a tela de salas conectando de verdade.
+2. **D5:** voz por proximidade com volume por distância, posição estéreo, voz de pássaro e efeito Doppler.
+3. **N5:** roubo de ninhos e cajus caindo, depois da D3.
+4. **F2:** documentos de entrega.
+5. **F1 e F3:** teste com dois computadores no hotspot e ensaio da apresentação. Como o Daniel pausou, o segundo
+   computador precisa ser combinado.
 
 ## 1. Resumo
 

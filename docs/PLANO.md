@@ -115,8 +115,14 @@ Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 ### 3.6 Voz por proximidade
 
 O áudio é capturado em 48 kHz, passa por detecção de fala, recebe o filtro de voz de pássaro e é comprimido com Opus. O
-host repassa cada pacote apenas aos jogadores dentro do alcance. Quem recebe aplica volume por distância e posição
-estéreo. O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
+host repassa cada pacote apenas aos jogadores dentro do alcance. Quem recebe aplica:
+
+1. **Volume por distância:** voz cheia até 15 m e silêncio a partir de 80 m.
+2. **Posição estéreo:** a voz vem do lado em que o outro pássaro está.
+3. **Efeito Doppler:** a voz fica mais aguda quando os pássaros se aproximam e mais grave quando se afastam, calculada pela
+   velocidade relativa entre quem fala e quem ouve.
+
+O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
 
 ## 4. Arquitetura
 
@@ -172,9 +178,9 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Conexão UDP na `main` | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
+| **M3** Multiplayer | Conexão UDP na `main`, replicação em andamento | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
 | **M4** Pássaros | Gerador e ecossistema na `main` | Sincronizar os NPCs em rede (D6) |
-| **M5** Voz | Não iniciado | Voz por proximidade (D5) |
+| **M5** Voz | Em andamento | Voz por proximidade com Doppler (D5) |
 | **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
@@ -188,6 +194,8 @@ Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alar
 | Gestos confundidos entre si | Máquina de estados com histerese e ajuste com pessoas diferentes |
 | Eco na voz | Fones e detecção de fala |
 | Escopo grande para 19 dias | Marcos independentes, com jogo funcional ao fim de cada um |
+| Daniel pausou e restou uma pessoa | Tarefas dele assumidas pelo Neto, com subagents em paralelo |
+| Teste de rede depende de um segundo computador | Testes automáticos em uma máquina e um segundo computador combinado para a F1 |
 
 ## 8. Pendências
 
@@ -197,6 +205,6 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Implementar D3, D5, D6 e N5.
+3. Implementar D3, D5, D6 e N5, agora todas com o Neto.
 4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
 5. Fazer o teste integrado e ensaiar a apresentação.
