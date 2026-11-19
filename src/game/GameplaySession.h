@@ -3,6 +3,7 @@
 #include "game/CashewCollector.h"
 #include "game/NestMenu.h"
 #include "game/NestSite.h"
+#include "game/RivalNests.h"
 #include "save/ProfileStore.h"
 #include "save/RecordManager.h"
 #include "shared/GameAuthority.h"
@@ -37,6 +38,7 @@ public:
     const NestSite& nest() const { return nest_; }
     int nestSizeLevel() const;
     int nestRevision() const { return nestRevision_; }    // Muda quando o visual do ninho precisa ser refeito.
+    const RivalNests& rivalNests() const { return rivals_; }   // Ninhos dos outros jogadores conectados.
     const CashewCollector& collector() const { return collector_; }
     const Profile* profile() const { return profile_ ? &*profile_ : nullptr; }
 
@@ -62,6 +64,7 @@ private:
     std::unique_ptr<GameAuthority> authority_;
     CashewCollector collector_;
     NestSite nest_;
+    RivalNests rivals_;
     ProfileStore store_;
     RecordManager records_;
     std::optional<Profile> profile_;

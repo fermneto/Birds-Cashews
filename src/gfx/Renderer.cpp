@@ -346,6 +346,28 @@ void Renderer::setNestMesh(const MeshBuilder& nest) { nestMesh_ = std::make_uniq
 
 void Renderer::setNestBeaconMesh(const MeshBuilder& beacon) { nestBeaconMesh_ = std::make_unique<Mesh>(beacon.vertices()); }
 
+// Sem rivais na sala a malha fica vazia e nada e desenhado.
+void Renderer::setRivalNestMesh(const MeshBuilder& nests) {
+    rivalNestsMesh_ = nests.vertices().empty() ? nullptr : std::make_unique<Mesh>(nests.vertices());
+}
+
+void Renderer::setRivalBeaconMesh(const MeshBuilder& beacon) { rivalBeaconMesh_ = std::make_unique<Mesh>(beacon.vertices()); }
+
+void Renderer::drawRivalNests() {
+    if (!rivalNestsMesh_ || !rivalBeaconMesh_) return;
+    glDisable(GL_CULL_FACE);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    rivalNestsMesh_->draw();
+    worldShader_.set("uGlow", 0.6f);
+    for (const glm::mat4& transform : rivalBeacons_) {
+        worldShader_.set("uModel", transform);
+        rivalBeaconMesh_->draw();
+    }
+    worldShader_.set("uGlow", 0.0f);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    glEnable(GL_CULL_FACE);
+}
+
 // O ninho e visto por dentro e por fora, entao as duas faces sao desenhadas.
 void Renderer::drawNest() {
     if (!nestMesh_ || !nestBeaconMesh_) return;
@@ -470,6 +492,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawBirds(time);
     drawCashews();
     drawNest();
+    drawRivalNests();
     drawWater(camera, time);
     drawWind(animation);
     drawViewModel(camera, animation);

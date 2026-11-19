@@ -3,6 +3,7 @@
 #include "game/GameplaySession.h"
 #include "game/NestEconomy.h"
 #include "game/NestModel.h"
+#include "game/RivalNests.h"
 #include "input/GestureControls.h"
 #include "shared/LocalAuthority.h"
 #include <unistd.h>
@@ -179,6 +180,90 @@ void testNestSite(TestRun& run, const World& world) {
     run.check("ninho: fica sobre um cajueiro em todas as sementes", allOnTree);
     run.check("ninho: poleiro livre e acessivel segundo World::resolve", allReachable);
     run.check("ninho: cada um dos 6 jogadores tem o proprio cajueiro", allDistinct);
+}
+
+// Cada computador monta o proprio World: o lugar de cada ninho precisa sair igual em todos.
+void testRivalSites(TestRun& run, const World& world) {
+    const World elsewhere(kSeed);
+    std::set<size_t> trees;
+    std::set<std::pair<float, float>> spots;
+    bool same = true;
+    for (PlayerId player = 0; player < kMaxPlayers; player++) {
+        const NestSite site = chooseNestSite(world, kSeed, player);
+        same = same && sameSite(site, chooseNestSite(elsewhere, kSeed, player));
+        trees.insert(site.tree);
+        spots.insert({site.base.x, site.base.z});
+    }
+    run.check("ninhos da sala: 6 jogadores em lugares distintos", trees.size() == kMaxPlayers && spots.size() == kMaxPlayers);
+    run.check("ninhos da sala: o mesmo lugar em todas as maquinas", same);
+
+    // O host (jogador 0) e um cliente (jogador 3) veem os mesmos ninhos dos jogadores que os dois enxergam.
+    std::vector<PlayerPublicState> players;
+    for (PlayerId player = 0; player < kMaxPlayers; player++) {
+        PlayerPublicState state;
+        state.id = player;
+        state.nestLevel = static_cast<uint8_t>(player % 3);
+        players.push_back(state);
+    }
+    RivalNests host(world, kSeed), client(elsewhere, kSeed);
+    host.update(players, 0);
+    client.update(players, 3);
+    bool agree = host.nests().size() == kMaxPlayers - 1 && client.nests().size() == kMaxPlayers - 1;
+    for (const RivalNest& nest : host.nests()) {
+        const RivalNest* other = client.find(nest.owner);
+        if (nest.owner == 3) continue;
+        agree = agree && other && sameSite(nest.site, other->site) && nest.sizeLevel == other->sizeLevel;
+    }
+    agree = agree && client.find(0) && sameSite(client.find(0)->site, chooseNestSite(world, kSeed, 0));
+    run.check("ninhos da sala: host e cliente concordam, inclusive no ninho do host", agree);
+    run.check("ninhos da sala: o proprio ninho nao entra na lista dos outros", !host.find(0) && !client.find(3));
+}
+
+// Entrar, comprar Tamanho, sair e cair, como chega pela lista replicada de jogadores.
+void testRivalRoster(TestRun& run, const World& world) {
+    const auto stateOf = [](PlayerId id, int level) {
+        PlayerPublicState state;
+        state.id = id;
+        state.nestLevel = static_cast<uint8_t>(level);
+        return state;
+    };
+    const auto meshSize = [](const RivalNests& rivals) { return buildRivalNestsMesh(rivals.nests()).vertices().size(); };
+    RivalNests rivals(world, kSeed);
+    const PlayerPublicState me = stateOf(kMe, 2);
+
+    run.check("ninho rival: jogando sozinho nao ha ninho dos outros",
+              !rivals.update({me}, kMe) && rivals.nests().empty() && rivals.revision() == 0 && meshSize(rivals) == 0);
+
+    const bool joined = rivals.update({me, stateOf(2, 0)}, kMe);
+    const RivalNest* nest = rivals.find(2);
+    run.check("ninho rival: aparece quando o jogador entra",
+              joined && nest && sameSite(nest->site, chooseNestSite(world, kSeed, 2)) && nest->sizeLevel == 0);
+    const size_t small = meshSize(rivals);
+    const int revision = rivals.revision();
+    bool steady = true;
+    for (int frame = 0; frame < 30; frame++) steady = steady && !rivals.update({stateOf(2, 0), me}, kMe);
+    run.check("ninho rival: sem mudanca nao remonta a malha", steady && rivals.revision() == revision);
+
+    const bool grew = rivals.update({me, stateOf(2, 3)}, kMe);
+    run.check("ninho rival: cresce quando o dono compra Tamanho",
+              grew && rivals.find(2)->sizeLevel == 3 && meshSize(rivals) > small && rivals.revision() == revision + 1);
+    run.check("ninho rival: nivel invalido vindo da rede fica no maximo",
+              rivals.update({me, stateOf(2, 200)}, kMe) && rivals.find(2)->sizeLevel == kMaxUpgradeLevel);
+
+    rivals.update({me, stateOf(2, 3), stateOf(4, 1)}, kMe);
+    const bool left = rivals.update({me, stateOf(4, 1)}, kMe);
+    run.check("ninho rival: some quando o dono sai e o outro fica",
+              left && !rivals.find(2) && rivals.find(4) && rivals.nests().size() == 1);
+    const bool dropped = rivals.update({me}, kMe);
+    run.check("ninho rival: some quando o dono cai", dropped && rivals.nests().empty() && meshSize(rivals) == 0);
+
+    const NestSite own = chooseNestSite(world, kSeed, kMe), rival = chooseNestSite(world, kSeed, 4);
+    const glm::vec3 camera = (own.base + rival.base) * 0.5f + glm::vec3(0, 200, 0);
+    const float ownScale = glm::length(glm::vec3(nestBeaconTransform(own, 0, camera, 0.0f)[0]));
+    const float rivalScale = glm::length(glm::vec3(rivalBeaconTransform(own, 0, camera, 0.0f)[0]));
+    bool bluer = true;
+    for (const Vertex& vertex : buildRivalBeaconMesh().vertices()) bluer = bluer && vertex.color.b > vertex.color.r;
+    run.check("ninho rival: marcador menor e azul", rivalScale > 0 && rivalScale < ownScale * 0.7f && bluer);
 }
 
 void testVisualGrowth(TestRun& run) {
@@ -639,6 +724,8 @@ int runNestSelfTest() {
     TestRun run;
     const World world(kSeed);
     testNestSite(run, world);
+    testRivalSites(run, world);
+    testRivalRoster(run, world);
     testVisualGrowth(run);
     testLandingAndDelivery(run, world);
     testMenu(run, world);
