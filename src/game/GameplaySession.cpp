@@ -123,6 +123,7 @@ void GameplaySession::publishLocalPlayer() {
     PlayerPublicState state;
     state.id = localPlayer_;
     state.position = flight.position();
+    state.velocity = perched_ ? glm::vec3(0) : flight.velocity();
     state.yaw = flight.yaw();
     state.pitch = flight.pitch();
     state.roll = flight.roll();

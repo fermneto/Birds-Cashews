@@ -1,6 +1,6 @@
 CXX      := g++
-CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Isrc $(shell pkg-config --cflags opencv4 sdl2)
-LDLIBS   := $(shell pkg-config --libs opencv4 sdl2 gl) -lpthread
+CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Isrc $(shell pkg-config --cflags opencv4 sdl2 opus)
+LDLIBS   := $(shell pkg-config --libs opencv4 sdl2 gl opus) -lpthread
 SRC      := $(shell find src -name '*.cpp')
 OBJ      := $(SRC:src/%.cpp=build/%.o)
 DEP      := $(OBJ:.o=.d)
