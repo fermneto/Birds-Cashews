@@ -1,4 +1,5 @@
 #pragma once
+#include "ai/NpcEcosystem.h"
 #include "entity/PlayerBird.h"
 #include "game/GameplaySession.h"
 #include "gfx/Renderer.h"
@@ -37,6 +38,8 @@ private:
     bool handleEvents();
     void advance(float frameSeconds);
     void updateCashews(float frameSeconds);
+    void updateNpcs(float frameSeconds);
+    void prepareBirds();
     void refreshPreview();
     void drawTelemetry(cv::Mat& image) const;
     Camera3D buildCamera() const;
@@ -60,6 +63,7 @@ private:
     PlayerBird player_;
     CashewField cashews_;
     GameplaySession session_;
+    NpcEcosystem npcs_;
     std::unique_ptr<FlightInput> input_;
     std::unique_ptr<GameUi> ui_;
     PoseSource* poseSource_ = nullptr;

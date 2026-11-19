@@ -3,6 +3,8 @@
 #include "game/GameplaySession.h"
 #include "game/NestEconomy.h"
 #include "game/NestModel.h"
+#include "input/GestureControls.h"
+#include "shared/LocalAuthority.h"
 #include <unistd.h>
 #include <algorithm>
 #include <cmath>
@@ -571,6 +573,68 @@ void testFullLoop(TestRun& run, const World& world) {
 }
 }
 
+void testBodyControls(TestRun& run, const World& world) {
+    GestureControls mapper;
+    GestureState gesture;
+    gesture.mode = FlightMode::Flap;
+    gesture.stroke = 0.8f;
+    gesture.flapCount = 2;
+    gesture.flapStrength = 0.7f;
+    gesture.menuCount = 1;
+    gesture.menuChoice = ArmSide::Right;
+    FlightControls read = mapper.read(gesture, true, 10.0);
+    run.check("corpo: usa o voo continuo", read.bodyControlled && read.stroke == 0.8f);
+    run.check("corpo: conta as batidas e o menu", read.flaps == 2 && read.menuPressed == ArmSide::Right);
+    read = mapper.read(gesture, false, 10.1);
+    run.check("corpo: cada batida e cada escolha valem uma unica vez", read.flaps == 0 && read.menuPressed == ArmSide::None);
+    run.check("corpo: imagem recente mantem a batida", read.stroke == 0.8f);
+    read = mapper.read(gesture, false, 10.5);
+    run.check("corpo: sem imagem nova a batida para de empurrar", read.stroke == 0.0f);
+
+    TempDir dir;
+    Rig rig(world, dir.path());
+    rig.landOnNest();
+    FlightControls body;
+    body.bodyControlled = true;
+    body.flaps = 1;
+    body.flapStrength = 0.7f;
+    rig.tick(body);
+    run.check("corpo: bater os bracos decola do ninho", !rig.session.perched() && rig.bird.flight().verticalSpeed() > 10.0f);
+}
+
+void testHunterDrop(TestRun& run, const World& world) {
+    TempDir dir;
+    auto owned = std::make_unique<LocalAuthority>();
+    LocalAuthority& authority = *owned;
+    const glm::vec3 cashew = kFarAway + glm::vec3(0, 0, -2);
+    Rig rig(world, dir.path(), {cashew, cashew + glm::vec3(1, 0, 0)}, std::move(owned));
+    rig.bird.flight().place(kFarAway, 0.0f, 0.0f);
+    rig.ticks(3);
+    run.check("cacador: o jogador esta com carga", rig.session.view().carried == 2);
+
+    rig.session.publishLocalPlayer();
+    run.check("cacador: em voo a carga fica visivel", authority.players().size() == 1 && authority.players()[0].carried == 2);
+    rig.session.drainFeedback();
+    GameEvent drop;
+    drop.type = GameEventType::CashewDropped;
+    drop.target = kMe;
+    drop.value = 2;
+    authority.request(drop);
+    rig.tick();
+    run.check("cacador: derruba a carga e mostra o aviso", rig.session.view().carried == 0 && rig.session.view().cargoLostNow);
+    run.check("cacador: avisa uma unica vez", rig.countFeedback(GameplayFeedback::CargoLost) == 1);
+    rig.ticks(200);
+    run.check("cacador: o aviso some sozinho", !rig.session.view().cargoLostNow);
+
+    authority.request(drop);
+    rig.tick();
+    run.check("cacador: sem carga nao ha aviso", rig.countFeedback(GameplayFeedback::CargoLost) == 0);
+
+    rig.landOnNest();
+    rig.session.publishLocalPlayer();
+    run.check("cacador: quem esta no ninho nao vira alvo", authority.players()[0].carried == 0);
+}
+
 int runNestSelfTest() {
     TestRun run;
     const World world(kSeed);
@@ -585,5 +649,7 @@ int runNestSelfTest() {
     testRecordAndFeedback(run, world);
     testNestDirection(run, world);
     testFullLoop(run, world);
+    testBodyControls(run, world);
+    testHunterDrop(run, world);
     return run.failures;
 }

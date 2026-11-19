@@ -52,7 +52,7 @@ void testFlightModes(TestRun& run, const World& world) {
     PlayerBird glide = birdAt(kOpenSky);
     fly(glide, world, mode(FlightMode::Glide), 5.0f);
     const float glideLoss = kOpenSky.y - glide.flight().position().y;
-    run.check("planar perde altura devagar", glideLoss > 3.0f && glideLoss < 20.0f);
+    run.check("planar perde altura devagar", glideLoss > 9.0f && glideLoss < 13.0f);
 
     PlayerBird flap = birdAt(kOpenSky);
     flapFor(flap, world, 10, 0.6f);
@@ -79,6 +79,17 @@ void testFlapResponse(TestRun& run, const World& world) {
     once.flapStrength = 0.55f;
     falling.applyControls(once);
     run.check("uma batida fraca interrompe a queda na hora", falling.flight().verticalSpeed() > 5.0f);
+
+    auto cameraBird = birdAt(kOpenSky);
+    fly(cameraBird, world, mode(FlightMode::Dive), 1.0f);
+    once.bodyControlled = true;
+    once.stroke = 1;
+    const float startingHeight = cameraBird.flight().position().y;
+    cameraBird.applyControls(once);
+    run.check("evento de batida isolado nao aplica impulso na camera", cameraBird.flight().verticalSpeed() < 0);
+    for (int beat = 0; beat < 4; ++beat) fly(cameraBird, world, once, 0.8f);
+    run.check("batidas pela camera sustentam subida sem bracos erguidos",
+              cameraBird.flight().position().y > startingHeight + 15);
 
     for (float period : {0.6f, 0.8f, 1.2f}) {
         PlayerBird bird = birdAt({0, 120, 1000});   // Longe do teto de voo.
@@ -171,7 +182,9 @@ void testCollisions(TestRun& run, const World& world) {
 
 void testGroundAndLimits(TestRun& run, const World& world) {
     const float x = 300, z = -100;
-    PlayerBird bird = birdAt({x, world.island().heightAt(x, z) + 3.0f, z});
+    const auto normal = world.island().normalAt(x, z);
+    PlayerBird bird = birdAt({x, world.island().heightAt(x, z) + 3.0f, z},
+                             std::atan2(-normal.x, normal.z));
     fly(bird, world, mode(FlightMode::Glide), 6.0f);
     run.check("o passaro pousa e para no chao", bird.flight().grounded() && bird.flight().speed() < 1.0f);
     const float groundY = bird.flight().position().y;
@@ -221,6 +234,24 @@ int runFlightSelfTest() {
     TestRun run;
     const World world(kSeed);
     testFlightModes(run, world);
+    FlightModel glider;
+    glider.place({0, 250, 0}, 0, FlightModel::kCruiseSpeed);
+    FlightControls raised;
+    raised.bodyControlled = true;
+    raised.pullUp = 1;
+    for (int i = 0; i < 120; ++i) glider.step(raised, kStep);
+    run.check("erguer os bracos troca velocidade por altitude", glider.position().y > 250 && glider.speed() < FlightModel::kCruiseSpeed);
+    run.check("puxada completa sobe mais do que avanca", glider.verticalSpeed() > glider.speed());
+    FlightModel partial;
+    partial.place({0, 250, 0}, 0, FlightModel::kCruiseSpeed);
+    raised.pullUp = 0.5f;
+    for (int i = 0; i < 120; ++i) partial.step(raised, kStep);
+    run.check("meia puxada conserva mais velocidade horizontal", partial.speed() > glider.speed()
+              && partial.verticalSpeed() > 0 && partial.verticalSpeed() < glider.verticalSpeed());
+    raised.pullUp = 0;
+    const float beforeRelease = glider.verticalSpeed();
+    glider.step(raised, kStep);
+    run.check("soltar a puxada preserva a continuidade", std::abs(glider.verticalSpeed() - beforeRelease) < 1);
     testFlapResponse(run, world);
     testFieldOfView(run, world);
     testTurning(run, world);

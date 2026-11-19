@@ -36,6 +36,12 @@ void drawGesture(cv::Mat& image, const GestureState& g, double fps) {
     drawOutlinedText(image, arm, {20, 150}, 0.7, cv::Scalar(255, 220, 120));
     if (g.menuProgress > 0)
         cv::rectangle(image, cv::Rect(20, 160, static_cast<int>(200 * g.menuProgress), 10), cv::Scalar(255, 220, 120), -1);
+    if (g.mode != FlightMode::Lost) {
+        const bool rising = g.pullUp > g.dive;
+        const int percent = static_cast<int>((rising ? g.pullUp : g.dive) * 100 + 0.5f);
+        drawOutlinedText(image, std::string(rising ? "Subida " : "Mergulho ") + std::to_string(percent) + "%",
+                         {20, 200}, 0.7, color);
+    }
     drawBankBar(image, g.bank);
 }
 }

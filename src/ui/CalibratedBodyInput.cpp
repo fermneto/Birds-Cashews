@@ -1,21 +1,12 @@
 #include "ui/CalibratedBodyInput.h"
+#include "vision/Clock.h"
 #include "vision/VisionOverlay.h"
 #include <algorithm>
 
 FlightControls CalibratedBodyInput::poll() {
-    if (vision_.snapshot(view_, sequence_)) previewFresh_ = poseFresh_ = true;
-    const GestureState& gesture = view_.gesture;
-    FlightControls controls;
-    controls.mode = gesture.mode;
-    controls.bank = gesture.bank;
-    controls.flaps = gesture.flapCount - lastFlapCount_;
-    controls.flapStrength = gesture.flapStrength;
-    lastFlapCount_ = gesture.flapCount;
-    if (gesture.menuCount != lastMenuCount_) controls.menuPressed = gesture.menuChoice;
-    lastMenuCount_ = gesture.menuCount;
-    controls.raisedArm = gesture.raisedArm;
-    controls.menuProgress = gesture.menuProgress;
-    return controls;
+    const bool newSample = vision_.snapshot(view_, sequence_);
+    if (newSample) previewFresh_ = poseFresh_ = true;
+    return controls_.read(view_.gesture, newSample, nowSeconds());
 }
 
 bool CalibratedBodyInput::preview(cv::Mat& image) {

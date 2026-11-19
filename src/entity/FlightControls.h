@@ -11,4 +11,8 @@ struct FlightControls {
     ArmSide menuPressed = ArmSide::None;   // Lado confirmado neste quadro.
     ArmSide raisedArm = ArmSide::None;
     float menuProgress = 0;
+    bool bodyControlled = false;           // Com o corpo, o voo usa os valores continuos abaixo.
+    float dive = 0, pullUp = 0, stroke = 0;
+    float leftWingHeight = 0, rightWingHeight = 0;
+    float diveAmount() const { return bodyControlled ? dive : float(mode == FlightMode::Dive); }
 };

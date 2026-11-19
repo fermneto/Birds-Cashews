@@ -1,6 +1,7 @@
 #pragma once
 #include "vision/Pose.h"
 #include <cstdint>
+#include <deque>
 
 enum class FlightMode { Lost, Glide, Flap, Dive };
 enum class ArmSide { None, Left, Right };
@@ -11,6 +12,8 @@ const char* flightModeName(FlightMode mode);
 // nao perca eventos quando roda em ritmo diferente da camera.
 struct GestureState {
     FlightMode mode = FlightMode::Lost;
+    float dive = 0, pullUp = 0, stroke = 0;
+    float leftWingHeight = 0, rightWingHeight = 0;
     float bank = 0;                  // -1 (esquerda) a 1 (direita).
     uint32_t flapCount = 0;
     float flapStrength = 0;          // 0 a 1, forca da ultima batida.
@@ -28,7 +31,7 @@ public:
 
 private:
     struct Arm { float out = 0; float drop = 0; };
-    struct Features { Arm left, right; float wristAngleDeg = 0; };
+    struct Features { Arm left, right; float wristAngleDeg = 0, shoulderAngleDeg = 0; };
 
     bool extract(const Pose& pose, Features& features);
     float bodyScale(const Pose& pose);
@@ -44,8 +47,12 @@ private:
     float scale_ = 0;
     double lastTime_ = -1, lastSeen_ = -1;
 
+    struct WristSample { double time; float left, right; };
+    std::deque<WristSample> wristHistory_;
     bool strokeDown_ = false, strokeReady_ = false;
     float topHeight_ = 0, topLeft_ = 0, topRight_ = 0, bottomHeight_ = 0;
+    float strokeRecovery_ = 0;
+    float strokeStartHeight_ = 0;
     double topTime_ = 0, lastFlapTime_ = -100;
 
     double diveSince_ = -1;

@@ -3,11 +3,12 @@
 
 // Pose das asas e do bico vistos em primeira pessoa.
 struct BirdAnimation {
-    float wingAngle = -4.0f;   // Graus: positivo levanta a asa.
+    float leftWingAngle = -4.0f, rightWingAngle = -4.0f;   // Graus: positivo levanta a asa.
     float wingSweep = 0.0f;    // Graus: positivo recolhe a asa para tras.
     float beakOpen = 0.0f;     // 0 a 1.
     float shake = 0.0f;
     float kick = 0.0f;         // Impulso visual de cada batida.
+    float wind = 0, windPhase = 0, speedVibration = 0;
     float fov = 72.0f;         // Campo de visao, que abre com a velocidade.
 };
 

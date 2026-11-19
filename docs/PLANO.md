@@ -34,11 +34,14 @@ Todas as medidas são divididas pela largura dos ombros, para não depender da d
 
 | Gesto | Detecção | Efeito |
 |---|---|---|
-| Bater | Ciclo sobe e desce dos punhos, com amplitude acima de 0,6 ombro | Cada descida dá impulso proporcional à amplitude |
-| Planar | Punhos abertos e afastados do tronco | Perde altura devagar e mantém a velocidade |
-| Mergulhar | Punhos junto ao corpo por mais de 0,25 s | Desce e acelera |
-| Curvar | Ângulo da linha entre os punhos, com zona morta de 8° e limite de 45° | Inclina e faz a curva como um avião |
+| Bater | Descida rápida dos dois punhos | Empurra o pássaro enquanto as asas descem. Também decola do ninho |
+| Planar | Braços abertos na altura dos ombros | Perde altura devagar e mantém a velocidade |
+| Subir | Braços erguidos acima dos ombros | Troca velocidade por altitude, de forma proporcional à altura dos braços |
+| Mergulhar | Braços abaixados junto ao corpo | Desce e acelera, de forma proporcional à altura dos braços |
+| Curvar | Ângulo entre os punhos, com zona morta de 8° e limite de 45° | Inclina e faz a curva como um avião |
 | Menu do ninho | Braço esquerdo ou direito erguido por 0,7 s | Escolhe a opção |
+
+As asas vistas em primeira pessoa acompanham a altura de cada braço. Em alta velocidade, rajadas de vento aparecem na tela.
 
 Se o corpo sair do quadro, o pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena,
 com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração confere se o corpo inteiro está visível.
@@ -101,9 +104,11 @@ Cada pássaro nasce de uma semente de 32 bits, que alimenta um genoma determiní
 
 | Porte | Comportamento |
 |---|---|
-| Pequeno | Voa em bando usando o algoritmo Boids |
-| Médio | Procura e disputa cajus |
-| Grande | Persegue quem carrega muitos cajus e derruba a carga |
+| Pequeno (6 pássaros) | Voa em bando usando o algoritmo Boids |
+| Médio (2 pássaros) | Procura e disputa cajus |
+| Grande (1 pássaro) | Persegue quem carrega 2 cajus ou mais e derruba a carga |
+
+Quem está pousado no ninho não é atacado. Por enquanto, a carga derrubada some do mundo. Os cajus caindo chegam com a N5.
 
 Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 
@@ -124,16 +129,20 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 
 | Módulo | Classes principais |
 |---|---|
-| `vision/` | `Camera`, `PoseDetector`, `GestureRecognizer`, `CalibrationScreen` |
-| `core/` | `Game`, `StateMachine`, `MenuState`, `PlayState`, `Config` |
-| `world/` | `World`, `Island`, `CashewTree`, `Cashew`, `Nest` |
-| `entity/` | `Bird`, `PlayerBird`, `NpcBird`, `FlightModel`, `Stats` |
-| `procedural/` | `BirdGenome`, `BirdMeshBuilder`, `PartLibrary`, `Palette` |
-| `ai/` | `Flock`, `NpcBrain`, `ForagerBehavior`, `HunterBehavior` |
+| `vision/` | `Camera`, `PoseDetector`, `GestureRecognizer`, `VisionPipeline` |
+| `input/` | `FlightInput`, `BodyInput`, `KeyboardInput`, `GestureControls` |
+| `core/` | `Game` |
+| `world/` | `World`, `Island`, `CashewTree` |
+| `entity/` | `PlayerBird`, `FlightModel` |
+| `game/` | `GameplaySession`, `CashewField`, `CashewCollector`, `NestMenu` |
+| `save/` | `Profile`, `ProfileStore`, `WorldStore`, `RecordManager` |
+| `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
+| `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
+| `ai/` | `NpcEcosystem` |
 | `net/` | `UdpSession` (implementa `NetSession`) |
-| `audio/` | `SoundManager`, `VoiceChat`, `VoiceFilter`, `SpatialMixer` |
-| `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `Hud`, `Sprite` |
-| `save/` | `ProfileStore`, `WorldStore`, `RecordManager` |
+| `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
+| `shared/` | Contratos entre as frentes e `LocalAuthority` |
+| `voice/` | Planejado para a D5 |
 
 **Rede:** o host decide cajus, NPCs, roubos e colisões. Cada cliente simula o próprio voo para responder sem atraso. O
 host envia o estado 20 vezes por segundo e os clientes interpolam os outros pássaros.
@@ -144,14 +153,14 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 |---|---|---|---|
 | 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Pendente (F2) |
 | 2 | Bastante métodos | Classes pequenas por módulo | Atendido |
-| 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair | No PR #7 |
-| 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Arquivo na `main`, tela no PR #7 |
-| 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa | No PR #7 |
+| 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair | Atendido |
+| 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Atendido |
+| 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa | Atendido |
 | 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN | Atendido |
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
-| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | No PR #7 |
-| 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente | No PR #7 |
+| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
+| 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente | Falta validar o áudio |
 | Instrução 4 | Indicar uso de IA | `docs/USO_DE_IA.md` | Pendente (F2) |
 
 ## 6. Cronograma
@@ -162,9 +171,9 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 |---|---|---|
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
-| **M2** Ciclo de jogo | Regras na `main`, interface no PR #7 | Validar e fazer o merge do PR #7 |
+| **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
 | **M3** Multiplayer | Conexão UDP na `main` | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
-| **M4** Pássaros | Gerador procedural na `main` | Levar o ecossistema de NPCs (D4) para a `main` e sincronizar em rede (D6) |
+| **M4** Pássaros | Gerador e ecossistema na `main` | Sincronizar os NPCs em rede (D6) |
 | **M5** Voz | Não iniciado | Voz por proximidade (D5) |
 | **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
@@ -179,17 +188,15 @@ Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alar
 | Gestos confundidos entre si | Máquina de estados com histerese e ajuste com pessoas diferentes |
 | Eco na voz | Fones e detecção de fala |
 | Escopo grande para 19 dias | Marcos independentes, com jogo funcional ao fim de cada um |
-| Conflitos entre a D4 e o PR #7 nos mesmos arquivos | Fazer o merge do PR #7 primeiro e depois atualizar a branch da D4 |
 
 ## 8. Pendências
 
 O tema "Outro" foi aprovado pelo professor. A apresentação usará computadores próprios, conectados ao hotspot de um
 celular.
 
-1. Validar o PR #7 com janela visível, webcam e som.
-2. Levar a D4 para a `main`, revisando as mudanças de voo, gestos e no modelo de pose.
-3. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
+1. Validar o jogo integrado com janela visível, webcam e som.
+2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-4. Implementar D3, D5, D6 e N5.
-5. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
-6. Fazer o teste integrado e ensaiar a apresentação.
+3. Implementar D3, D5, D6 e N5.
+4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
+5. Fazer o teste integrado e ensaiar a apresentação.

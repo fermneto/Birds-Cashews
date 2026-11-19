@@ -21,6 +21,8 @@ CashewCollector::CashewCollector(CashewField& field, GameAuthority& authority, P
 
 void CashewCollector::handle(const GameEvent& event) {
     if (event.type == GameEventType::CashewCollected) applyCollected(event);
+    if (event.type == GameEventType::CashewDropped && event.target == localPlayer_)
+        carried_ = std::max(0, carried_ - event.value);
     if (event.type == GameEventType::CashewRespawned) {
         pendingRespawn_.erase(event.cashew);
         field_.markRespawned(event.cashew);

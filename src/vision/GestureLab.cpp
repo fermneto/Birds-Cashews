@@ -3,6 +3,7 @@
 #include "vision/VisionOverlay.h"
 #include "vision/VisionPipeline.h"
 #include "core/TestRun.h"
+#include "entity/FlightModel.h"
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
@@ -158,6 +159,66 @@ void testFlap(TestRun& run) {
     }, 4.0);
     run.check("baixar os bracos devagar nao conta batida", s.flapCount == 0);
 
+    for (double duration : {1.0, 0.30}) {
+        for (double fps : {10., 15., 30.}) {
+            GestureRecognizer transition;
+            const auto end = simulate(transition, [duration](double t) {
+                const float progress = static_cast<float>(std::clamp((t - 0.5) / duration, 0.0, 1.0));
+                return syntheticPose(1.5f - 1.4f * progress, 1.5f * progress,
+                                     1.5f - 1.4f * progress, 1.5f * progress);
+            }, 2.5, 1.0 / fps);
+            const bool fast = duration < 0.5;
+            run.check(std::string(fast ? "descida rapida conta uma batida" : "transicao lenta mergulha sem batida")
+                      + " a " + std::to_string(int(fps)) + " FPS",
+                      end.flapCount == unsigned(fast) && end.mode == FlightMode::Dive);
+        }
+    }
+    // Mesmo arco de movimento por quatro segundos, em dois ritmos.
+    for (int fps : {10, 15, 30}) {
+        const auto flyCycle = [fps](double period, float amplitude = 0.9f) {
+            FlightModel bird;
+            bird.place({0, 150, 0}, 0, FlightModel::kCruiseSpeed);
+            GestureRecognizer rec;
+            FlightControls c;
+            c.bodyControlled = true;
+            for (int tick = 0; tick < 480; ++tick) {
+                if (tick % (120 / fps) == 0) {
+                    const double t = tick / 120.0;
+                    const float drop = 0.4f - amplitude * std::cos(2 * CV_PI * t / period);
+                    const auto g = rec.update(syntheticPose(1, drop, 1, drop), t);
+                    c.stroke = g.stroke;
+                    c.dive = g.dive;
+                    c.pullUp = g.pullUp;
+                }
+                bird.step(c, 1.0f / 120);
+            }
+            return glm::vec2(bird.position().y, -bird.position().z / 4.0f);
+        };
+        const auto fast = flyCycle(0.8), slow = flyCycle(2.0), shortStroke = flyCycle(0.8, 0.45f);
+        const float fastHeight = fast.x, slowHeight = slow.x;
+        run.check("ritmo rapido aumenta velocidade horizontal media", fast.y > slow.y + 1);
+        run.check("maior amplitude aumenta velocidade e sustentacao",
+                  fast.y > shortStroke.y + 1 && fast.x > shortStroke.x);
+        std::cout << "Voo em 4 s (" << fps << " FPS): lento " << slowHeight - 150
+                  << ", rapido " << fastHeight - 150 << "\n";
+        run.check("batidas confortaveis sustentam o voo", slowHeight >= 150);
+        run.check("ciclos rapidos ganham mais altitude a " + std::to_string(fps) + " FPS",
+                  fastHeight > 150 && fastHeight > slowHeight + 2);
+    }
+    GestureRecognizer asymmetric;
+    auto wings = asymmetric.update(syntheticPose(1, -0.8f, 1, 0), 0.0);
+    run.check("erguer so o punho esquerdo move so a asa esquerda",
+              wings.leftWingHeight > 0.5f && wings.rightWingHeight == 0);
+    wings = asymmetric.update(syntheticPose(1, 0, 1, -0.8f), 0.1);
+    run.check("erguer so o punho direito move so a asa direita",
+              wings.rightWingHeight > 0.5f && wings.leftWingHeight == 0);
+
+    const auto extreme = simulate(asymmetric, [](double) {
+        return syntheticPose(0.05f, -1.4f, 0.05f, 1.4f);
+    }, 1.0, kStep, 0.2);
+    run.check("bracos verticais opostos sustentam a curva", extreme.bank > 0.8f);
+    const auto reversed = asymmetric.update(syntheticPose(.05f, 1.4f, .05f, -1.4f), 1.24);
+    run.check("trocar os bracos suaviza a inversao", reversed.bank > -0.5f && reversed.bank < extreme.bank);
     GestureRecognizer oneArm;
     s = simulate(oneArm, [](double t) {
         return syntheticPose(1.0f, 0.4f - 0.9f * static_cast<float>(std::cos(2.0 * CV_PI * t / 0.8)), 1.0f, 0.0f);
@@ -202,6 +263,16 @@ int runGestureSelfTest() {
     TestRun run;
     testGlideAndBank(run);
     testDive(run);
+    GestureRecognizer analog;
+    auto partial = simulate(analog, [](double) { return syntheticPose(.5f,.72f,.5f,.72f); }, 1.5);
+    run.check("bracos a meia altura produzem mergulho parcial", partial.dive > .4f && partial.dive < .6f);
+    auto turning = simulate(analog, [](double) {
+        auto pose = syntheticPose(.1f,1.5f,.1f,1.5f);
+        pose.joints[RShoulder].pos.y += 36;
+        pose.joints[RWrist].pos.y += 36;
+        return pose;
+    }, 1.5, kStep, 1.5);
+    run.check("inclinacao do tronco curva durante mergulho", turning.dive > .85f && turning.bank > .25f);
     testFlap(run);
     testTracking(run);
     testMenu(run);

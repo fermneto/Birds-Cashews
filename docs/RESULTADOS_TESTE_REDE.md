@@ -55,8 +55,8 @@ também não mostra se o cliente saiu por queda de rede ou por encerramento do p
 
 ## 4. Testes automáticos de rede
 
-`runNetworkSelfTest` foi executado à parte em 18/11/2026, com a `main` no commit `8976ab6`, porque ainda não faz parte de
-`./birds --selftest`. Todas as verificações passaram:
+`runNetworkSelfTest` faz parte de `./birds --selftest` desde a integração da D4. Todas as verificações passaram em
+18/11/2026:
 
 | Verificação | Resultado |
 |---|---|
@@ -74,4 +74,3 @@ também não mostra se o cliente saiu por queda de rede ou por encerramento do p
 2. Repetir a queda desligando o Wi-Fi do cliente.
 3. Repetir o roteiro completo no hotspot do celular, que é a rede da apresentação.
 4. Testar 3 e 4 jogadores conectados, porque o teste usou apenas um cliente.
-5. Registrar `runNetworkSelfTest` em `./birds --selftest`, para que esses testes rodem a cada alteração.
