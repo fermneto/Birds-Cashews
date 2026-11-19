@@ -3,6 +3,42 @@
 Plano para **Neto** e **Daniel** desenvolverem em paralelo, cada um no seu computador, usando subagents do Claude Code.
 A entrega é em **07/12/2026**. As regras do jogo estão em [`PLANO.md`](PLANO.md).
 
+## Situação atual
+
+Atualizado em 18/11/2026, com a `main` no commit `8976ab6`. Ela compila e passa nas 369 verificações de `./birds --selftest`.
+
+| Tarefa | Dono | Situação | Onde está | O que falta |
+|---|---|---|---|---|
+| T0 Contratos | Neto | **Concluída** | PR #1 | Nada |
+| N1 Cajus e carga | Neto | **Concluída** | PR #3 | Nada |
+| N2 Perfil e record | Neto | **Concluída** | PR #2 | Nada |
+| N3 Ninho e upgrades | Neto | **Concluída** | PR #4 | Nada |
+| N4 Menus, HUD e sons | Neto | **Aguardando validação** | PR #7, aberto | Testar com janela, webcam e som, depois fazer o merge |
+| N5 Roubo e colisões | Neto | Não iniciada | Nenhum | Pode começar com o substituto da D3 |
+| D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver `RESULTADOS_TESTE_REDE.md` |
+| D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Registrar os testes no `--selftest` |
+| D3 Replicação de jogadores | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
+| D4 Ecossistema de NPCs | Daniel | **Em andamento** | Branch `daniel/d4-npcs`, sem PR | Resolver conflitos e abrir o PR |
+| D5 Voz por proximidade | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
+| D6 NPCs em rede | Daniel | Bloqueada | Nenhum | Depende de D3 e D4 |
+| F1 Teste integrado | Ambos | Bloqueada | Nenhum | Depende de N4, N5, D5 e D6 |
+| F2 Documentos | Neto | Não iniciada | Nenhum | README, UML, uso de IA e créditos |
+| F3 Apresentação | Ambos | Bloqueada | Nenhum | Depende de F1 |
+
+### Próximos passos
+
+**Neto**
+1. Testar o PR #7 no jogo real: navegação, calibração com webcam, HUD, menu do ninho e sons.
+2. Fazer o merge do PR #7.
+3. Iniciar a N5 e a F2 em paralelo, como prevê a Onda 3.
+
+**Daniel**
+1. Esperar o merge do PR #7 e só então atualizar a branch `daniel/d4-npcs` com a `main`.
+2. Abrir o PR da D4. Hoje a branch conflita com a `main` em 6 arquivos e com o PR #7 em 8 arquivos.
+3. Explicar no PR da D4 as mudanças em pastas estáveis: voo, gestos e o arquivo `models/pose_trimmed.onnx`, que foi alterado.
+4. Registrar `runNetworkSelfTest` e `runBirdFactorySelfTest` em `runSelfTests`, em `src/main.cpp`.
+5. Iniciar a D3 e a D5.
+
 ## 1. Resumo
 
 | Pessoa | Frente | Entrega principal |
