@@ -11,11 +11,11 @@
 struct VoiceSettings {
     bool useDevices = true;      // false: sem SDL, o audio entra por feedMicrophone e sai por renderOutput (testes).
     bool birdVoice = true;
-    float pitchSemitones = 5.0f;
+    float pitchSemitones = 8.0f;   // Bem mais aguda que a voz original.
     int bitrate = 24000;
     int jitterFrames = 3;        // 60 ms.
     int outputQueueMs = 40;      // Quanto audio fica na fila da saida, contra soluços da thread principal.
-    float volume = 1.0f;
+    float volume = 1.6f;           // A voz fica acima dos efeitos do jogo; o limitador evita saturar.
     SpeechSettings speech;
     SpatialSettings spatial;
 };
@@ -42,7 +42,7 @@ public:
 
     void setMuted(bool muted) { muted_ = muted; }
     bool muted() const { return muted_; }
-    void setBirdVoice(bool enabled, float semitones = 5.0f);
+    void setBirdVoice(bool enabled, float semitones = 8.0f);
     void setVolume(float volume);
     const VoiceSettings& settings() const { return settings_; }
     bool hasMicrophone() const { return devices_.hasCapture(); }

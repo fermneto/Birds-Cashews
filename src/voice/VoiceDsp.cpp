@@ -239,3 +239,36 @@ void Limiter::process(float* stereo, int frames) {
         right *= gain_;
     }
 }
+
+namespace {
+constexpr float kGainRiseDbPerFrame = 15.0f * kVoiceFrame / kVoiceRate;   // 15 dB por segundo.
+constexpr float kGainFallShare = 0.5f;                                     // Metade do excesso por quadro.
+constexpr float kSoftKnee = 0.85f;
+
+float softClip(float x) {
+    const float magnitude = std::abs(x);
+    if (magnitude <= kSoftKnee) return x;
+    const float over = (magnitude - kSoftKnee) / (1.0f - kSoftKnee);
+    return std::copysign(kSoftKnee + (1.0f - kSoftKnee) * std::tanh(over), x);
+}
+}
+
+AutoGain::AutoGain(float targetDb, float maxGainDb, float startGainDb)
+    : targetDb_(targetDb), maxGainDb_(maxGainDb), gainDb_(startGainDb), appliedLinear_(std::pow(10.0f, startGainDb / 20.0f)) {}
+
+void AutoGain::process(float* frame, int count, bool voiced) {
+    if (voiced && count > 0) {
+        double energy = 0;
+        for (int i = 0; i < count; i++) energy += static_cast<double>(frame[i]) * frame[i];
+        const float levelDb = 10.0f * std::log10(static_cast<float>(energy / count) + 1e-12f);
+        const float wanted = std::clamp(targetDb_ - levelDb, 0.0f, maxGainDb_);
+        if (wanted < gainDb_) gainDb_ -= (gainDb_ - wanted) * kGainFallShare;
+        else gainDb_ = std::min(wanted, gainDb_ + kGainRiseDbPerFrame);
+    }
+    const float target = std::pow(10.0f, gainDb_ / 20.0f);
+    const float step = (target - appliedLinear_) / std::max(count, 1);
+    for (int i = 0; i < count; i++) {
+        appliedLinear_ += step;
+        frame[i] = softClip(frame[i] * appliedLinear_);
+    }
+}

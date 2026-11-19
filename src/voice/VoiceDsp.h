@@ -93,6 +93,19 @@ private:
 };
 
 // Limitador estereo de pico com ataque instantaneo: a saida nunca passa do limiar.
+// Ganho automatico do microfone: leva a fala a um volume alvo, mesmo com microfone baixo.
+// So mede durante a fala, para nao amplificar o ruido das pausas. Desce rapido e sobe devagar,
+// e o ganho muda amostra a amostra para nao estalar. Um limitador suave evita saturar.
+class AutoGain {
+public:
+    explicit AutoGain(float targetDb = -16.0f, float maxGainDb = 26.0f, float startGainDb = 12.0f);
+    void process(float* frame, int count, bool voiced);
+    float gainDb() const { return gainDb_; }
+
+private:
+    float targetDb_, maxGainDb_, gainDb_, appliedLinear_;
+};
+
 class Limiter {
 public:
     explicit Limiter(float threshold = 0.89f, float releaseSeconds = 0.15f);

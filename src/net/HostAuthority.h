@@ -13,7 +13,7 @@
 namespace net {
 
 inline constexpr float kStateInterval = 1.0f / 20.0f;   // Estado e snapshots a 20 Hz.
-inline constexpr float kVoiceRange = 80.0f;             // Alem disso a voz ja e silencio (PLANO 3.6).
+inline constexpr float kVoiceRange = 120.0f;            // Alem disso a voz ja e silencio (PLANO 3.6).
 inline constexpr float kSpeakingHold = 0.3f;            // Segundos de "falando" depois do ultimo quadro.
 inline constexpr size_t kMaxVoiceQueue = 64;
 
@@ -25,7 +25,7 @@ struct HostConfig {
 
 // Autoridade do host. Confirma, na ordem de chegada, os pedidos locais e os dos clientes, e
 // transmite os eventos confirmados a todos pelo canal confiavel. O jogador local do host e o 0.
-// Tambem e o VoiceLink do host: repassa cada quadro so a quem esta a ate 80 m de quem fala.
+// Tambem e o VoiceLink do host: repassa cada quadro so a quem esta a ate kVoiceRange de quem fala.
 class HostAuthority final : public GameAuthority, public VoiceLink {
 public:
     HostAuthority(UdpSession& udp, HostConfig config);

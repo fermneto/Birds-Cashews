@@ -114,10 +114,11 @@ Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 
 ### 3.6 Voz por proximidade
 
-O áudio é capturado em 48 kHz, passa por detecção de fala, recebe o filtro de voz de pássaro e é comprimido com Opus. O
-host repassa cada pacote apenas aos jogadores dentro do alcance. Quem recebe aplica:
+O áudio é capturado em 48 kHz e passa por detecção de fala. Um ganho automático leva a voz a um volume alvo, mesmo com
+microfone baixo. Depois a voz recebe o filtro de pássaro, 8 semitons acima, e é comprimida com Opus. O host repassa cada
+pacote apenas aos jogadores a até 120 m. Quem recebe aplica:
 
-1. **Volume por distância:** voz cheia até 15 m e silêncio a partir de 80 m.
+1. **Volume por distância:** voz cheia até 30 m, ainda bem audível a 60 m e silêncio a partir de 120 m.
 2. **Posição estéreo:** a voz vem do lado em que o outro pássaro está.
 3. **Efeito Doppler:** a voz fica mais aguda quando os pássaros se aproximam e mais grave quando se afastam, calculada pela
    velocidade relativa entre quem fala e quem ouve.

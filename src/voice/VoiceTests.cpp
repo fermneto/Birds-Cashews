@@ -256,15 +256,38 @@ void testJitterBuffer(TestRun& run) {
     run.check("Voz: jitter limita o atraso numa rajada", burst.buffered() <= 7 && burst.stats().overflow > 0);
 }
 
+// Microfone baixo: a fala chega a 40 dB abaixo do maximo e precisa sair perto do volume alvo.
+void testAutoGain(TestRun& run) {
+    AutoGain quiet;
+    const std::vector<float> whisper = tone(300, 100 * kVoiceFrame, 0.008f);
+    std::vector<float> out = whisper;
+    for (int i = 0; i < 100; i++) quiet.process(out.data() + i * kVoiceFrame, kVoiceFrame, true);
+    const float level = 20.0f * std::log10(rms(out.data() + 80 * kVoiceFrame, 20 * kVoiceFrame));
+    run.check(describe("Voz: microfone baixo e amplificado ate o volume alvo (dB)", level), level > -20.0f && level < -12.0f);
+
+    AutoGain loud;
+    std::vector<float> shout = tone(300, 50 * kVoiceFrame, 0.95f);
+    for (int i = 0; i < 50; i++) loud.process(shout.data() + i * kVoiceFrame, kVoiceFrame, true);
+    const float peak = *std::max_element(shout.begin(), shout.end());
+    run.check("Voz: voz alta nao satura", peak <= 1.0f && loud.gainDb() < 1.0f);
+
+    AutoGain pauses;
+    const float before = pauses.gainDb();
+    std::vector<float> silence(kVoiceFrame, 0.0001f);
+    for (int i = 0; i < 100; i++) pauses.process(silence.data(), kVoiceFrame, false);
+    run.check("Voz: o ganho nao sobe durante as pausas", pauses.gainDb() == before);
+}
+
 void testSpatial(TestRun& run) {
     const SpatialSettings settings;
     bool monotonic = true;
-    for (float d = 15; d < 80; d += 1) monotonic = monotonic && distanceGain(d + 1, settings) <= distanceGain(d, settings);
-    run.check("Voz: volume cheio ate 15 m e silencio a 80 m",
-              distanceGain(0, settings) == 1 && distanceGain(15, settings) == 1 && distanceGain(80, settings) == 0 &&
+    for (float d = 30; d < 120; d += 1) monotonic = monotonic && distanceGain(d + 1, settings) <= distanceGain(d, settings);
+    run.check("Voz: volume cheio ate 30 m e silencio a 120 m",
+              distanceGain(0, settings) == 1 && distanceGain(30, settings) == 1 && distanceGain(120, settings) == 0 &&
               distanceGain(200, settings) == 0);
-    run.check("Voz: volume cai suave e sempre entre 15 e 80 m",
-              monotonic && near(distanceGain(47.5f, settings), 0.5, 0.01) && distanceGain(20, settings) > 0.95f);
+    run.check("Voz: volume cai suave e sempre entre 30 e 120 m",
+              monotonic && near(distanceGain(75.0f, settings), 0.5, 0.01) && distanceGain(40, settings) > 0.95f);
+    run.check("Voz: a 60 m ainda se ouve bem", distanceGain(60, settings) > 0.7f);
 
     VoiceListener me;
     PlayerPublicState other;
@@ -452,8 +475,9 @@ void testLoopbackChat(TestRun& run) {
     std::vector<float> left, right;
     for (size_t i = 0; i < heard.size(); i += 2) { left.push_back(heard[i]); right.push_back(heard[i + 1]); }
     const size_t from = 50 * kVoiceFrame, count = 48000;
-    const double measured = peakFrequency(right, from, count, 250, 500);
-    run.check(describe("Voz: Bruno ouve a voz de passaro de Alice (Hz)", measured), near(measured, 300.0 * kBirdRatio, 3.0));
+    const double expected = 300.0 * std::pow(2.0, VoiceSettings{}.pitchSemitones / 12.0);
+    const double measured = peakFrequency(right, from, count, 250, 600);
+    run.check(describe("Voz: Bruno ouve a voz de passaro de Alice (Hz)", measured), near(measured, expected, 3.0));
     const float rightLevel = rms(right.data() + from, count), leftLevel = rms(left.data() + from, count);
     run.check(describe("Voz: Alice a direita soa na direita (direita/esquerda)", rightLevel / std::max(leftLevel, 1e-6f)),
               rightLevel > 0.05f && rightLevel > 5 * leftLevel);
@@ -467,6 +491,7 @@ int runVoiceSelfTest() {
     testPitchShifter(run);
     testOpus(run);
     testJitterBuffer(run);
+    testAutoGain(run);
     testSpatial(run);
     testDoppler(run);
     testBoundedDoppler(run);

@@ -18,7 +18,7 @@ enum class MatchMode { Solo, Host, Client };
 //
 // Ponto de integracao da voz (D5): voice() e o VoiceLink da sala ativa, ou nullptr jogando sozinho.
 // sendVoice manda a voz do jogador local (o PlayerId de quem fala e preenchido pela autoridade);
-// receiveVoice entrega a voz dos outros, ja filtrada pelo host a 80 m. Para posicionar o som, use
+// receiveVoice entrega a voz dos outros, ja filtrada pelo host pelo alcance da voz. Para posicionar o som, use
 // authority()->players() e o PlayerId local de localPlayer(). Enviar voz tambem liga o "speaking" do
 // jogador local por kSpeakingHold segundos no estado replicado.
 class NetMatch final : public NetSession {

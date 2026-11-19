@@ -17,17 +17,19 @@ public:
 
     bool speaking() const { return speaking_; }
     float level() const { return speaking_ ? detector_.level() : 0.0f; }
+    float gainDb() const { return gain_.gainDb(); }
     const SpeechDetector& detector() const { return detector_; }
     bool ok() const { return encoder_.ok(); }
     int latency() const { return birdVoice_ ? shifter_.latency() : 0; }
 
 private:
     SpeechDetector detector_;
+    AutoGain gain_;
     PitchShifter shifter_;
     VoiceEncoder encoder_;
     bool birdVoice_;
     bool speaking_ = false;
     uint16_t sequence_ = 0;
     std::vector<uint8_t> previous_;
-    std::vector<float> shifted_;
+    std::vector<float> shifted_, boosted_;
 };

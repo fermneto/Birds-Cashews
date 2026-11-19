@@ -1,7 +1,7 @@
 #include "voice/VoiceSender.h"
 
 VoiceSender::VoiceSender(const SpeechSettings& speech, bool birdVoice, float semitones, int bitrate)
-    : detector_(speech), shifter_(semitones), encoder_(bitrate), birdVoice_(birdVoice), shifted_(kVoiceFrame) {}
+    : detector_(speech), shifter_(semitones), encoder_(bitrate), birdVoice_(birdVoice), shifted_(kVoiceFrame), boosted_(kVoiceFrame) {}
 
 void VoiceSender::setBirdVoice(bool enabled, float semitones) {
     if (enabled && !birdVoice_) shifter_.reset();
@@ -11,9 +11,11 @@ void VoiceSender::setBirdVoice(bool enabled, float semitones) {
 
 std::vector<VoiceFrame> VoiceSender::process(const float* frame, PlayerId speaker, bool muted) {
     const bool voiced = detector_.process(frame, kVoiceFrame);
-    const float* source = frame;
+    std::copy(frame, frame + kVoiceFrame, boosted_.begin());
+    gain_.process(boosted_.data(), kVoiceFrame, voiced);
+    const float* source = boosted_.data();
     if (birdVoice_) {
-        shifter_.process(frame, shifted_.data(), kVoiceFrame);
+        shifter_.process(boosted_.data(), shifted_.data(), kVoiceFrame);
         source = shifted_.data();
     }
     std::vector<uint8_t> packet = encoder_.encode(source);

@@ -578,8 +578,8 @@ void testPlayerLeft(TestRun& t) {
 void testVoiceRelay(TestRun& t) {
     Room room;
     for (int i = 1; i < kMaxPlayers; i++) room.join({kWorld, "V" + std::to_string(i), 0});
-    // Do jogador 1: host a 10 m, 2 a 79 m, 3 a 81 m; 4 e 5 longe de todos, mas perto um do outro.
-    const glm::vec3 spots[] = {{0, 50, 0}, {10, 50, 0}, {10, 50, 79}, {10, 50, -81}, {500, 50, 500}, {530, 50, 500}};
+    // Do jogador 1: host a 10 m, 2 a 119 m, 3 a 121 m; 4 e 5 longe de todos, mas perto um do outro.
+    const glm::vec3 spots[] = {{0, 50, 0}, {10, 50, 0}, {10, 50, 119}, {10, 50, -121}, {500, 50, 500}, {530, 50, 500}};
     const auto place = [&] {
         room.host.authority->publishLocalPlayer(stateAt(0, spots[0]));
         for (int i = 1; i < kMaxPlayers; i++) room.clients[i - 1]->authority->publishLocalPlayer(stateAt(i, spots[i]));
@@ -596,7 +596,7 @@ void testVoiceRelay(TestRun& t) {
     };
     room.clients[0]->authority->sendVoice({kNoPlayer, 1, Bytes(80, 1)});
     for (int i = 0; i < 5; i++) { place(); room.step(); listen(); }
-    t.check("voz: o host recebe e repassa a quem esta a ate 80 m", heard[0].size() == 1 && heard[2].size() == 1 &&
+    t.check("voz: o host recebe e repassa a quem esta ao alcance da voz", heard[0].size() == 1 && heard[2].size() == 1 &&
                                                                   heard[0][0].speaker == 1 && heard[0][0].sequence == 1);
     t.check("voz: quem esta longe ou fala nao recebe", heard[1].empty() && heard[3].empty() && heard[4].empty() && heard[5].empty());
 
