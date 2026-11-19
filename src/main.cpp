@@ -4,6 +4,7 @@
 #include "game/NestTests.h"
 #include "save/SaveTests.h"
 #include "shared/ContractTests.h"
+#include "ui/UiTests.h"
 #include "vision/GestureLab.h"
 #include <SDL.h>
 #include <unistd.h>
@@ -52,7 +53,7 @@ private:
 
 int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
-                       + runSaveSelfTest() + runNestSelfTest();
+                       + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }

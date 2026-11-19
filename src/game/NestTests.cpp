@@ -253,7 +253,7 @@ void testMenu(TestRun& run, const World& world) {
     bool namesMatch = menu().page == NestMenuPage::Eat && menu().options.size() == eat.size();
     for (size_t i = 0; namesMatch && i < eat.size(); i++) namesMatch = menu().options[i].name == eat[i];
     run.check("menu: esquerdo abre Comer com as opcoes certas", namesMatch);
-    run.check("menu: lista explica os dois bracos", menu().leftLabel == "Proxima opcao" && menu().rightLabel == "Faltam 3 moedas");
+    run.check("menu: lista explica os dois bracos", menu().leftLabel == "Próxima opção" && menu().rightLabel == "Faltam 3 moedas");
 
     bool cycles = true;
     for (int i = 1; i < 5; i++) {
@@ -310,7 +310,7 @@ void testPurchases(TestRun& run, const World& world) {
     Rig maxed(world, maxedDir.path());
     maxed.landOnNest();
     maxed.press(ArmSide::Left);
-    run.check("compra: nivel maximo aparece no rotulo", maxed.session.view().menu.rightLabel == "Nivel maximo");
+    run.check("compra: nivel maximo aparece no rotulo", maxed.session.view().menu.rightLabel == "Nível máximo");
     maxed.session.drainFeedback();
     maxed.press(ArmSide::Right);
     run.check("compra: acima do maximo e negada", maxed.countFeedback(GameplayFeedback::UpgradeDenied) == 1);

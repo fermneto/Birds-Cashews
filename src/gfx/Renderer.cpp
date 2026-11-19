@@ -4,10 +4,15 @@
 #include <cmath>
 #include <opencv2/imgproc.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 namespace {
 const glm::vec3 kSunDirection = glm::normalize(glm::vec3(0.45f, 0.75f, 0.35f));
 const glm::vec3 kHorizon(0.76f, 0.87f, 0.93f);
+
+// A interface e desenhada em 1280x720 e ajustada a janela sem deformar.
+constexpr float kLogicalWidth = 1280.0f, kLogicalHeight = 720.0f;
+constexpr float kPreviewX = 948.0f, kPreviewY = 12.0f, kPreviewWidth = 320.0f, kPreviewHeight = 240.0f;
 
 struct IslandBird {
     uint32_t seed;
@@ -119,6 +124,21 @@ uniform sampler2D uImage;
 out vec4 color;
 void main() { color = vec4(texture(uImage, vUv).bgr, 1.0); })";
 
+// A camada da interface ja chega com a cor multiplicada pelo alfa.
+const char* const kOverlayFragment = R"(#version 330 core
+in vec2 vUv;
+uniform sampler2D uImage;
+out vec4 color;
+void main() { color = texture(uImage, vUv); })";
+
+void configureTexture(GLuint texture) {
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
 std::vector<Vertex> waterQuad() {
     constexpr float s = 7000.0f;
     MeshBuilder mesh;
@@ -130,6 +150,7 @@ std::vector<Vertex> waterQuad() {
 Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, glm::vec3 spawnPoint)
     : worldShader_(kWorldVertex, kWorldFragment), skyShader_(kSkyVertex, kSkyFragment),
       waterShader_(kWorldVertex, kWaterFragment), previewShader_(kPreviewVertex, kPreviewFragment),
+      overlayShader_(kPreviewVertex, kOverlayFragment),
       worldMesh_(worldMesh.vertices()), cloudMesh_(cloudMesh.vertices()), waterMesh_(waterQuad()),
       spawnPoint_(spawnPoint) {
     for (const auto& bird : kIslandBirds) {
@@ -141,17 +162,16 @@ Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, g
     }
     glGenVertexArrays(1, &emptyVao_);
     glGenTextures(1, &previewTexture_);
-    glBindTexture(GL_TEXTURE_2D, previewTexture_);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenTextures(1, &overlayTexture_);
+    configureTexture(previewTexture_);
+    configureTexture(overlayTexture_);
     glEnable(GL_CULL_FACE);
 }
 
 Renderer::~Renderer() {
     glDeleteVertexArrays(1, &emptyVao_);
     glDeleteTextures(1, &previewTexture_);
+    glDeleteTextures(1, &overlayTexture_);
     if (targetFbo_) {
         glDeleteFramebuffers(1, &targetFbo_);
         glDeleteTextures(1, &targetColor_);
@@ -301,18 +321,55 @@ void Renderer::setPreview(const cv::Mat& image) {
     previewHeight_ = image.rows;
 }
 
+// Converte um retangulo da resolucao logica para coordenadas da tela.
+glm::vec4 Renderer::logicalRect(float x, float y, float width, float height) const {
+    const float windowWidth = static_cast<float>(width_), windowHeight = static_cast<float>(height_);
+    const float scale = std::min(windowWidth / kLogicalWidth, windowHeight / kLogicalHeight);
+    const float left = (windowWidth - kLogicalWidth * scale) * 0.5f + x * scale;
+    const float top = (windowHeight - kLogicalHeight * scale) * 0.5f + y * scale;
+    return {2.0f * left / windowWidth - 1.0f, 1.0f - 2.0f * (top + height * scale) / windowHeight,
+            2.0f * width * scale / windowWidth, 2.0f * height * scale / windowHeight};
+}
+
 void Renderer::drawPreview() {
-    if (previewWidth_ == 0) return;
+    if (previewWidth_ == 0 || !previewVisible_) return;
     glDisable(GL_DEPTH_TEST);
-    const float w = 2.0f * previewWidth_ / width_, h = 2.0f * previewHeight_ / height_;
-    const float margin = 24.0f / width_;
     previewShader_.use();
-    previewShader_.set("uRect", glm::vec4(1.0f - w - margin, 1.0f - h - margin * width_ / height_, w, h));
+    previewShader_.set("uRect", logicalRect(kPreviewX, kPreviewY, kPreviewWidth, kPreviewHeight));
     previewShader_.set("uImage", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, previewTexture_);
     glBindVertexArray(emptyVao_);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+void Renderer::setOverlay(const cv::Mat& image) {
+    CV_Assert(image.type() == CV_8UC4 && image.isContinuous());
+    glBindTexture(GL_TEXTURE_2D, overlayTexture_);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    if (image.cols != overlayWidth_ || image.rows != overlayHeight_) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.cols, image.rows, 0, GL_BGRA, GL_UNSIGNED_BYTE, image.data);
+        overlayWidth_ = image.cols;
+        overlayHeight_ = image.rows;
+    } else {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.cols, image.rows, GL_BGRA, GL_UNSIGNED_BYTE, image.data);
+    }
+}
+
+void Renderer::drawOverlay() {
+    if (overlayWidth_ == 0) return;
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    overlayShader_.use();
+    overlayShader_.set("uRect", logicalRect(0.0f, 0.0f, kLogicalWidth, kLogicalHeight));
+    overlayShader_.set("uImage", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, overlayTexture_);
+    glBindVertexArray(emptyVao_);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_BLEND);
 }
 
 void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, float time) {
@@ -326,6 +383,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawWater(camera, time);
     drawViewModel(camera, animation);
     drawPreview();
+    drawOverlay();
 }
 
 void Renderer::createTarget() {

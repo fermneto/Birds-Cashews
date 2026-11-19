@@ -24,7 +24,7 @@ UpgradeOptionView backOption() {
 }
 
 std::string buyLabel(const UpgradeOptionView& option, int coins) {
-    if (option.level >= option.maxLevel) return "Nivel maximo";
+    if (option.level >= option.maxLevel) return "Nível máximo";
     if (!option.affordable) return "Faltam " + std::to_string(option.price - coins) + " moedas";
     return "Comprar por " + std::to_string(option.price);
 }
@@ -76,7 +76,7 @@ NestMenuView describeNestMenu(const NestMenu& menu, const Profile& profile) {
                                                                 : describeOption(static_cast<NestUpgrade>(i), profile));
     }
     view.options.push_back(backOption());
-    view.leftLabel = "Proxima opcao";
+    view.leftLabel = "Próxima opção";
     view.rightLabel = menu.selected() == NestMenu::kBackOption ? "Voltar"
                                                                : buyLabel(view.options[menu.selected()], profile.coins());
     return view;
