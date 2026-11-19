@@ -1,5 +1,6 @@
 #include "core/Game.h"
 #include "game/CashewModel.h"
+#include "game/NestModel.h"
 #include "input/BodyInput.h"
 #include "input/KeyboardInput.h"
 #include "vision/Clock.h"
@@ -19,14 +20,25 @@ constexpr float kFixedStep = 1.0f / 120.0f;
 constexpr float kTelemetryInterval = 0.1f;
 const cv::Size kPreviewSize(320, 240);
 constexpr PlayerId kLocalPlayer = 0;
+const char* const kDefaultProfile = "Jogador";
+
+std::filesystem::path saveDirFor(const GameOptions& options) {
+    if (!options.saveDir.empty()) return options.saveDir;
+    char* base = SDL_GetBasePath();
+    const std::filesystem::path path = std::filesystem::path(base ? base : "./") / "saves";
+    SDL_free(base);
+    return path;
+}
 }
 
 Game::Game(const GameOptions& options)
     : options_(options), window_("Birds&Cashews", 1280, 720, options.hidden), world_(options.seed),
       renderer_(world_.buildMesh(), world_.buildCloudMesh(), world_.spawnPoint()), cashews_(world_, options.seed),
-      collector_(cashews_, authority_, kLocalPlayer) {
+      session_(world_, options.seed, cashews_, player_, saveDirFor(options), kLocalPlayer) {
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
+    renderer_.setNestBeaconMesh(buildNestBeaconMesh());
     player_.spawn(world_.spawnPoint(), 0.0f);
+    session_.startProfile(kDefaultProfile);
     window_.drawableSize(width_, height_);
     renderer_.resize(width_, height_);
 }
@@ -58,20 +70,15 @@ bool Game::handleEvents() {
     return true;
 }
 
-// Todo evento confirmado passa por aqui, porque pollEvents entrega cada um uma unica vez.
-void Game::updateCashews(float frameSeconds) {
-    for (const GameEvent& event : authority_.pollEvents()) collector_.handle(event);
-    const glm::vec3 position = player_.flight().position();
-    collector_.update(frameSeconds, position);
-    player_.setBeakTarget(BeakSource::Cashew, collector_.beakTarget(position));
-}
+// Todo evento confirmado passa pela sessao aqui, porque pollEvents entrega cada um uma unica vez.
+void Game::updateCashews(float frameSeconds) { session_.update(frameSeconds); }
 
 // A fisica usa passo fixo para se comportar igual em qualquer taxa de quadros.
 void Game::advance(float frameSeconds) {
-    player_.applyControls(input_->poll());
+    session_.applyControls(input_->poll());
     accumulator_ = std::min(accumulator_ + frameSeconds, 0.1f);
     while (accumulator_ >= kFixedStep) {
-        player_.step(world_, kFixedStep);
+        session_.stepBird(kFixedStep);
         accumulator_ -= kFixedStep;
     }
     updateCashews(frameSeconds);
@@ -86,7 +93,7 @@ void Game::drawTelemetry(cv::Mat& image) const {
     const std::string text = "ALT " + std::to_string(static_cast<int>(flight.position().y - ground)) + " m   VEL "
                            + std::to_string(static_cast<int>(flight.speed() * 3.6f)) + " km/h";
     drawOutlinedText(image, text, {10, image.rows - 12}, 0.5, cv::Scalar(255, 255, 255));
-    const std::string cargo = "CAJUS " + std::to_string(collector_.carried()) + "/" + std::to_string(collector_.stats().capacity);
+    const std::string cargo = "CAJUS " + std::to_string(session_.collector().carried()) + "/" + std::to_string(session_.collector().stats().capacity);
     drawOutlinedText(image, cargo, {10, image.rows - 36}, 0.6, cv::Scalar(90, 210, 255));
     if (player_.nearBoundary()) drawOutlinedText(image, "VOLTE PARA A ILHA", {10, 28}, 0.7, cv::Scalar(70, 90, 255));
 }
@@ -120,9 +127,19 @@ void Game::prepareCashews(const Camera3D& camera) {
                                  visibleCashews(cashews_, viewProjection, camera.position, kCashewDetailDistance, kCashewDrawDistance));
 }
 
+// O ninho so e remontado quando o nivel de Tamanho muda.
+void Game::prepareNest(const Camera3D& camera) {
+    if (shownNestRevision_ != session_.nestRevision()) {
+        shownNestRevision_ = session_.nestRevision();
+        renderer_.setNestMesh(buildNestMesh(session_.nest(), session_.nestSizeLevel()));
+    }
+    renderer_.setNestBeacon(nestBeaconTransform(session_.nest(), session_.nestSizeLevel(), camera.position, time_));
+}
+
 void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
+    prepareNest(camera);
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -130,6 +147,7 @@ void Game::renderFrame() {
 cv::Mat Game::captureFrame(float time) {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
+    prepareNest(camera);
     return renderer_.capture(camera, player_.animation(), time);
 }
 
@@ -143,6 +161,7 @@ int Game::run() {
         refreshPreview();
         renderFrame();
     }
+    session_.saveNow();
     return 0;
 }
 
@@ -176,6 +195,7 @@ int Game::renderTest(const std::string& outputDir) {
     player_.spawn(world_.spawnPoint(), 0.0f);
     measureFrames("Quadro 1280x720");
     captureCashewShots(outputDir);
+    captureNestShots(outputDir);
     return 0;
 }
 
@@ -196,7 +216,7 @@ void Game::aimAt(glm::vec3 eye, glm::vec3 target) {
     player_.spawn(eye, std::atan2(view.x, -view.z));
     player_.flight().setAttitude(std::atan2(view.y, glm::length(glm::vec2(view.x, view.z))), 0.0f);
     player_.applyControls(FlightControls{});
-    player_.setBeakTarget(BeakSource::Cashew, collector_.beakTarget(eye));
+    player_.setBeakTarget(BeakSource::Cashew, session_.collector().beakTarget(eye));
     for (int i = 0; i < 40; i++) player_.animate(1.0f / 60.0f);
 }
 
@@ -215,15 +235,40 @@ void Game::captureCashewShots(const std::string& outputDir) {
     aimAt(eyeAt(15.0f, 2.0f), spot.position);
     cv::imwrite(outputDir + "/10_caju_perto.png", captureFrame(3.0f));
 
-    collector_.update(0.0f, spot.position);
-    for (const GameEvent& event : authority_.pollEvents()) collector_.handle(event);
+    player_.flight().position() = spot.position;
+    updateCashews(0.0f);
+    updateCashews(0.0f);
     previewBase_ = cv::Mat(kPreviewSize, CV_8UC3, cv::Scalar(45, 35, 30));
     cv::Mat composed = previewBase_.clone();
     drawTelemetry(composed);
     renderer_.setPreview(composed);
     aimAt(eyeAt(15.0f, 2.0f), spot.position);
     cv::imwrite(outputDir + "/11_caju_coletado.png", captureFrame(3.0f));
-    std::cout << "Carga depois da coleta: " << collector_.carried() << "/" << collector_.stats().capacity << "\n";
+    std::cout << "Carga depois da coleta: " << session_.collector().carried() << "/" << session_.collector().stats().capacity << "\n";
+}
+
+// Fotografa o ninho de longe, de perto, pousado e no tamanho maximo.
+void Game::captureNestShots(const std::string& outputDir) {
+    const NestSite& nest = session_.nest();
+    const glm::vec3 heading(std::sin(nest.yaw), 0, -std::cos(nest.yaw));
+    const auto shoot = [&](const char* name, float distance, float rise) {
+        aimAt(nest.perch + heading * distance + glm::vec3(0, rise, 0), nest.perch);
+        cv::imwrite(outputDir + "/" + name, captureFrame(3.0f));
+    };
+    shoot("12_ninho_longe.png", 620.0f, 70.0f);
+    shoot("13_ninho_medio.png", 170.0f, 45.0f);
+
+    player_.spawn(nest.perch + glm::vec3(0, 6, 0), nest.yaw);
+    for (int i = 0; i < 60; i++) {
+        updateCashews(1.0f / 60.0f);
+        player_.animate(1.0f / 60.0f);
+    }
+    cv::imwrite(outputDir + "/14_ninho_pousado.png", captureFrame(3.0f));
+    std::cout << "Pousado no ninho: " << (session_.perched() ? "sim" : "nao") << "\n";
+
+    ProfileStore(saveDirFor(options_)).save(Profile::restored("Ninho maximo", 1, 0, 0, {}, {0, 0, 0, kMaxUpgradeLevel}));
+    session_.startProfile("Ninho maximo");
+    shoot("15_ninho_maximo.png", 170.0f, 45.0f);
 }
 
 // Simula um mergulho real para conferir o campo de visao em alta velocidade.

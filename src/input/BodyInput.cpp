@@ -13,6 +13,10 @@ FlightControls BodyInput::poll() {
     controls.flaps = gesture.flapCount - lastFlapCount_;
     controls.flapStrength = gesture.flapStrength;
     lastFlapCount_ = gesture.flapCount;
+    if (gesture.menuCount != lastMenuCount_) controls.menuPressed = gesture.menuChoice;
+    lastMenuCount_ = gesture.menuCount;
+    controls.raisedArm = gesture.raisedArm;
+    controls.menuProgress = gesture.menuProgress;
     return controls;
 }
 

@@ -248,6 +248,24 @@ void Renderer::drawCashews() {
     worldShader_.set("uGlow", 0.0f);
 }
 
+void Renderer::setNestMesh(const MeshBuilder& nest) { nestMesh_ = std::make_unique<Mesh>(nest.vertices()); }
+
+void Renderer::setNestBeaconMesh(const MeshBuilder& beacon) { nestBeaconMesh_ = std::make_unique<Mesh>(beacon.vertices()); }
+
+// O ninho e visto por dentro e por fora, entao as duas faces sao desenhadas.
+void Renderer::drawNest() {
+    if (!nestMesh_ || !nestBeaconMesh_) return;
+    glDisable(GL_CULL_FACE);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    nestMesh_->draw();
+    worldShader_.set("uGlow", 0.6f);
+    worldShader_.set("uModel", nestBeaconTransform_);
+    nestBeaconMesh_->draw();
+    worldShader_.set("uGlow", 0.0f);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    glEnable(GL_CULL_FACE);
+}
+
 // O mar acompanha a camera para nunca mostrar a borda.
 void Renderer::drawWater(const Camera3D& camera, float time) {
     glEnable(GL_BLEND);
@@ -304,6 +322,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawWorld(camera);
     drawBirds(time);
     drawCashews();
+    drawNest();
     drawWater(camera, time);
     drawViewModel(camera, animation);
     drawPreview();

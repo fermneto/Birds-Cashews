@@ -15,6 +15,6 @@ private:
     VisionPipeline vision_;
     VisionSnapshot view_;
     uint64_t sequence_ = 0;
-    uint32_t lastFlapCount_ = 0;
+    uint32_t lastFlapCount_ = 0, lastMenuCount_ = 0;
     bool fresh_ = false;
 };

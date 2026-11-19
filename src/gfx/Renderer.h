@@ -19,6 +19,9 @@ public:
     void setPreview(const cv::Mat& bgrImage);
     void setCashewMeshes(const MeshBuilder& fruit, const MeshBuilder& farFruit, const MeshBuilder& stems);
     void setCashewInstances(std::vector<glm::mat4> nearby, std::vector<glm::mat4> distant);
+    void setNestMesh(const MeshBuilder& nest);
+    void setNestBeaconMesh(const MeshBuilder& beacon);
+    void setNestBeacon(const glm::mat4& transform) { nestBeaconTransform_ = transform; }
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
 
 private:
@@ -26,6 +29,7 @@ private:
     void drawWorld(const Camera3D& camera);
     void drawBirds(float time);
     void drawCashews();
+    void drawNest();
     void drawWater(const Camera3D& camera, float time);
     void drawViewModel(const Camera3D& camera, const BirdAnimation& animation);
     void drawPreview();
@@ -35,6 +39,8 @@ private:
     Mesh worldMesh_, cloudMesh_, waterMesh_;
     std::unique_ptr<Mesh> cashewFruit_, cashewFarFruit_, cashewStems_;
     std::vector<glm::mat4> nearbyCashews_, distantCashews_;
+    std::unique_ptr<Mesh> nestMesh_, nestBeaconMesh_;
+    glm::mat4 nestBeaconTransform_{0.0f};
     BirdViewModel viewModel_;
     glm::vec3 spawnPoint_;
     struct FlyingBird {

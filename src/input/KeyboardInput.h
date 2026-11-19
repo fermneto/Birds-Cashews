@@ -8,7 +8,7 @@ public:
     bool preview(cv::Mat& image) override;
 
 private:
-    bool spaceHeld_ = false, shown_ = false;
+    bool spaceHeld_ = false, shown_ = false, leftHeld_ = false, rightHeld_ = false;
     float bank_ = 0;
     uint32_t lastFlapTicks_ = 0;
 };
