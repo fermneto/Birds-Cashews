@@ -13,8 +13,7 @@ bool CalibratedBodyInput::preview(cv::Mat& image) {
     if (!previewFresh_) return false;
     previewFresh_ = false;
     image = view_.frame.clone();
-    const VisionMetrics m = vision_.metrics();
-    drawVisionOverlay(image, view_.pose, view_.gesture, m.processed / std::max(m.seconds, 0.001));
+    drawVisionSkeleton(image, view_.pose);
     return true;
 }
 

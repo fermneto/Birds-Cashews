@@ -39,7 +39,7 @@ public:
     UiScreen screen() const { return flow_.current(); }
     bool playing() const { return flow_.current() == UiScreen::Playing; }
     bool closed() const { return flow_.closed(); }
-    bool showsCornerPreview() const { return flow_.current() != UiScreen::Calibration; }
+    bool showsCornerPreview() const { return poseSource_ && flow_.current() != UiScreen::Calibration; }
 
     int selectedRow() const { return cursor_.index(); }
     std::vector<MenuRow> rows() const;
@@ -64,6 +64,8 @@ private:
     void activatePause(int index);
     void finishRoom(bool ready);
     void updateCalibration(float seconds);
+    void updateCoins(float seconds);
+    float coinsOpacity() const;
     void handleKey(const SDL_KeyboardEvent& key);
 
     TextField* activeField();
@@ -103,4 +105,6 @@ private:
     float armProgress_ = 0;
     std::string error_, recordFooter_, lastKey_;
     float clock_ = 0, sinceCompose_ = 1.0f;
+    int lastCoins_ = -1;
+    float coinsHold_ = 0;
 };

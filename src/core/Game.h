@@ -41,7 +41,6 @@ private:
     void updateNpcs(float frameSeconds);
     void prepareBirds();
     void refreshPreview();
-    void drawTelemetry(cv::Mat& image) const;
     Camera3D buildCamera() const;
     void prepareCashews(const Camera3D& camera);
     void prepareNest(const Camera3D& camera);

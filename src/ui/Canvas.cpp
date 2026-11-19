@@ -2,6 +2,7 @@
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace {
 // Divide por 255 com arredondamento correto.
@@ -70,6 +71,29 @@ Canvas::Canvas(int width, int height) : pixels_(height, width, CV_8UC4, cv::Scal
 
 void Canvas::clear() {
     pixels_.setTo(cv::Scalar::all(0));
+}
+
+void Canvas::gradient(const cv::Rect& area, cv::Scalar color, float startAlpha, float endAlpha, bool horizontal) {
+    const cv::Rect visible = area & cv::Rect(0, 0, width(), height());
+    if (visible.empty()) return;
+    // Calcula cada faixa uma unica vez, porque o HUD e redesenhado durante o voo.
+    const int length = horizontal ? area.width : area.height;
+    std::vector<cv::Vec4b> bands(static_cast<size_t>(length));
+    for (int i = 0; i < length; i++) {
+        const float t = static_cast<float>(i) / std::max(length - 1, 1);
+        const float alpha = startAlpha + (endAlpha - startAlpha) * t * t * (3.0f - 2.0f * t);
+        bands[static_cast<size_t>(i)] = {toByte(color[0] * alpha), toByte(color[1] * alpha), toByte(color[2] * alpha), toByte(alpha * 255.0)};
+    }
+    for (int y = visible.y; y < visible.y + visible.height; y++) {
+        uchar* out = pixels_.ptr<uchar>(y) + visible.x * 4;
+        for (int x = visible.x; x < visible.x + visible.width; x++, out += 4) {
+            const cv::Vec4b& in = bands[static_cast<size_t>(horizontal ? x - area.x : y - area.y)];
+            if (in[3] == 0) continue;
+            const int keep = 255 - in[3];
+            for (int c = 0; c < 3; c++) out[c] = static_cast<uchar>(std::min(in[c] + div255(out[c] * keep), 255));
+            out[3] = static_cast<uchar>(std::min(in[3] + div255(out[3] * keep), 255));
+        }
+    }
 }
 
 void Canvas::fill(const cv::Rect& area, cv::Scalar color, float alpha, int radius) {

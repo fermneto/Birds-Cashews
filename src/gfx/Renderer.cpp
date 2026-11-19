@@ -13,7 +13,7 @@ const glm::vec3 kHorizon(0.76f, 0.87f, 0.93f);
 
 // A interface e desenhada em 1280x720 e ajustada a janela sem deformar.
 constexpr float kLogicalWidth = 1280.0f, kLogicalHeight = 720.0f;
-constexpr float kPreviewX = 948.0f, kPreviewY = 12.0f, kPreviewWidth = 320.0f, kPreviewHeight = 240.0f;
+constexpr float kPreviewX = 1036.0f, kPreviewY = 28.0f, kPreviewWidth = 204.0f, kPreviewHeight = 153.0f;
 
 struct IslandBird {
     uint32_t seed;

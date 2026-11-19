@@ -24,6 +24,8 @@ public:
     // Cores em BGR, com alfa de 0 a 1 separado.
     void fill(const cv::Rect& area, cv::Scalar color, float alpha, int radius = 0);
     void outline(const cv::Rect& area, cv::Scalar color, int thickness, int radius);
+    // Degrade suave de alfa, da esquerda para a direita ou de cima para baixo.
+    void gradient(const cv::Rect& area, cv::Scalar color, float startAlpha, float endAlpha, bool horizontal);
     void progressBar(const cv::Rect& area, float progress, cv::Scalar color);
     void image(const cv::Mat& premultipliedBgra, cv::Point topLeft, float opacity = 1.0f);
     void imageCentered(const cv::Mat& premultipliedBgra, cv::Point center, float opacity = 1.0f);

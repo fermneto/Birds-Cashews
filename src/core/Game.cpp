@@ -102,23 +102,12 @@ void Game::advance(float frameSeconds) {
     telemetryTimer_ += frameSeconds;
 }
 
-void Game::drawTelemetry(cv::Mat& image) const {
-    const FlightModel& flight = player_.flight();
-    const float ground = std::max(world_.island().heightAt(flight.position().x, flight.position().z), 0.0f);
-    const std::string text = "ALT " + std::to_string(static_cast<int>(flight.position().y - ground)) + " m   VEL "
-                           + std::to_string(static_cast<int>(flight.speed() * 3.6f)) + " km/h";
-    drawOutlinedText(image, text, {10, image.rows - 12}, 0.5, cv::Scalar(255, 255, 255));
-    if (player_.nearBoundary()) drawOutlinedText(image, "VOLTE PARA A ILHA", {10, 28}, 0.7, cv::Scalar(70, 90, 255));
-}
-
 void Game::refreshPreview() {
     cv::Mat image;
     if (input_->preview(image)) cv::resize(image, previewBase_, kPreviewSize, 0, 0, cv::INTER_AREA);
     if (previewBase_.empty() || telemetryTimer_ < kTelemetryInterval) return;
     telemetryTimer_ = 0;
-    cv::Mat composed = previewBase_.clone();
-    if (!ui_ || ui_->playing()) drawTelemetry(composed);
-    renderer_.setPreview(composed);
+    renderer_.setPreview(previewBase_);
 }
 
 // Fora da partida o mundo fica parado ao fundo e os comandos do jogador movem os menus.
@@ -357,9 +346,7 @@ void Game::captureCashewShots(const std::string& outputDir) {
     updateCashews(0.0f);
     updateCashews(0.0f);
     previewBase_ = cv::Mat(kPreviewSize, CV_8UC3, cv::Scalar(45, 35, 30));
-    cv::Mat composed = previewBase_.clone();
-    drawTelemetry(composed);
-    renderer_.setPreview(composed);
+    renderer_.setPreview(previewBase_);
     aimAt(eyeAt(15.0f, 2.0f), spot.position);
     cv::imwrite(outputDir + "/11_caju_coletado.png", captureFrame(3.0f));
     std::cout << "Carga depois da coleta: " << session_.collector().carried() << "/" << session_.collector().stats().capacity << "\n";

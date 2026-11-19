@@ -15,7 +15,7 @@ std::string cacheKey(const std::string& text, const TextStyle& style) {
     return key.str();
 }
 
-// Junta a letra e o contorno escuro em uma unica imagem pre-multiplicada.
+// Junta a letra e a sombra suave em uma unica imagem pre-multiplicada.
 cv::Mat composeGlyphs(const cv::Mat& coverage, const cv::Mat& halo, cv::Scalar color) {
     cv::Mat out(coverage.size(), CV_8UC4);
     for (int y = 0; y < out.rows; y++) {
@@ -24,7 +24,7 @@ cv::Mat composeGlyphs(const cv::Mat& coverage, const cv::Mat& halo, cv::Scalar c
         uchar* pixel = out.ptr<uchar>(y);
         for (int x = 0; x < out.cols; x++, pixel += 4) {
             const float a = letter[x] / 255.0f;
-            const float behind = (shadow[x] / 255.0f) * 0.82f * (1.0f - a);
+            const float behind = (shadow[x] / 255.0f) * 0.72f * (1.0f - a);
             for (int c = 0; c < 3; c++) pixel[c] = cv::saturate_cast<uchar>(color[c] * a + 12.0f * behind);
             pixel[3] = cv::saturate_cast<uchar>((a + behind) * 255.0f);
         }
@@ -53,8 +53,8 @@ int TextPainter::width(const std::string& text, int size) {
 }
 
 TextPainter::Sprite TextPainter::render(const std::string& text, const TextStyle& style) {
-    const int border = style.outline ? std::max(2, style.size / 10) : 0;
-    const int pad = style.size / 2 + border + 2;
+    const int border = style.outline ? std::max(3, style.size / 7) : 0;
+    const int pad = style.size / 2 + 2 * border + 2;
     const int advance = width(text, style.size);
     const cv::Point origin(pad, pad + style.size + style.size / 3);
     cv::Mat canvas(origin.y + style.size + pad, advance + 2 * pad, CV_8UC3, cv::Scalar::all(0));
@@ -63,8 +63,11 @@ TextPainter::Sprite TextPainter::render(const std::string& text, const TextStyle
     cv::Mat coverage, halo;
     cv::extractChannel(canvas, coverage, 0);
     if (border > 0) {
-        const cv::Mat shape = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(2 * border + 1, 2 * border + 1));
-        cv::dilate(coverage, halo, shape);
+        // Sombra deslocada para baixo e desfocada: separa o texto do cenario sem contorno pesado.
+        const cv::Mat shift = (cv::Mat_<double>(2, 3) << 1, 0, 0, 0, 1, std::max(1, style.size / 18));
+        cv::warpAffine(coverage, halo, shift, coverage.size());
+        cv::GaussianBlur(halo, halo, cv::Size(), border * 0.55);
+        halo.convertTo(halo, CV_8UC1, 1.7);
     } else {
         halo = cv::Mat::zeros(coverage.size(), CV_8UC1);
     }

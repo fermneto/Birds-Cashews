@@ -1,89 +1,90 @@
-#include "ui/UiScenes.h"
-#include "ui/UiTheme.h"
+#include "ui/UiWidgets.h"
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
 
 namespace {
-const cv::Rect kPanel(24, 24, 900, 672);
-constexpr int kRowHeight = 56, kRowGap = 8, kMaxVisibleRows = 7;
+constexpr int kMenuX = 64, kMenuWidth = 540, kRowHeight = 50, kRowGap = 4, kHeroHeight = 66, kMaxVisibleRows = 7;
+constexpr int kPromptWidth = 232, kPromptHeight = 52;
 
-TextStyle style(int size, cv::Scalar color = theme::kWhite, TextAlign align = TextAlign::Left) {
-    TextStyle s;
-    s.size = size;
-    s.color = color;
-    s.align = align;
-    return s;
-}
+TextStyle style(int size, cv::Scalar color = theme::kWhite, TextAlign align = TextAlign::Left) { return uiStyle(size, color, align); }
 
-void drawFieldBox(UiKit& kit, const MenuRow& row, const cv::Rect& area, bool selected, bool caretOn) {
-    const cv::Rect box(area.x + 230, area.y + 8, area.width - 244, area.height - 16);
-    kit.canvas.fill(box, theme::kInk, 0.85f, 8);
-    kit.canvas.outline(box, selected ? theme::kWhite : theme::kMuted, selected ? 2 : 1, 8);
-    const int size = 22, room = box.width - 28;
+void drawFieldValue(UiKit& kit, const MenuRow& row, const cv::Rect& area, bool selected, bool caretOn) {
+    const cv::Rect box(area.x + 190, area.y + 8, area.width - 204, area.height - 16);
+    kit.canvas.fill({box.x, box.y + box.height - 2, box.width, 2}, selected ? theme::kGold : theme::kMuted, selected ? 1.0f : 0.5f);
+    const int size = 20, room = box.width - 12;
     std::string shown = row.value;
     while (!shown.empty() && kit.text.width(shown, size) > room) {
         size_t length = 1;
         while (length < shown.size() && (static_cast<unsigned char>(shown[length]) & 0xC0) == 0x80) length++;
         shown.erase(0, length);
     }
-    kit.text.draw(kit.canvas, shown, {box.x + 12, box.y + box.height - 11}, style(size));
-    if (selected && caretOn) {
-        const int x = box.x + 14 + kit.text.width(shown, size);
-        kit.canvas.fill({x, box.y + 7, 3, box.height - 14}, theme::kWhite, 1.0f);
-    }
+    kit.text.draw(kit.canvas, shown, {box.x + 4, box.y + box.height - 9}, style(size));
+    if (selected && caretOn) kit.canvas.fill({box.x + 6 + kit.text.width(shown, size), box.y + 5, 2, box.height - 12}, theme::kGold, 1.0f);
 }
 
-void drawRow(UiKit& kit, const MenuRow& row, const cv::Rect& area, bool selected, bool caretOn) {
-    kit.canvas.fill(area, selected ? theme::kAccent : theme::kInk, selected ? 0.95f : 0.62f, 12);
-    if (selected) kit.canvas.outline(area, theme::kGold, 2, 12);
-    const int baseline = area.y + area.height / 2 + 9;
+// A linha escolhida ganha luz e cor. As demais ficam como texto simples sobre o cenario.
+void drawRow(UiKit& kit, const MenuRow& row, const cv::Rect& area, bool selected, bool caretOn, int textSize) {
+    if (selected) {
+        kit.canvas.gradient(area, theme::kAccent, 0.95f, 0.0f, true);
+        kit.canvas.fill({area.x, area.y, 5, area.height}, theme::kGold, 1.0f);
+    }
+    const int baseline = area.y + area.height / 2 + textSize / 3;
+    const cv::Scalar color = selected ? theme::kWhite : theme::kMuted;
     if (row.field) {
-        kit.text.drawFit(kit.canvas, row.label, {area.x + 18, baseline}, 204, style(24));
-        drawFieldBox(kit, row, area, selected, caretOn);
+        kit.text.drawFit(kit.canvas, row.label, {area.x + 22, baseline}, 160, style(textSize, color));
+        drawFieldValue(kit, row, area, selected, caretOn);
         return;
     }
-    const int valueWidth = row.value.empty() ? 0 : std::min(kit.text.width(row.value, 20) + 16, area.width / 2);
-    kit.text.drawFit(kit.canvas, row.label, {area.x + 18, baseline}, area.width - 36 - valueWidth, style(24));
+    const int valueWidth = row.value.empty() ? 0 : std::min(kit.text.width(row.value, 16) + 16, area.width / 2);
+    kit.text.drawFit(kit.canvas, row.label, {area.x + 22, baseline}, area.width - 44 - valueWidth, style(textSize, color));
     if (valueWidth > 0)
-        kit.text.drawFit(kit.canvas, row.value, {area.x + area.width - valueWidth - 2, baseline}, valueWidth - 4,
-                         style(20, theme::kMuted));
+        kit.text.drawFit(kit.canvas, row.value, {area.x + area.width - valueWidth - 8, baseline}, valueWidth - 4, style(16, theme::kMuted));
 }
 
-void drawRows(UiKit& kit, const std::vector<MenuRow>& rows, int selected, const cv::Rect& area, int maxRows, bool caretOn) {
+void drawScrollMark(UiKit& kit, cv::Point center, bool up) {
+    const int tip = up ? -5 : 5;
+    kit.canvas.line(center + cv::Point(-7, -tip), center + cv::Point(0, tip), theme::kGold, 2);
+    kit.canvas.line(center + cv::Point(0, tip), center + cv::Point(7, -tip), theme::kGold, 2);
+}
+
+void drawRows(UiKit& kit, const std::vector<MenuRow>& rows, int selected, const cv::Rect& area, int maxRows, bool caretOn, bool hero = false) {
     const int total = static_cast<int>(rows.size());
     const int visible = std::min(total, maxRows);
     const int first = std::clamp(selected - visible / 2, 0, std::max(total - visible, 0));
+    int y = area.y;
     for (int i = 0; i < visible; i++) {
-        const cv::Rect rowArea(area.x, area.y + i * (kRowHeight + kRowGap), area.width, kRowHeight);
-        drawRow(kit, rows[first + i], rowArea, first + i == selected, caretOn);
+        const bool big = hero && first + i == 0;
+        const int height = big ? kHeroHeight : kRowHeight;
+        drawRow(kit, rows[first + i], {area.x, y, area.width, height}, first + i == selected, caretOn, big ? 32 : 22);
+        y += height + kRowGap + (big ? 8 : 0);
     }
-    const int right = area.x + area.width - 4;
-    if (first > 0) kit.text.draw(kit.canvas, "▲", {right, area.y - 6}, style(16, theme::kGold, TextAlign::Right));
-    if (first + visible < total) {
-        const int bottom = area.y + visible * (kRowHeight + kRowGap) + 12;
-        kit.text.draw(kit.canvas, "▼", {right, bottom}, style(16, theme::kGold, TextAlign::Right));
-    }
+    const int markX = area.x + area.width - 14;
+    if (first > 0) drawScrollMark(kit, {markX, area.y - 12}, true);
+    if (first + visible < total) drawScrollMark(kit, {markX, y + 6}, false);
 }
 
-void drawGestureCard(UiKit& kit, const cv::Rect& area, const std::string& arm, const std::string& action,
-                     bool active, float progress) {
-    kit.canvas.fill(area, theme::kInk, 0.72f, 10);
-    if (active) kit.canvas.outline(area, theme::kGold, 2, 10);
-    kit.text.draw(kit.canvas, arm, {area.x + 14, area.y + 25}, style(17, theme::kMuted));
-    kit.text.drawFit(kit.canvas, action, {area.x + 14, area.y + 52}, area.width - 28, style(22));
-    kit.canvas.progressBar({area.x + 14, area.y + 62, area.width - 28, 10}, active ? progress : 0.0f, theme::kGold);
+// Comandos no rodape, como os botoes indicados em jogos de console.
+void drawGestureLegend(UiKit& kit, cv::Point origin, int promptWidth, const GestureHint& hint) {
+    const float opacity = hint.enabled ? 1.0f : 0.55f;
+    drawArmPrompt(kit, {origin.x, origin.y, promptWidth, kPromptHeight}, ArmSide::Left, "Próxima opção",
+                  hint.enabled && hint.raisedArm == ArmSide::Left, hint.progress, opacity);
+    drawArmPrompt(kit, {origin.x + promptWidth + 10, origin.y, promptWidth, kPromptHeight}, ArmSide::Right, "Confirmar",
+                  hint.enabled && hint.raisedArm == ArmSide::Right, hint.progress, opacity);
 }
 
-// Legenda fixa com o que cada braco faz e o andamento do gesto atual.
-void drawGestureLegend(UiKit& kit, const cv::Rect& area, const GestureHint& hint) {
-    const int cardHeight = 84;
-    drawGestureCard(kit, {area.x, area.y, area.width, cardHeight}, "Braço esquerdo erguido", "Próxima opção",
-                    hint.enabled && hint.raisedArm == ArmSide::Left, hint.progress);
-    drawGestureCard(kit, {area.x, area.y + cardHeight + 8, area.width, cardHeight}, "Braço direito erguido", "Confirmar",
-                    hint.enabled && hint.raisedArm == ArmSide::Right, hint.progress);
-    const int y = area.y + 2 * cardHeight + 34;
+void drawKeyboardHint(UiKit& kit, cv::Point baseline, int width, const GestureHint& hint) {
     const std::string keys = hint.enabled ? "Teclado: setas e Enter, ou Q e E" : "Conclua os passos para liberar os gestos";
-    kit.text.drawFit(kit.canvas, keys, {area.x + 4, y}, area.width - 8, style(16, hint.enabled ? theme::kMuted : theme::kGold));
+    kit.text.drawFit(kit.canvas, keys, baseline, width, style(14, hint.enabled ? theme::kMuted : theme::kGold));
+}
+
+// O nome do jogo usa o amarelo do caju apenas no "&".
+void drawWordmark(UiKit& kit, cv::Point baseline) {
+    constexpr int kSize = 58;
+    kit.text.draw(kit.canvas, "Birds", baseline, style(kSize));
+    int x = baseline.x + kit.text.width("Birds", kSize) + 4;
+    kit.text.draw(kit.canvas, "&", {x, baseline.y}, style(kSize, theme::kGold));
+    x += kit.text.width("&", kSize) + 4;
+    kit.text.draw(kit.canvas, "Cashews", {x, baseline.y}, style(kSize));
 }
 
 void drawCheck(UiKit& kit, cv::Point center, bool done) {
@@ -189,28 +190,30 @@ void drawChecklist(UiKit& kit, cv::Point origin, const CalibrationTracker& track
 }
 
 void drawMenuScene(UiKit& kit, const MenuScene& scene) {
-    kit.canvas.fill({0, 0, kit.canvas.width(), kit.canvas.height()}, cv::Scalar(0, 0, 0), 0.42f);
-    kit.canvas.fill(kPanel, theme::kPanel, 0.86f, 18);
-    kit.canvas.image(kit.assets.icon(UiIcon::Cashew, 60), {kPanel.x + 28, kPanel.y + 20});
-    kit.text.drawFit(kit.canvas, scene.title, {kPanel.x + 100, kPanel.y + 66}, kPanel.width - 130, style(44, theme::kGold));
-    kit.text.drawFit(kit.canvas, scene.subtitle, {kPanel.x + 32, kPanel.y + 112}, kPanel.width - 64, style(21, theme::kMuted));
+    // O mundo continua visivel: so a coluna do menu escurece para manter a leitura.
+    kit.canvas.fill({0, 0, kit.canvas.width(), kit.canvas.height()}, theme::kInk, 0.22f);
+    kit.canvas.gradient({0, 0, 860, kUiHeight}, theme::kInk, 0.94f, 0.0f, true);
 
-    const cv::Rect rowsArea(kPanel.x + 28, kPanel.y + 134, kPanel.width - 56, 448);
-    drawRows(kit, scene.rows, scene.selected, rowsArea, kMaxVisibleRows, scene.caretOn);
+    if (scene.hero) drawWordmark(kit, {kMenuX, 112});
+    else kit.text.drawFit(kit.canvas, scene.title, {kMenuX, 104}, kMenuWidth, style(46));
+    kit.text.drawFit(kit.canvas, scene.subtitle, {kMenuX, 146}, kMenuWidth, style(18, theme::kMuted));
 
-    const int messageY = kPanel.y + kPanel.height - 44;
-    if (!scene.error.empty()) kit.text.drawFit(kit.canvas, scene.error, {kPanel.x + 32, messageY}, kPanel.width - 64, style(21, theme::kRed));
-    else kit.text.drawFit(kit.canvas, scene.notice, {kPanel.x + 32, messageY}, kPanel.width - 64, style(20, theme::kGold));
-    kit.text.drawFit(kit.canvas, scene.footer, {kPanel.x + 32, kPanel.y + kPanel.height - 14}, kPanel.width - 64, style(18, theme::kMuted));
+    drawRows(kit, scene.rows, scene.selected, {kMenuX - 22, 176, kMenuWidth + 22, 400}, kMaxVisibleRows, scene.caretOn, scene.hero);
 
-    kit.canvas.outline(kPreviewArea, theme::kGold, 2, 4);
-    drawGestureLegend(kit, {kPreviewArea.x, kPreviewArea.y + kPreviewArea.height + 14, kPreviewArea.width, 240}, scene.gesture);
+    constexpr int kPromptsY = 636;
+    if (!scene.error.empty()) kit.text.drawFit(kit.canvas, scene.error, {kMenuX, 592}, kMenuWidth, style(17, theme::kRed));
+    else kit.text.drawFit(kit.canvas, scene.notice, {kMenuX, 592}, kMenuWidth, style(16, theme::kGold));
+    kit.text.drawFit(kit.canvas, scene.footer, {kMenuX, 620}, kMenuWidth, style(15, theme::kMuted));
+
+    drawGestureLegend(kit, {kMenuX, kPromptsY}, kPromptWidth, scene.gesture);
+    drawKeyboardHint(kit, {kMenuX + 2 * kPromptWidth + 28, kPromptsY + 32}, 300, scene.gesture);
+    if (scene.showPreview) drawPreviewFrame(kit);
 }
 
 void drawCalibrationScene(UiKit& kit, const CalibrationScene& scene) {
-    kit.canvas.fill({0, 0, kit.canvas.width(), kit.canvas.height()}, theme::kPanel, 0.94f);
-    kit.text.draw(kit.canvas, "Calibração", {28, 52}, style(38, theme::kGold));
-    kit.text.drawFit(kit.canvas, "Vídeo em modo espelho", {270, 50}, 400, style(20, theme::kMuted));
+    kit.canvas.fill({0, 0, kit.canvas.width(), kit.canvas.height()}, theme::kPanel, 0.96f);
+    kit.text.draw(kit.canvas, "Calibração", {28, 54}, style(36));
+    kit.text.drawFit(kit.canvas, "Vídeo em modo espelho", {262, 52}, 400, style(17, theme::kMuted));
 
     const cv::Rect video(28, 72, 816, 612);
     if (scene.hasCamera && !scene.frame.empty()) {
@@ -236,6 +239,7 @@ void drawCalibrationScene(UiKit& kit, const CalibrationScene& scene) {
         y += 40;
     }
     drawRows(kit, scene.rows, scene.selected, {column, y, width, 2 * kRowHeight + kRowGap}, 2, false);
-    y += 2 * (kRowHeight + kRowGap) + 8;
-    drawGestureLegend(kit, {column, y, width, 220}, scene.gesture);
+    y += 2 * (kRowHeight + kRowGap) + 12;
+    drawGestureLegend(kit, {column, y}, (width - 10) / 2, scene.gesture);
+    drawKeyboardHint(kit, {column + 2, y + kPromptHeight + 24}, width - 4, scene.gesture);
 }

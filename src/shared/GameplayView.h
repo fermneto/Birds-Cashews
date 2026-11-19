@@ -32,6 +32,7 @@ struct GameplayView {
     bool leadingRecord = false;
     bool recordBeatenNow = false;   // Verdadeiro enquanto o aviso deve aparecer.
     bool cargoLostNow = false;      // Um cacador acabou de derrubar a carga.
+    bool nearBoundary = false;      // O passaro esta saindo da area da ilha.
     bool perchedOnNest = false;
     float nestDistance = 0;    // Metros ate o ninho.
     float nestBearing = 0;     // Radianos em relacao a frente do passaro; positivo e a direita.

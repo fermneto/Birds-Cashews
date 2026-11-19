@@ -283,6 +283,7 @@ void GameplaySession::refreshView() {
     view_.recordHolder = records_.holder();
     view_.recordBeatenNow = recordNotice_ > 0;
     view_.cargoLostNow = cargoLostNotice_ > 0;
+    view_.nearBoundary = bird_.nearBoundary();
     view_.perchedOnNest = perched_;
     view_.nestDistance = glm::length(toNest);
     view_.nestBearing = std::remainder(std::atan2(toNest.x, -toNest.z) - flight.yaw(), kFullTurn);

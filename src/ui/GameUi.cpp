@@ -4,6 +4,7 @@
 #include <sstream>
 
 namespace {
+constexpr float kCoinsVisibleSeconds = 3.5f, kCoinsFadeSeconds = 0.5f;
 constexpr float kMinComposeSeconds = 1.0f / 30.0f;
 const char* const kMultiplayerNotice = "O multiplayer ainda não está ativo: a partida começa com você sozinho.";
 
@@ -273,12 +274,22 @@ void GameUi::updateCalibration(float seconds) {
     if (tracker_.marksDone() > before) sound_.play(UiSound::Mark);
 }
 
+// Depois de mudar, o saldo fica visivel por alguns segundos e some aos poucos.
+void GameUi::updateCoins(float seconds) {
+    const int coins = gameplay_->view().coins;
+    coinsHold_ = coins != lastCoins_ ? kCoinsVisibleSeconds : std::max(0.0f, coinsHold_ - seconds);
+    lastCoins_ = coins;
+}
+
+float GameUi::coinsOpacity() const { return std::min(coinsHold_ / kCoinsFadeSeconds, 1.0f); }
+
 void GameUi::update(float seconds) {
     clock_ += seconds;
     const bool inMatch = flow_.current() == UiScreen::Playing;
     for (const GameplayFeedback feedback : gameplay_->drainFeedback())
         if (inMatch) sound_.play(feedback);
     if (inMatch) banner_.update(gameplay_->view().recordBeatenNow, seconds);
+    if (inMatch) updateCoins(seconds);
     if (flow_.current() == UiScreen::Calibration) updateCalibration(seconds);
 }
 
@@ -305,12 +316,12 @@ std::string GameUi::menuSubtitle() const {
 
 std::string GameUi::mainFooter() const {
     const std::string profile = profiles_.active().empty() ? "Nenhum perfil escolhido" : "Perfil: " + profiles_.active();
-    return profile + "   |   " + recordFooter_;
+    return profile + "  ·  " + recordFooter_;
 }
 
 std::string GameUi::pauseFooter() const {
     const GameplayView& view = gameplay_->view();
-    return "Pontuação: " + std::to_string(view.totalDelivered) + "   |   Record: " + std::to_string(view.record);
+    return "Pontuação " + std::to_string(view.totalDelivered) + "  ·  Record " + std::to_string(view.record);
 }
 
 MenuScene GameUi::menuScene() const {
@@ -323,6 +334,8 @@ MenuScene GameUi::menuScene() const {
     if (flow_.current() == UiScreen::Rooms) scene.notice = kMultiplayerNotice;
     if (flow_.current() == UiScreen::MainMenu) scene.footer = mainFooter();
     if (flow_.current() == UiScreen::Pause) scene.footer = pauseFooter();
+    scene.hero = flow_.current() == UiScreen::MainMenu;
+    scene.showPreview = showsCornerPreview();
     scene.caretOn = activeField() && static_cast<int>(clock_ * 2.0f) % 2 == 0;
     scene.gesture = {raisedArm_, armProgress_, true};
     return scene;
@@ -334,6 +347,8 @@ HudScene GameUi::hudScene() const {
     scene.bannerOpacity = banner_.opacity();
     scene.bannerScale = banner_.scale();
     scene.bodyLost = poseSource_ && !poseSource_->bodyDetected();
+    scene.showPreview = showsCornerPreview();
+    scene.coinsOpacity = coinsOpacity();
     return scene;
 }
 
@@ -369,7 +384,7 @@ std::string GameUi::frameKey() const {
 
     const GameplayView& v = gameplay_->view();
     key << '|' << v.carried << ',' << v.capacity << ',' << v.coins << ',' << v.totalDelivered << ',' << v.record << ','
-        << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << std::lround(v.nestDistance) << ','
+        << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << v.nearBoundary << ',' << quantized(coinsOpacity(), 20.0f) << ',' << std::lround(v.nestDistance) << ','
         << quantized(v.nestBearing, 60.0f) << ',' << quantized(banner_.opacity(), 30.0f) << ','
         << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected());
     const NestMenuView& menu = v.menu;
