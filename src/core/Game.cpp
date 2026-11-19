@@ -2,6 +2,8 @@
 #include "game/CashewModel.h"
 #include "input/BodyInput.h"
 #include "input/KeyboardInput.h"
+#include "ui/CalibratedBodyInput.h"
+#include "ui/UiShowcase.h"
 #include "vision/Clock.h"
 #include "vision/VisionOverlay.h"
 #include <opencv2/imgcodecs.hpp>
@@ -34,8 +36,9 @@ Game::Game(const GameOptions& options)
 // Sem webcam disponivel, o jogo continua no teclado.
 void Game::createInput() {
     if (!options_.keyboard) {
-        auto body = std::make_unique<BodyInput>(options_.cameraIndex, options_.modelPath);
+        auto body = std::make_unique<CalibratedBodyInput>(options_.cameraIndex, options_.modelPath);
         if (body->start()) {
+            poseSource_ = body.get();
             input_ = std::move(body);
             return;
         }
@@ -44,18 +47,29 @@ void Game::createInput() {
     input_ = std::make_unique<KeyboardInput>();
 }
 
+// PONTO UNICO DE TROCA: quando a N3 entrar, devolva gameplay() aqui e remova demoGameplay_ do Game.h.
+GameplaySource& Game::uiGameplay() {
+    return demoGameplay_;
+}
+
+void Game::createUi(const std::filesystem::path& savesDir, SoundManager::Output sound) {
+    ui_ = std::make_unique<GameUi>(UiConfig{assetsDirectory(), savesDir, sound}, uiGameplay());
+    ui_->attachPoseSource(poseSource_);
+}
+
+// Retorna false quando o jogador sai. O Esc agora pertence as telas.
 bool Game::handleEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) return false;
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) return false;
+        if (ui_) ui_->handleEvent(event);
+        else if (event.type == SDL_QUIT) return false;
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) window_.toggleFullscreen();
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             window_.drawableSize(width_, height_);
             renderer_.resize(width_, height_);
         }
     }
-    return true;
+    return !ui_ || !ui_->closed();
 }
 
 // Todo evento confirmado passa por aqui, porque pollEvents entrega cada um uma unica vez.
@@ -86,8 +100,6 @@ void Game::drawTelemetry(cv::Mat& image) const {
     const std::string text = "ALT " + std::to_string(static_cast<int>(flight.position().y - ground)) + " m   VEL "
                            + std::to_string(static_cast<int>(flight.speed() * 3.6f)) + " km/h";
     drawOutlinedText(image, text, {10, image.rows - 12}, 0.5, cv::Scalar(255, 255, 255));
-    const std::string cargo = "CAJUS " + std::to_string(collector_.carried()) + "/" + std::to_string(collector_.stats().capacity);
-    drawOutlinedText(image, cargo, {10, image.rows - 36}, 0.6, cv::Scalar(90, 210, 255));
     if (player_.nearBoundary()) drawOutlinedText(image, "VOLTE PARA A ILHA", {10, 28}, 0.7, cv::Scalar(70, 90, 255));
 }
 
@@ -97,8 +109,25 @@ void Game::refreshPreview() {
     if (previewBase_.empty() || telemetryTimer_ < kTelemetryInterval) return;
     telemetryTimer_ = 0;
     cv::Mat composed = previewBase_.clone();
-    drawTelemetry(composed);
+    if (!ui_ || ui_->playing()) drawTelemetry(composed);
     renderer_.setPreview(composed);
+}
+
+// Fora da partida o mundo fica parado ao fundo e os comandos do jogador movem os menus.
+void Game::updateScreens(float frameSeconds) {
+    if (ui_->playing()) {
+        advance(frameSeconds);
+    } else {
+        ui_->updateMenus(input_->poll());
+        time_ += frameSeconds;
+        telemetryTimer_ += frameSeconds;
+    }
+    ui_->update(frameSeconds);
+}
+
+void Game::presentUi(float frameSeconds) {
+    renderer_.setPreviewVisible(ui_->showsCornerPreview());
+    if (ui_->compose(frameSeconds)) renderer_.setOverlay(ui_->overlay());
 }
 
 Camera3D Game::buildCamera() const {
@@ -135,12 +164,16 @@ cv::Mat Game::captureFrame(float time) {
 
 int Game::run() {
     createInput();
+    createUi(executableDirectory() / "saves", SoundManager::Output::Device);
     double last = nowSeconds();
     while (handleEvents()) {
         const double now = nowSeconds();
-        advance(static_cast<float>(now - last));
+        const float frameSeconds = static_cast<float>(now - last);
         last = now;
+        updateScreens(frameSeconds);
+        if (ui_->closed()) break;
         refreshPreview();
+        presentUi(frameSeconds);
         renderFrame();
     }
     return 0;
@@ -175,7 +208,55 @@ int Game::renderTest(const std::string& outputDir) {
     player_.spawn(world_.spawnPoint(), 0.0f);
     measureFrames("Quadro 1280x720");
     captureCashewShots(outputDir);
+    captureUiShots(outputDir);
     return 0;
+}
+
+// Fotografa todas as telas com dados de exemplo, em uma pasta de saves descartavel.
+void Game::captureUiShots(const std::string& outputDir) {
+    const std::filesystem::path saves = std::filesystem::path(outputDir) / "saves_render_test";
+    std::filesystem::remove_all(saves);
+    DemoGameplaySource demo;
+    ScriptedPoseSource camera;
+    GameUi ui(UiConfig{assetsDirectory(), saves, SoundManager::Output::Silent}, demo);
+    player_.spawn(world_.spawnPoint(), 0.0f);
+    player_.flight().setAttitude(-0.12f, 0.0f);
+    player_.applyControls(FlightControls{});
+    cv::resize(camera.frame(), previewBase_, kPreviewSize, 0, 0, cv::INTER_AREA);
+    renderer_.setPreview(previewBase_);
+
+    runUiShowcase(ui, demo, camera, [&](const std::string& name) {
+        ui.forceCompose();
+        renderer_.setOverlay(ui.overlay());
+        renderer_.setPreviewVisible(ui.showsCornerPreview());
+        cv::imwrite(outputDir + "/" + name + ".png", captureFrame(3.0f));
+    });
+
+    sendKey(ui, SDLK_ESCAPE);
+    ui.forceCompose();
+    renderer_.setOverlay(ui.overlay());
+    measureFrames("Quadro com HUD pronto");
+    measureHudFrames(ui, demo);
+    std::filesystem::remove_all(saves);
+}
+
+// Pior caso: os dados mudam a todo quadro e a camada inteira e redesenhada e reenviada.
+void Game::measureHudFrames(GameUi& ui, DemoGameplaySource& demo) {
+    std::vector<double> samples;
+    GameplayView view = DemoGameplaySource::nestEatSample();
+    for (int i = 0; i < 90; i++) {
+        view.nestDistance = 100.0f + static_cast<float>(i);
+        view.nestBearing = i * 0.1f;
+        demo.setView(view);
+        const double before = nowSeconds();
+        ui.update(1.0f / 60.0f);
+        if (ui.compose(1.0f)) renderer_.setOverlay(ui.overlay());
+        captureFrame(i / 60.0f);
+        samples.push_back((nowSeconds() - before) * 1000.0);
+    }
+    std::sort(samples.begin(), samples.end());
+    std::cout << std::fixed << std::setprecision(1) << "Quadro redesenhando o HUD: mediana " << samples[45] << " ms, p95 "
+              << samples[85] << " ms\n";
 }
 
 void Game::measureFrames(const std::string& label) {

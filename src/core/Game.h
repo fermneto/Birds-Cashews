@@ -5,6 +5,9 @@
 #include "gfx/Window.h"
 #include "input/FlightInput.h"
 #include "shared/LocalAuthority.h"
+#include "ui/DemoGameplaySource.h"
+#include "ui/GameUi.h"
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -27,6 +30,10 @@ public:
 
 private:
     void createInput();
+    void createUi(const std::filesystem::path& savesDir, SoundManager::Output sound);
+    GameplaySource& uiGameplay();
+    void updateScreens(float frameSeconds);
+    void presentUi(float frameSeconds);
     bool handleEvents();
     void advance(float frameSeconds);
     void updateCashews(float frameSeconds);
@@ -40,6 +47,8 @@ private:
     void captureCashewShots(const std::string& outputDir);
     void aimAt(glm::vec3 eye, glm::vec3 target);
     void measureFrames(const std::string& label);
+    void captureUiShots(const std::string& outputDir);
+    void measureHudFrames(GameUi& ui, DemoGameplaySource& demo);
 
     GameOptions options_;
     Window window_;
@@ -50,6 +59,9 @@ private:
     CashewField cashews_;
     CashewCollector collector_;
     std::unique_ptr<FlightInput> input_;
+    DemoGameplaySource demoGameplay_;
+    std::unique_ptr<GameUi> ui_;
+    PoseSource* poseSource_ = nullptr;
     cv::Mat previewBase_;
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;
     int width_ = 1280, height_ = 720;

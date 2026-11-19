@@ -3,6 +3,7 @@
 #include "game/CashewTests.h"
 #include "save/SaveTests.h"
 #include "shared/ContractTests.h"
+#include "ui/UiTests.h"
 #include "vision/GestureLab.h"
 #include <SDL.h>
 #include <exception>
@@ -34,7 +35,7 @@ std::string modelPath() {
 
 int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
-                       + runSaveSelfTest();
+                       + runSaveSelfTest() + runUiSelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }

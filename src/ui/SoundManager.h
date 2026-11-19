@@ -1,0 +1,46 @@
+#pragma once
+#include "shared/GameplayView.h"
+#include <SDL.h>
+#include <array>
+#include <cstdint>
+#include <vector>
+
+enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denied, Record, NestMove, Landed, TakeOff, Count };
+
+UiSound soundFor(GameplayFeedback feedback);
+
+// Sintetiza os efeitos ao abrir e mistura tudo na thread de audio do SDL.
+// Sem dispositivo de audio, todas as chamadas viram silencio.
+class SoundManager {
+public:
+    enum class Output { Device, Silent };
+
+    explicit SoundManager(Output output = Output::Device);
+    ~SoundManager();
+    SoundManager(const SoundManager&) = delete;
+    SoundManager& operator=(const SoundManager&) = delete;
+
+    bool hasDevice() const { return device_ != 0; }
+    void play(UiSound sound);
+    void play(GameplayFeedback feedback) { play(soundFor(feedback)); }
+
+    static std::vector<int16_t> synthesize(UiSound sound);
+    static int sampleRate();
+
+private:
+    struct Voice {
+        const std::vector<int16_t>* samples = nullptr;
+        size_t position = 0;
+    };
+    static constexpr int kVoices = 8;
+
+    static void audioCallback(void* self, Uint8* stream, int bytes);
+    void mix(int16_t* output, int count);
+    void openDevice();
+
+    SDL_AudioDeviceID device_ = 0;
+    bool subsystemOpen_ = false;
+    std::array<std::vector<int16_t>, static_cast<size_t>(UiSound::Count)> bank_;
+    std::array<Voice, kVoices> voices_{};
+    std::vector<int> mixBuffer_;
+};
