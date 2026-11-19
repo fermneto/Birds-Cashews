@@ -33,7 +33,7 @@ std::filesystem::path saveDirFor(const GameOptions& options) {
 
 Game::Game(const GameOptions& options)
     : options_(options), window_("Birds&Cashews", 1280, 720, options.hidden), world_(options.seed),
-      renderer_(world_.buildMesh(), world_.buildCloudMesh()), cashews_(world_, options.seed),
+      renderer_(world_.buildMesh(), world_.buildCloudMesh(), world_.spawnPoint()), cashews_(world_, options.seed),
       session_(world_, options.seed, cashews_, player_, saveDirFor(options), kLocalPlayer) {
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
@@ -177,6 +177,7 @@ int Game::renderTest(const std::string& outputDir) {
         {"4_mergulho", world_.spawnPoint(), 0.1f, -0.75f, 0.0f, FlightMode::Dive},
         {"5_praia", glm::vec3(0, 28, 930), 0.0f, -0.08f, 0.0f, FlightMode::Glide},
         {"6_mar", glm::vec3(0, 40, 900), 3.14f, -0.05f, 0.0f, FlightMode::Glide},
+        {"8_passaros", world_.spawnPoint(), 0.0f, 0.0f, 0.0f, FlightMode::Glide},
     };
     renderer_.resize(1280, 720);
     width_ = 1280;
