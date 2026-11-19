@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <set>
 #include <thread>
 
 namespace {
@@ -107,9 +108,7 @@ void RehearsalPeer::step(float dt) {
     GameAuthority& authority = session_->authority();
     npcs_.advance(dt, authority.players(), field_, authority);
     if (!host_) return;
-    std::vector<net::NpcPublicState> npcs;
-    for (const NpcBird& npc : npcs_.birds()) npcs.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, npc.mode});
-    host_->setNpcs(std::move(npcs));
+    host_->setNpcs(npcs_.publicStates());
 }
 
 namespace {
@@ -183,7 +182,8 @@ int joinRehearsal(const std::filesystem::path& saveDir, const std::string& addre
     size_t shown = 0;
     float elapsed = 0, afterDelivery = 0;
     bool sawHost = false;
-    size_t npcs = 0;
+    size_t npcs = 0, perched = 0;
+    std::set<uint8_t> roles;
     while (elapsed < 30.0f) {
         const float dt = pacer.wait();
         elapsed += dt;
@@ -198,13 +198,20 @@ int joinRehearsal(const std::filesystem::path& saveDir, const std::string& addre
             if (event.actor == me || event.type == GameEventType::PlayerJoined) printEvent("Cliente recebeu", event);
         }
         for (const PlayerPublicState& player : peer.authority().players()) sawHost = sawHost || player.id == 0;
-        npcs = std::max(npcs, match.clientAuthority()->npcs().size());
+        const auto received = match.clientAuthority()->npcs();
+        npcs = std::max(npcs, received.size());
+        size_t resting = 0;
+        for (const net::NpcPublicState& npc : received) {
+            roles.insert(npc.role);
+            resting += npc.perched ? 1 : 0;
+        }
+        perched = std::max(perched, resting);
         if (peer.delivered()) afterDelivery += dt;
         if (afterDelivery > 1.0f) break;
     }
     const int delivered = peer.session().view().totalDelivered;
     std::cout << "Resumo do cliente: ve o host " << (sawHost ? "sim" : "nao") << ", NPCs recebidos " << npcs
-              << ", cajus entregues " << delivered << "\n";
+              << " (" << roles.size() << " papeis, ate " << perched << " pousados), cajus entregues " << delivered << "\n";
     match.leave();
     return sawHost && npcs > 0 && delivered >= 2 ? 0 : 1;
 }

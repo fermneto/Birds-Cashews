@@ -271,7 +271,8 @@ void Renderer::setBirdInstances(std::vector<BirdInstance> birds) {
     birds_ = std::move(birds);
 }
 
-void Renderer::drawBird(const BirdInstance& bird, float angle) {
+// Cada asa gira no ombro: sobe ou desce, recolhe no comprimento e recua a ponta.
+void Renderer::drawBird(const BirdInstance& bird, const WingPose& wings) {
     auto model = glm::translate(glm::mat4(1.0f), bird.position);
     model = glm::rotate(model, -bird.yaw, glm::vec3(0, 1, 0));
     model = glm::rotate(model, bird.pitch, glm::vec3(1, 0, 0));
@@ -284,22 +285,22 @@ void Renderer::drawBird(const BirdInstance& bird, float angle) {
         auto shoulder = flyer.rightShoulder;
         shoulder.x *= side;
         auto wing = glm::translate(model, shoulder);
-        wing = glm::rotate(wing, side * angle, glm::vec3(0, 0, 1));
+        wing = glm::rotate(wing, side * wings.lift, glm::vec3(0, 0, 1));
+        wing = glm::rotate(wing, -side * wings.sweep, glm::vec3(0, 1, 0));
+        wing = glm::scale(wing, glm::vec3(wings.spread, 1.0f, 1.0f));
         worldShader_.set("uModel", glm::translate(wing, -shoulder));
         (side < 0 ? flyer.leftWing : flyer.rightWing)->draw();
     }
 }
 
 void Renderer::drawBirds(float time) {
+    // Um leve brilho deixa as cores dos passaros vivas mesmo na sombra e contra as copas.
+    worldShader_.set("uGlow", 0.15f);
     if (!demoBirds_) {
-        for (const auto& bird : birds_) {
-            const auto& flyer = birdMeshes_.at(bird.seed);
-            float angle = 0.08f;
-            if (bird.mode == FlightMode::Flap)
-                angle += 0.78f * std::sin(time * flyer.beatRate + static_cast<float>(bird.seed % 31));
-            if (bird.mode == FlightMode::Dive) angle = 0.42f;
-            drawBird(bird, angle);
-        }
+        for (const auto& bird : birds_)
+            drawBird(bird, birdMotion_.advance(bird, birdMeshes_.at(bird.seed).beatRate, time));
+        birdMotion_.forgetUnseen(time);
+        worldShader_.set("uGlow", 0.0f);
         return;
     }
     for (size_t i = 0; i < kIslandBirds.size(); ++i) {
@@ -307,11 +308,13 @@ void Renderer::drawBirds(float time) {
         const float phase = time * (0.62f + 0.04f * i) + 0.7f * i;
         const glm::vec3 drift(12.0f * std::sin(phase), 2.5f * std::sin(2.0f * phase),
                               12.0f * std::cos(phase));
-        const float activity = glm::smoothstep(-0.4f, 0.4f, std::sin(time * 1.3f + i * 2.0f));
-        const float beat = std::sin(time * birdMeshes_.at(bird.seed).beatRate + i * 1.7f);
-        drawBird({bird.seed, spawnPoint_ + bird.offset + drift, glm::radians(90.0f) - phase,
-                  0.0f, 0.20f, bird.scale}, 0.08f + activity * (0.17f + 0.78f * beat));
+        BirdInstance demo{bird.seed, spawnPoint_ + bird.offset + drift, glm::radians(90.0f) - phase,
+                          0.0f, 0.20f, bird.scale};
+        demo.key = 0x80000000u + static_cast<uint32_t>(i);
+        demo.glideFlaps = 0.5f;
+        drawBird(demo, birdMotion_.advance(demo, birdMeshes_.at(bird.seed).beatRate, time));
     }
+    worldShader_.set("uGlow", 0.0f);
 }
 
 void Renderer::setCashewMeshes(const MeshBuilder& fruit, const MeshBuilder& farFruit, const MeshBuilder& stems) {
@@ -472,7 +475,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawNest();
     drawWater(camera, time);
     drawWind(animation);
-    drawViewModel(camera, animation);
+    if (viewModelVisible_) drawViewModel(camera, animation);
     drawPreview();
     drawOverlay();
 }

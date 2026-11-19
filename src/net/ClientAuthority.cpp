@@ -60,7 +60,8 @@ std::vector<NpcPublicState> ClientAuthority::npcs() const {
     for (size_t i = 0; i < npcs_.size() && i < lastNpcs_.size(); i++) {
         if (npcs_[i].empty()) continue;
         const PlayerPublicState state = npcs_[i].sample(now_);
-        list.push_back({lastNpcs_[i].seed, state.position, state.yaw, state.pitch, state.roll, state.mode});
+        list.push_back({lastNpcs_[i].seed, state.position, state.yaw, state.pitch, state.roll, state.mode,
+                        state.carried, state.speaking});
     }
     return list;
 }
@@ -175,6 +176,9 @@ void ClientAuthority::handleSnapshot(const SnapshotMessage& snapshot) {
         state.roll = npc.roll;
         state.mode = npc.mode;
         state.birdSeed = npc.seed;
+        // Papel e pouso sao discretos: vao em campos que a interpolacao copia do estado mais proximo.
+        state.carried = npc.role;
+        state.speaking = npc.perched;
         npcs_[i].push(snapshot.time, now_, state);
     }
     lastNpcs_ = snapshot.npcs;

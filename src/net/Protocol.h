@@ -13,7 +13,8 @@ namespace net {
 
 inline constexpr uint8_t kProtocolVersion = 1;
 inline constexpr size_t kMaxNameLength = 32;
-inline constexpr size_t kMaxNpcs = 16;
+inline constexpr size_t kMaxNpcs = 24;
+inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.
 inline constexpr size_t kMaxEventsPerMessage = 48;
 
 enum class MessageType : uint8_t {
@@ -29,12 +30,14 @@ enum class MessageType : uint8_t {
 
 enum class RefuseReason : uint8_t { Full = 1, Version, WorldSeed };
 
-// O que os clientes precisam para desenhar um NPC: so o host simula.
+// O que os clientes precisam para desenhar e animar um NPC: so o host simula.
 struct NpcPublicState {
     uint32_t seed = 0;
     glm::vec3 position{0};
     float yaw = 0, pitch = 0, roll = 0;
     FlightMode mode = FlightMode::Glide;
+    uint8_t role = 0;       // NpcRole: define o ritmo de batidas no planeio.
+    bool perched = false;   // Pousado numa copa: asas recolhidas.
 };
 
 struct HelloMessage {

@@ -1,4 +1,5 @@
 #include "net/MatchTests.h"
+#include "ai/NpcEcosystem.h"
 #include "core/NetRehearsal.h"
 #include "core/TestRun.h"
 #include "net/ClientAuthority.h"
@@ -266,19 +267,34 @@ void testProtocol(TestRun& t) {
     SnapshotMessage full;
     full.time = 3.0f;
     for (PlayerId id = 0; id < kMaxPlayers; id++) full.players.push_back(stateAt(id, {id * 10.0f, 50, 0}));
-    for (uint32_t i = 0; i < 9; i++) full.npcs.push_back({i * 3u, {1, 2, 3}, 0.1f, 0.2f, 0.3f, FlightMode::Dive});
+    // Todos os NPCs do ecossistema, com papel e pouso variando.
+    const uint32_t npcCount = static_cast<uint32_t>(NpcEcosystem::kCount);
+    for (uint32_t i = 0; i < npcCount; i++)
+        full.npcs.push_back({i * 3u, {1, 2, 3}, 0.1f, 0.2f, 0.3f, FlightMode::Dive,
+                             static_cast<uint8_t>(i % kNpcRoleCount), i % 3 == 0});
     const auto snapshotBytes = encodeSnapshot(full);
     const auto snapshotBack = decodeSnapshot(snapshotBytes);
-    t.check("protocolo: snapshot ida e volta com 6 jogadores e 9 NPCs",
-            snapshotBack && snapshotBack->players.size() == kMaxPlayers && snapshotBack->npcs.size() == 9 &&
+    bool behaviors = snapshotBack && snapshotBack->npcs.size() == npcCount;
+    for (uint32_t i = 0; behaviors && i < npcCount; i++)
+        behaviors = snapshotBack->npcs[i].role == i % kNpcRoleCount && snapshotBack->npcs[i].perched == (i % 3 == 0);
+    t.check("protocolo: snapshot ida e volta com 6 jogadores e todos os NPCs",
+            snapshotBack && snapshotBack->players.size() == kMaxPlayers && snapshotBack->npcs.size() == npcCount &&
             snapshotBack->players[5].position.x == 50.0f && snapshotBack->npcs[8].seed == 24u &&
             snapshotBack->npcs[8].mode == FlightMode::Dive);
+    t.check("protocolo: snapshot leva o papel e o pouso de cada NPC", behaviors);
     // 13 bytes do UdpSession + 8 do UDP + 20 do IPv4. 1200 deixa folga ate em VPN e IPv6 sobre MTU de 1500.
-    t.check("protocolo: snapshot cheio cabe em um datagrama sem fragmentar",
+    t.check("protocolo: snapshot cheio (6 jogadores, " + std::to_string(npcCount) + " NPCs, " +
+            std::to_string(snapshotBytes.size()) + " bytes) cabe em um datagrama sem fragmentar",
             snapshotBytes.size() + 13 + 8 + 20 <= 1200 && snapshotBytes.size() <= kMaxPayload);
     SnapshotMessage worst = full;
     worst.npcs.assign(kMaxNpcs, full.npcs[0]);
-    t.check("protocolo: ate o snapshot no limite de NPCs cabe no limite do UdpSession", encodeSnapshot(worst).size() <= kMaxPayload);
+    const auto worstBytes = encodeSnapshot(worst);
+    t.check("protocolo: ate o snapshot no limite de NPCs (" + std::to_string(kMaxNpcs) + ", " + std::to_string(worstBytes.size()) +
+            " bytes) cabe no limite do UdpSession", worstBytes.size() <= kMaxPayload && decodeSnapshot(worstBytes) &&
+            decodeSnapshot(worstBytes)->npcs.size() == kMaxNpcs);
+    Bytes badBehavior = snapshotBytes;
+    badBehavior.back() |= 0x40;
+    t.check("protocolo: byte de comportamento invalido recusado", !decodeSnapshot(badBehavior));
     t.check("protocolo: snapshot truncado recusado", rejectsTruncated(snapshotBytes, decodeSnapshot));
     SnapshotMessage repeated = full;
     repeated.players[1].id = 0;
@@ -496,7 +512,8 @@ void testSnapshotFlow(TestRun& t) {
     Client& a = room.join({kWorld, "A", 11});
     Client& b = room.join({kWorld, "B", 22});
     std::vector<NpcPublicState> npcs;
-    for (uint32_t i = 0; i < 9; i++) npcs.push_back({i * 3u + 1, {i * 10.0f, 30, 0}, 0.2f, 0, 0, FlightMode::Glide});
+    for (uint32_t i = 0; i < 9; i++)
+        npcs.push_back({i * 3u + 1, {i * 10.0f, 30, 0}, 0.2f, 0, 0, FlightMode::Glide, static_cast<uint8_t>(i % 8), i == 4});
 
     double maxJump = 0, error = 1e9;
     glm::vec3 previous(0);
@@ -534,8 +551,9 @@ void testSnapshotFlow(TestRun& t) {
     bool npcsMatch = replicated.size() == npcs.size();
     for (size_t i = 0; npcsMatch && i < npcs.size(); i++)
         npcsMatch = replicated[i].seed == npcs[i].seed && std::fabs(replicated[i].position.x - npcs[i].position.x) < 0.01f &&
-                    std::fabs(replicated[i].position.z - npcs[i].position.z) < 5.0f && replicated[i].yaw == 0.2f;
-    t.check("npcs: o cliente recebe os NPCs do host, interpolados", npcsMatch);
+                    std::fabs(replicated[i].position.z - npcs[i].position.z) < 5.0f && replicated[i].yaw == 0.2f &&
+                    replicated[i].role == npcs[i].role && replicated[i].perched == npcs[i].perched;
+    t.check("npcs: o cliente recebe os NPCs do host, interpolados, com papel e pouso", npcsMatch);
 }
 
 // ---- Queda e saida ----

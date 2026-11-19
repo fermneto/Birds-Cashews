@@ -1,6 +1,8 @@
 #include "core/Game.h"
+#include "core/BirdShots.h"
 #include "game/CashewModel.h"
 #include "game/NestModel.h"
+#include "shared/BirdFactory.h"
 #include "input/BodyInput.h"
 #include "input/KeyboardInput.h"
 #include "ui/CalibratedBodyInput.h"
@@ -91,11 +93,7 @@ void Game::updateNpcs(float frameSeconds) {
     if (match_.mode() == net::MatchMode::Client) return;
     GameAuthority& authority = session_->authority();
     npcs_.advance(frameSeconds, authority.players(), cashews_, authority);
-    if (net::HostAuthority* host = match_.hostAuthority()) {
-        std::vector<net::NpcPublicState> npcs;
-        for (const NpcBird& npc : npcs_.birds()) npcs.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, npc.mode});
-        host->setNpcs(std::move(npcs));
-    }
+    if (net::HostAuthority* host = match_.hostAuthority()) host->setNpcs(npcs_.publicStates());
 }
 
 // A rede roda a todo quadro, ate nos menus, para a conexao nao cair por falta de resposta.
@@ -231,17 +229,26 @@ void Game::prepareNest(const Camera3D& camera) {
 void Game::prepareBirds() {
     std::vector<BirdInstance> birds;
     birds.reserve(npcs_.birds().size() + kMaxPlayers);
+    const auto addNpc = [&](const net::NpcPublicState& npc, size_t index) {
+        BirdInstance bird{npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, kBirdScale, npc.mode};
+        bird.key = static_cast<uint32_t>(index);
+        bird.perched = npc.perched;
+        bird.glideFlaps = npc.role < kNpcRoleCount ? npcGlideFlaps(static_cast<NpcRole>(npc.role)) : 0.4f;
+        birds.push_back(bird);
+    };
     if (const net::ClientAuthority* client = match_.clientAuthority()) {
-        for (const net::NpcPublicState& npc : client->npcs())
-            birds.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, 2.2f, npc.mode});
+        const auto npcs = client->npcs();
+        for (size_t i = 0; i < npcs.size(); i++) addNpc(npcs[i], i);
     } else {
-        for (const auto& npc : npcs_.birds())
-            birds.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, 2.2f, npc.mode});
+        for (size_t i = 0; i < npcs_.birds().size(); i++) addNpc(npcPublicState(npcs_.birds()[i]), i);
     }
     if (match_.online()) {
         for (const PlayerPublicState& other : session_->authority().players())
-            if (other.id != match_.localPlayer() && other.id != kNoPlayer)
-                birds.push_back({other.birdSeed, other.position, other.yaw, other.pitch, other.roll, 2.2f, other.mode});
+            if (other.id != match_.localPlayer() && other.id != kNoPlayer) {
+                BirdInstance bird{other.birdSeed, other.position, other.yaw, other.pitch, other.roll, kBirdScale, other.mode};
+                bird.key = 1000u + other.id;
+                birds.push_back(bird);
+            }
     }
     renderer_.setBirdInstances(std::move(birds));
 }
@@ -314,6 +321,7 @@ int Game::renderTest(const std::string& outputDir) {
         cv::imwrite(outputDir + "/" + shot.name + ".png", captureFrame(3.0f));
     }
     captureDiveShot(outputDir);
+    captureBirdShots(renderer_, world_, options_.seed, outputDir);
     player_.spawn(world_.spawnPoint(), 0.0f);
     measureFrames("Quadro 1280x720");
     captureCashewShots(outputDir);
