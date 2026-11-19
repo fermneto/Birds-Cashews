@@ -94,23 +94,28 @@ só com ele mesmo faria o record ser batido a cada caju.
 
 ### 3.5 Pássaros procedurais
 
-Cada pássaro nasce de uma semente de 32 bits, que alimenta um genoma determinístico:
+Cada pássaro nasce de uma semente de 32 bits, que alimenta um genoma determinístico. O genoma usa só o gerador inteiro do jogo e contas básicas, sem trigonometria, para dar o mesmo resultado em qualquer computador:
 
-1. **Corpo:** gera seções elípticas ao longo de uma curva, definindo tamanho e proporções.
-2. **Partes:** sorteia bico, crista, cauda, asas e pernas em famílias paramétricas de polígonos.
-3. **Encaixe:** cada parte se liga a um ponto de encaixe do corpo e escala conforme o tamanho dele.
-4. **Cor:** gera uma paleta harmônica em HSV.
-5. **Comportamento:** massa e envergadura definem o papel no ecossistema.
+1. **Corpo:** 9 seções octogonais ao longo do eixo do voo, com cabeça, pescoço, peito, barriga e uropígio de proporções próprias.
+2. **Partes:** bico em losango (comprimento, altura e curva), crista (nenhuma, tufo, leque ou penacho para trás), cauda em leque sem sobreposição (leque, bifurcada, cunha, reta, longa ou com fitas) e asas em 4 painéis com ponta fina, redonda ou com dedos.
+3. **Encaixe:** cada parte se liga a um ponto da cabeça ou do corpo e escala conforme o tamanho dele.
+4. **Cor:** paleta por harmonia (complementar, triádica, complementar dividida, tetrádica, análoga com destaque ou base neutra com dois tons vivos), com contraste forçado entre as duas cores maiores. Padrões sorteados pintam capuz, boné, máscara ou babador, colar, faixa no peito, barra e pontas das asas e faixa na ponta da cauda. O tom principal evita o verde das copas.
+5. **Comportamento:** o porte (comprimento e envergadura) define o papel no ecossistema. O host escolhe as sementes dos NPCs de modo que dois deles nunca fiquem parecidos.
 
-| Porte | Comportamento |
-|---|---|
-| Pequeno (6 pássaros) | Voa em bando usando o algoritmo Boids |
-| Médio (2 pássaros) | Procura e disputa cajus |
-| Grande (1 pássaro) | Persegue quem carrega 2 cajus ou mais e derruba a carga |
+| Papel | Quantos | Comportamento |
+|---|---|---|
+| Bando | 6 pequenos | Voa em bando usando o algoritmo Boids |
+| Coletor | 2 médios | Procura e disputa cajus |
+| Caçador | 1 grande | Persegue quem carrega 2 cajus ou mais e derruba a carga |
+| Curioso | 2 | Acompanha um jogador ao lado e um pouco atrás por alguns segundos e depois se afasta |
+| Assustado | 3 pequenos | Fica pousado no alto de uma copa e foge quando alguém chega perto; depois pousa em outra |
+| Planador | 2 grandes | Sobe em espiral nas térmicas e plana até a próxima |
+| Territorial | 1 médio | Ronda a própria árvore e persegue quem entra perto dela, a alguns metros |
+| Migratório | 5 médios | Bando em V que atravessa a ilha de ponta a ponta |
 
-Quem está pousado no ninho não é atacado. Por enquanto, a carga derrubada some do mundo. Os cajus caindo chegam com a N5.
+Só o caçador mexe na carga dos jogadores. Quem está pousado no ninho não é atacado. Por enquanto, a carga derrubada some do mundo. Os cajus caindo chegam com a N5. Todo NPC desvia de copas, troncos, chão e mar e nunca fica dentro deles.
 
-Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
+Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro. O snapshot leva também um byte de comportamento por NPC (papel e pouso), para o cliente animar cada um. As asas têm estado próprio por pássaro: o planeio flexiona e intercala rajadas de batidas, o mergulho recolhe as asas para trás e o pouso as dobra rente ao corpo.
 
 ### 3.6 Voz por proximidade
 

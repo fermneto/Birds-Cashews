@@ -12,7 +12,7 @@ constexpr float kMaxSpeed = 1000.0f;
 constexpr float kMaxAngle = 1000.0f;
 constexpr size_t kEventSize = 18;
 constexpr size_t kPlayerSize = 45;
-constexpr size_t kNpcSize = 29;
+constexpr size_t kNpcSize = 30;
 
 class Writer {
 public:
@@ -158,6 +158,8 @@ void writeNpc(Writer& out, const NpcPublicState& npc) {
     out.f32(npc.pitch);
     out.f32(npc.roll);
     out.u8(static_cast<uint8_t>(npc.mode));
+    // Um byte de comportamento: papel nos 4 bits baixos e pouso no bit mais alto.
+    out.u8(static_cast<uint8_t>((npc.role & 0x0F) | (npc.perched ? 0x80 : 0)));
 }
 
 NpcPublicState readNpc(Reader& in) {
@@ -168,6 +170,10 @@ NpcPublicState readNpc(Reader& in) {
     npc.pitch = in.f32(kMaxAngle);
     npc.roll = in.f32(kMaxAngle);
     npc.mode = in.mode();
+    const uint8_t behavior = in.u8();
+    if (behavior & 0x70) in.fail();
+    npc.role = behavior & 0x0F;
+    npc.perched = (behavior & 0x80) != 0;
     return npc;
 }
 } // namespace

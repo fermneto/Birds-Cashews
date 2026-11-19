@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <set>
 #include <thread>
 
 namespace {
@@ -22,6 +23,29 @@ const char* eventName(GameEventType type) {
         case GameEventType::PlayerLeft: return "jogador saiu";
     }
     return "?";
+}
+
+// Confere o ninho de outro jogador com o lugar calculado aqui, e avisa na primeira vez.
+bool knowsNest(const char* who, RehearsalPeer& peer, const World& world, uint32_t seed, PlayerId owner, bool& announced) {
+    const RivalNest* nest = peer.session().rivalNests().find(owner);
+    if (!nest) return false;
+    const NestSite expected = chooseNestSite(world, seed, owner);
+    const bool right = nest->site.tree == expected.tree && nest->site.base == expected.base;
+    if (!announced) {
+        announced = true;
+        std::cout << who << " o ninho do jogador " << static_cast<int>(owner) << " no cajueiro " << nest->site.tree << " em ("
+                  << std::lround(nest->site.base.x) << ", " << std::lround(nest->site.base.y) << ", "
+                  << std::lround(nest->site.base.z) << "), Tamanho " << nest->sizeLevel
+                  << (right ? ", no lugar esperado" : ", FORA do lugar esperado") << "\n";
+    }
+    return right;
+}
+
+// Os dois terminais imprimem o proprio ninho, para comparar com o que o outro lado conhece.
+void printOwnNest(const char* who, RehearsalPeer& peer) {
+    const NestSite& nest = peer.session().nest();
+    std::cout << who << ": o proprio ninho fica no cajueiro " << nest.tree << " em (" << std::lround(nest.base.x) << ", "
+              << std::lround(nest.base.y) << ", " << std::lround(nest.base.z) << ")\n";
 }
 
 std::string actorName(PlayerId id) { return id == kNoPlayer ? "NPC" : "jogador " + std::to_string(id); }
@@ -107,9 +131,7 @@ void RehearsalPeer::step(float dt) {
     GameAuthority& authority = session_->authority();
     npcs_.advance(dt, authority.players(), field_, authority);
     if (!host_) return;
-    std::vector<net::NpcPublicState> npcs;
-    for (const NpcBird& npc : npcs_.birds()) npcs.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, npc.mode});
-    host_->setNpcs(std::move(npcs));
+    host_->setNpcs(npcs_.publicStates());
 }
 
 namespace {
@@ -126,13 +148,15 @@ int hostRehearsal(const std::filesystem::path& saveDir, float seconds) {
     }
     RehearsalPeer peer(world, kDefaultSeed, std::move(field), saveDir, match.authority(), 0, true, match.hostAuthority());
     peer.startProfile("Host");
+    printOwnNest("Host", peer);
     std::cout << "Hospedando \"" << kRoomName << "\" na porta " << net::kLanPort << " por ate " << seconds
               << " s. Em outro terminal: ./birds --rede-teste entrar 127.0.0.1\n";
 
     Pacer pacer;
     size_t shown = 0;
     float elapsed = 0, report = 0;
-    bool joined = false, left = false;
+    bool joined = false, left = false, nestShown = false, knewNest = false;
+    PlayerId guest = kNoPlayer;
     int remoteCollected = 0, remoteDelivered = 0;
     while (elapsed < seconds && !left) {
         const float dt = pacer.wait();
@@ -145,10 +169,12 @@ int hostRehearsal(const std::filesystem::path& saveDir, float seconds) {
             if (event.actor == 0 || event.actor == kNoPlayer) continue;   // So os eventos vindos dos clientes.
             printEvent("Host viu", event);
             joined = joined || event.type == GameEventType::PlayerJoined;
+            if (event.type == GameEventType::PlayerJoined) guest = event.actor;
             left = left || (joined && event.type == GameEventType::PlayerLeft);
             if (event.type == GameEventType::CashewCollected) remoteCollected++;
             if (event.type == GameEventType::CashewDelivered) remoteDelivered += event.value;
         }
+        if (guest != kNoPlayer && !left) knewNest = knowsNest("Host conhece", peer, world, kDefaultSeed, guest, nestShown) || knewNest;
         if (report >= 1.0f) {
             report = 0;
             for (const PlayerPublicState& player : peer.authority().players()) {
@@ -160,8 +186,11 @@ int hostRehearsal(const std::filesystem::path& saveDir, float seconds) {
         }
     }
     std::cout << "Resumo do host: entrou " << (joined ? "sim" : "nao") << ", cajus coletados pelo cliente "
-              << remoteCollected << ", entregues " << remoteDelivered << ", saiu " << (left ? "sim" : "nao") << "\n";
-    return joined && remoteCollected > 0 && remoteDelivered > 0 && left ? 0 : 1;
+              << remoteCollected << ", entregues " << remoteDelivered << ", conhece o ninho dele " << (knewNest ? "sim" : "nao")
+              << ", saiu " << (left ? "sim" : "nao") << "\n";
+    const bool nestGone = peer.session().rivalNests().nests().empty();
+    if (left) std::cout << "Depois da saida o ninho do cliente " << (nestGone ? "sumiu" : "CONTINUA no mapa") << "\n";
+    return joined && remoteCollected > 0 && remoteDelivered > 0 && knewNest && left && nestGone ? 0 : 1;
 }
 
 int joinRehearsal(const std::filesystem::path& saveDir, const std::string& address, uint32_t seed) {
@@ -177,13 +206,15 @@ int joinRehearsal(const std::filesystem::path& saveDir, const std::string& addre
     std::cout << "Conectado como jogador " << static_cast<int>(me) << "\n";
     RehearsalPeer peer(world, kDefaultSeed, CashewField(world, kDefaultSeed), saveDir, match.authority(), me, false);
     peer.startProfile("Cliente");
+    printOwnNest("Cliente", peer);
     peer.setGoal(2);
 
     Pacer pacer;
     size_t shown = 0;
     float elapsed = 0, afterDelivery = 0;
-    bool sawHost = false;
-    size_t npcs = 0;
+    bool sawHost = false, nestShown = false, knewHostNest = false;
+    size_t npcs = 0, perched = 0;
+    std::set<uint8_t> roles;
     while (elapsed < 30.0f) {
         const float dt = pacer.wait();
         elapsed += dt;
@@ -198,15 +229,24 @@ int joinRehearsal(const std::filesystem::path& saveDir, const std::string& addre
             if (event.actor == me || event.type == GameEventType::PlayerJoined) printEvent("Cliente recebeu", event);
         }
         for (const PlayerPublicState& player : peer.authority().players()) sawHost = sawHost || player.id == 0;
-        npcs = std::max(npcs, match.clientAuthority()->npcs().size());
+        knewHostNest = knowsNest("Cliente conhece", peer, world, kDefaultSeed, 0, nestShown) || knewHostNest;
+        const auto received = match.clientAuthority()->npcs();
+        npcs = std::max(npcs, received.size());
+        size_t resting = 0;
+        for (const net::NpcPublicState& npc : received) {
+            roles.insert(npc.role);
+            resting += npc.perched ? 1 : 0;
+        }
+        perched = std::max(perched, resting);
         if (peer.delivered()) afterDelivery += dt;
         if (afterDelivery > 1.0f) break;
     }
     const int delivered = peer.session().view().totalDelivered;
-    std::cout << "Resumo do cliente: ve o host " << (sawHost ? "sim" : "nao") << ", NPCs recebidos " << npcs
-              << ", cajus entregues " << delivered << "\n";
+    std::cout << "Resumo do cliente: ve o host " << (sawHost ? "sim" : "nao") << ", conhece o ninho do host "
+              << (knewHostNest ? "sim" : "nao") << ", NPCs recebidos " << npcs << " (" << roles.size() << " papeis, ate "
+              << perched << " pousados), cajus entregues " << delivered << "\n";
     match.leave();
-    return sawHost && npcs > 0 && delivered >= 2 ? 0 : 1;
+    return sawHost && knewHostNest && npcs > 0 && delivered >= 2 ? 0 : 1;
 }
 }
 

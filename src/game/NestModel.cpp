@@ -17,6 +17,14 @@ const glm::vec3 kOuterStraw(0.47f, 0.32f, 0.17f), kInnerStraw(0.70f, 0.55f, 0.28
 const glm::vec3 kTwigDark(0.33f, 0.22f, 0.13f), kTwigLight(0.62f, 0.46f, 0.25f);
 const glm::vec3 kMastWhite(0.95f, 0.93f, 0.86f), kFlagRed(0.95f, 0.18f, 0.12f), kFlagYellow(0.99f, 0.76f, 0.14f);
 const glm::vec3 kBeaconTop(1.0f, 0.82f, 0.18f), kBeaconBottom(1.0f, 0.42f, 0.10f);
+const glm::vec3 kRivalFlag(0.16f, 0.45f, 0.98f), kRivalStripe(0.55f, 0.88f, 1.0f);
+const glm::vec3 kRivalBeaconTop(0.45f, 0.88f, 1.0f), kRivalBeaconBottom(0.12f, 0.36f, 0.98f);
+constexpr float kRivalBeaconSize = 0.55f;
+
+struct NestColors {
+    glm::vec3 flag, stripe;
+};
+const NestColors kOwnColors{kFlagRed, kFlagYellow}, kRivalColors{kRivalFlag, kRivalStripe};
 
 glm::vec3 around(glm::vec3 center, float angle, float radius, float height) {
     return center + glm::vec3(std::cos(angle) * radius, height, std::sin(angle) * radius);
@@ -64,55 +72,77 @@ void addStruts(MeshBuilder& mesh, glm::vec3 base, float radius, Rng& rng) {
 }
 
 // Mastro atras do poleiro, com faixas e bandeira, fora da visao de quem esta pousado.
-void addMast(MeshBuilder& mesh, glm::vec3 foot, float height, glm::vec3 side, float scale) {
+void addMast(MeshBuilder& mesh, glm::vec3 foot, float height, glm::vec3 side, float scale, const NestColors& colors) {
     constexpr int kBands = 5;
     for (int i = 0; i < kBands; i++) {
         const glm::vec3 low = foot + glm::vec3(0, height * i / kBands, 0), high = foot + glm::vec3(0, height * (i + 1) / kBands, 0);
-        mesh.tube({low, high}, {0.75f * scale, 0.6f * scale}, 6, i % 2 == 0 ? kFlagRed : kMastWhite);
+        mesh.tube({low, high}, {0.75f * scale, 0.6f * scale}, 6, i % 2 == 0 ? colors.flag : kMastWhite);
     }
     const glm::vec3 top = foot + glm::vec3(0, height, 0), drop(0, -9.0f * scale, 0);
     const glm::vec3 tip = top + side * (16.0f * scale) + drop * 0.5f;
-    mesh.triangle(top, top + drop, tip, kFlagRed);
-    mesh.triangle(top + drop * 0.3f, top + drop * 0.7f, top + side * (9.0f * scale) + drop * 0.5f, kFlagYellow);
+    mesh.triangle(top, top + drop, tip, colors.flag);
+    mesh.triangle(top + drop * 0.3f, top + drop * 0.7f, top + side * (9.0f * scale) + drop * 0.5f, colors.stripe);
 }
 
 glm::vec3 behindPerch(const NestSite& site, float radius) {
     return site.base + glm::vec3(-std::sin(site.yaw), 0, std::cos(site.yaw)) * (radius * 0.9f);
 }
-}
 
-MeshBuilder buildNestMesh(const NestSite& site, int sizeLevel) {
+void addNest(MeshBuilder& mesh, const NestSite& site, int sizeLevel, const NestColors& colors) {
     const float scale = nestScale(sizeLevel), radius = kBowlRadius * scale, rim = kRimHeight * scale;
-    MeshBuilder mesh;
     Rng rng(0x4E1570u);
     addStruts(mesh, site.base, radius, rng);
     addBowl(mesh, site.base, radius, rim);
     addTwigs(mesh, site.base, radius, rim, kBaseTwigLayers + sizeLevel, scale, rng);
     const glm::vec3 side(std::cos(site.yaw), 0, std::sin(site.yaw));
-    addMast(mesh, behindPerch(site, radius) + glm::vec3(0, rim * 0.5f, 0), kMastHeight * scale + rim * 0.5f, side, scale);
-    return mesh;
+    addMast(mesh, behindPerch(site, radius) + glm::vec3(0, rim * 0.5f, 0), kMastHeight * scale + rim * 0.5f, side, scale, colors);
 }
 
-MeshBuilder buildNestBeaconMesh() {
+MeshBuilder beaconMesh(glm::vec3 topColor, glm::vec3 bottomColor) {
     const glm::vec3 top(0, 7.5f, 0), bottom(0, -7.5f, 0);
     MeshBuilder mesh;
     for (int i = 0; i < 6; i++) {
         const float a = kFullTurn * i / 6, b = kFullTurn * (i + 1) / 6;
         const glm::vec3 p(std::cos(a) * 5.0f, 0, std::sin(a) * 5.0f), q(std::cos(b) * 5.0f, 0, std::sin(b) * 5.0f);
-        mesh.triangle(top, q, p, kBeaconTop);
-        mesh.triangle(bottom, p, q, kBeaconBottom);
+        mesh.triangle(top, q, p, topColor);
+        mesh.triangle(bottom, p, q, bottomColor);
     }
     return mesh;
 }
 
-glm::mat4 nestBeaconTransform(const NestSite& site, int sizeLevel, glm::vec3 camera, float time) {
+glm::mat4 beaconTransform(const NestSite& site, int sizeLevel, glm::vec3 camera, float time, float size) {
     const float nest = nestScale(sizeLevel);
     const float height = (kRimHeight + kMastHeight) * nest + kBeaconGap;
     const glm::vec3 center = behindPerch(site, kBowlRadius * nest) + glm::vec3(0, height, 0);
     const float distance = glm::length(center - camera);
     if (distance < kBeaconHideDistance) return glm::mat4(0.0f);
     const float appear = std::clamp((distance - kBeaconHideDistance) / (kBeaconFullDistance - kBeaconHideDistance), 0.0f, 1.0f);
-    const float scale = appear * std::clamp(distance / kBeaconGrowth, 1.0f, kBeaconMaxScale);
+    const float scale = size * appear * std::clamp(distance / kBeaconGrowth, 1.0f, kBeaconMaxScale);
     const glm::mat4 placed = glm::translate(glm::mat4(1.0f), center + glm::vec3(0, std::sin(time * 1.6f) * 1.5f, 0));
     return glm::scale(glm::rotate(placed, time * 1.2f, glm::vec3(0, 1, 0)), glm::vec3(scale));
+}
+}
+
+MeshBuilder buildNestMesh(const NestSite& site, int sizeLevel) {
+    MeshBuilder mesh;
+    addNest(mesh, site, sizeLevel, kOwnColors);
+    return mesh;
+}
+
+MeshBuilder buildRivalNestsMesh(const std::vector<RivalNest>& nests) {
+    MeshBuilder mesh;
+    for (const RivalNest& nest : nests) addNest(mesh, nest.site, nest.sizeLevel, kRivalColors);
+    return mesh;
+}
+
+MeshBuilder buildNestBeaconMesh() { return beaconMesh(kBeaconTop, kBeaconBottom); }
+
+MeshBuilder buildRivalBeaconMesh() { return beaconMesh(kRivalBeaconTop, kRivalBeaconBottom); }
+
+glm::mat4 nestBeaconTransform(const NestSite& site, int sizeLevel, glm::vec3 camera, float time) {
+    return beaconTransform(site, sizeLevel, camera, time, 1.0f);
+}
+
+glm::mat4 rivalBeaconTransform(const NestSite& site, int sizeLevel, glm::vec3 camera, float time) {
+    return beaconTransform(site, sizeLevel, camera, time, kRivalBeaconSize);
 }
