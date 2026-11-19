@@ -273,7 +273,7 @@ void testAutoGain(TestRun& run) {
     std::vector<float> shout = tone(300, 50 * kVoiceFrame, 0.95f);
     for (int i = 0; i < 50; i++) loud.process(shout.data() + i * kVoiceFrame, kVoiceFrame, true);
     const float peak = *std::max_element(shout.begin(), shout.end());
-    run.check("Voz: voz alta nao satura", peak <= 1.0f && loud.gainDb() < 1.0f);
+    run.check("Voz: voz alta nao satura", peak < 0.95f && near(rms(shout.data() + 40 * kVoiceFrame, 10 * kVoiceFrame), std::pow(10.0f, -16.0f / 20.0f), 0.01f));
 
     AutoGain pauses;
     const float before = pauses.gainDb();
@@ -315,15 +315,15 @@ void testDoppler(TestRun& run) {
     VoiceListener me;
     const glm::vec3 ahead(0, 0, -40);
     const float still = dopplerFactor(me, ahead, glm::vec3(0), settings);
-    const float approach = dopplerFactor(me, ahead, glm::vec3(0, 0, 40), settings);
-    const float recede = dopplerFactor(me, ahead, glm::vec3(0, 0, -40), settings);
+    const float approach = dopplerFactor(me, ahead, glm::vec3(0, 0, 24), settings);
+    const float recede = dopplerFactor(me, ahead, glm::vec3(0, 0, -24), settings);
     const float passing = dopplerFactor(me, ahead, glm::vec3(40, 0, 0), settings);
     run.check("Voz: Doppler e 1 com os dois parados e numa passagem de lado", still == 1.0f && near(passing, 1.0, 1e-5));
-    run.check(describe("Voz: Doppler aproximando = 343 / (343 - 3*40)", approach), near(approach, 343.0 / 223.0, 1e-4));
-    run.check(describe("Voz: Doppler afastando = 343 / (343 + 3*40)", recede), near(recede, 343.0 / 463.0, 1e-4));
+    run.check(describe("Voz: Doppler aproximando = 343 / (343 - 4,5*24)", approach), near(approach, 343.0 / 235.0, 1e-4));
+    run.check(describe("Voz: Doppler afastando = 343 / (343 + 4,5*24)", recede), near(recede, 343.0 / 451.0, 1e-4));
     me.velocity = {0, 0, -20};
     const float listenerMoving = dopplerFactor(me, ahead, glm::vec3(0), settings);
-    run.check(describe("Voz: Doppler com quem ouve indo ao encontro", listenerMoving), near(listenerMoving, 403.0 / 343.0, 1e-4));
+    run.check(describe("Voz: Doppler com quem ouve indo ao encontro", listenerMoving), near(listenerMoving, 433.0 / 343.0, 1e-4));
     run.check("Voz: Doppler limitado entre 0,6 e 1,6",
               dopplerFactor(VoiceListener{}, ahead, glm::vec3(0, 0, 100), settings) == 1.6f &&
               dopplerFactor(VoiceListener{}, ahead, glm::vec3(0, 0, -100), settings) == 0.6f);
