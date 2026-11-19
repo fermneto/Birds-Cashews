@@ -35,6 +35,7 @@ GameplaySession::GameplaySession(const World& world, uint32_t seed, CashewField&
                                  std::unique_ptr<GameAuthority> authority)
     : world_(world), bird_(bird), localPlayer_(localPlayer), authority_(orLocal(std::move(authority))),
       collector_(cashews, *authority_, localPlayer), nest_(chooseNestSite(world, seed, localPlayer)),
+      rivals_(world, seed),
       store_(saveDir), records_(saveDir) {
     refreshView();
 }
@@ -95,6 +96,7 @@ void GameplaySession::stepBird(float dt) {
 // Todo evento confirmado passa por aqui, porque pollEvents entrega cada um uma unica vez.
 void GameplaySession::update(float frameSeconds) {
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
+    rivals_.update(authority_->players(), localPlayer_);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
     cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);
     if (perched_) holdPerch(frameSeconds);

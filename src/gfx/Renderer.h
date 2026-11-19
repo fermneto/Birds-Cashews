@@ -30,6 +30,10 @@ public:
     void setNestMesh(const MeshBuilder& nest);
     void setNestBeaconMesh(const MeshBuilder& beacon);
     void setNestBeacon(const glm::mat4& transform) { nestBeaconTransform_ = transform; }
+    // Ninhos dos outros jogadores: uma malha so e um marcador menor por ninho.
+    void setRivalNestMesh(const MeshBuilder& nests);
+    void setRivalBeaconMesh(const MeshBuilder& beacon);
+    void setRivalBeacons(std::vector<glm::mat4> transforms) { rivalBeacons_ = std::move(transforms); }
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
 
 private:
@@ -38,6 +42,7 @@ private:
     void drawBirds(float time);
     void drawCashews();
     void drawNest();
+    void drawRivalNests();
     void drawWater(const Camera3D& camera, float time);
     void drawViewModel(const Camera3D& camera, const BirdAnimation& animation);
     void drawWind(const BirdAnimation& animation);
@@ -52,6 +57,8 @@ private:
     std::vector<glm::mat4> nearbyCashews_, distantCashews_;
     std::unique_ptr<Mesh> nestMesh_, nestBeaconMesh_;
     glm::mat4 nestBeaconTransform_{0.0f};
+    std::unique_ptr<Mesh> rivalNestsMesh_, rivalBeaconMesh_;
+    std::vector<glm::mat4> rivalBeacons_;
     BirdViewModel viewModel_;
     glm::vec3 spawnPoint_;
     struct FlyingBird {

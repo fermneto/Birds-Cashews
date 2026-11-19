@@ -5,6 +5,7 @@
 #include "shared/BirdFactory.h"
 #include "input/BodyInput.h"
 #include "input/KeyboardInput.h"
+#include "shared/LocalAuthority.h"
 #include "ui/CalibratedBodyInput.h"
 #include "ui/FakeNetSession.h"
 #include "ui/UiShowcase.h"
@@ -27,6 +28,20 @@ const cv::Size kPreviewSize(320, 240);
 constexpr PlayerId kLocalPlayer = 0;
 const char* const kDefaultProfile = "Jogador";
 
+// Jogo local com um jogador parado a mais, para fotografar o ninho de um rival sem abrir a rede.
+class GhostRivalAuthority final : public LocalAuthority {
+public:
+    explicit GhostRivalAuthority(const PlayerPublicState& rival) : rival_(rival) {}
+    std::vector<PlayerPublicState> players() const override {
+        std::vector<PlayerPublicState> list = LocalAuthority::players();
+        list.push_back(rival_);
+        return list;
+    }
+
+private:
+    PlayerPublicState rival_;
+};
+
 std::filesystem::path saveDirFor(const GameOptions& options) {
     if (!options.saveDir.empty()) return options.saveDir;
     char* base = SDL_GetBasePath();
@@ -45,6 +60,7 @@ Game::Game(const GameOptions& options)
     match_.setCashewCount(cashews_.size());
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
+    renderer_.setRivalBeaconMesh(buildRivalBeaconMesh());
     player_.spawn(world_.spawnPoint(), 0.0f);
     window_.drawableSize(width_, height_);
     renderer_.resize(width_, height_);
@@ -143,7 +159,7 @@ void Game::rebuildSession() {
                                                  match_.localPlayer(), std::move(authority));
     if (!profile.empty()) session_->startProfile(profile);
     if (ui_) ui_->setGameplay(*session_);
-    shownNestRevision_ = -1;
+    shownNestRevision_ = shownRivalRevision_ = -1;
     const char* const modes[] = {"sozinho", "hospedando a sala", "na sala como cliente"};
     std::cout << "Partida refeita: " << modes[static_cast<int>(match_.mode())] << ", jogador "
               << static_cast<int>(match_.localPlayer()) << "\n";
@@ -216,13 +232,23 @@ void Game::prepareCashews(const Camera3D& camera) {
                                  visibleCashews(cashews_, viewProjection, camera.position, kCashewDetailDistance, kCashewDrawDistance));
 }
 
-// O ninho so e remontado quando o nivel de Tamanho muda.
+// Os ninhos so sao remontados quando o nivel de Tamanho ou a lista de jogadores muda.
 void Game::prepareNest(const Camera3D& camera) {
     if (shownNestRevision_ != session_->nestRevision()) {
         shownNestRevision_ = session_->nestRevision();
         renderer_.setNestMesh(buildNestMesh(session_->nest(), session_->nestSizeLevel()));
     }
     renderer_.setNestBeacon(nestBeaconTransform(session_->nest(), session_->nestSizeLevel(), camera.position, time_));
+
+    const RivalNests& rivals = session_->rivalNests();
+    if (shownRivalRevision_ != rivals.revision()) {
+        shownRivalRevision_ = rivals.revision();
+        renderer_.setRivalNestMesh(buildRivalNestsMesh(rivals.nests()));
+    }
+    std::vector<glm::mat4> beacons;
+    for (const RivalNest& nest : rivals.nests())
+        beacons.push_back(rivalBeaconTransform(nest.site, nest.sizeLevel, camera.position, time_));
+    renderer_.setRivalBeacons(std::move(beacons));
 }
 
 // NPCs e outros jogadores sao passaros procedurais pela semente. No cliente os NPCs vem do host.
@@ -328,6 +354,7 @@ int Game::renderTest(const std::string& outputDir) {
     captureNestShots(outputDir);
     captureUiShots(outputDir);
     captureLiveNestShots(outputDir);
+    captureRivalNestShots(outputDir);
     return 0;
 }
 
@@ -468,6 +495,44 @@ void Game::captureNestShots(const std::string& outputDir) {
     ProfileStore(saveDirFor(options_)).save(Profile::restored("Ninho maximo", 1, 0, 0, {}, {0, 0, 0, kMaxUpgradeLevel}));
     session_->startProfile("Ninho maximo");
     shoot("15_ninho_maximo.png", 170.0f, 45.0f);
+}
+
+// Fotografa o proprio ninho ao lado do ninho de outro jogador, o rival mais proximo, com Tamanho 3.
+void Game::captureRivalNestShots(const std::string& outputDir) {
+    const NestSite own = chooseNestSite(world_, options_.seed, kLocalPlayer);
+    PlayerPublicState rival;
+    float closest = 1.0e9f;
+    for (PlayerId id = 1; id < kMaxPlayers; id++) {
+        const float distance = glm::length(chooseNestSite(world_, options_.seed, id).base - own.base);
+        if (distance < closest) {
+            closest = distance;
+            rival.id = id;
+        }
+    }
+    rival.position = world_.spawnPoint() + glm::vec3(0, 200, 0);
+    rival.nestLevel = 3;
+    session_ = std::make_unique<GameplaySession>(world_, options_.seed, cashews_, player_, saveDirFor(options_), kLocalPlayer,
+                                                 std::make_unique<GhostRivalAuthority>(rival));
+    session_->startProfile(kDefaultProfile);
+    updateCashews(0.0f);
+    shownNestRevision_ = shownRivalRevision_ = -1;
+    const RivalNest* nest = session_->rivalNests().find(rival.id);
+    if (!nest) {
+        std::cout << "Ninho rival: nao apareceu\n";
+        return;
+    }
+    renderer_.setOverlay(cv::Mat::zeros(height_, width_, CV_8UC4));   // Sem o HUD das fotos anteriores.
+    renderer_.setPreviewVisible(false);
+    std::cout << "Ninho rival: jogador " << static_cast<int>(rival.id) << " a " << std::lround(closest)
+              << " m do proprio, Tamanho " << nest->sizeLevel << "\n";
+
+    const glm::vec3 middle = (own.base + nest->site.base) * 0.5f, across = nest->site.base - own.base;
+    const glm::vec3 side = glm::normalize(glm::vec3(-across.z, 0, across.x));
+    aimAt(middle + side * std::max(closest * 1.1f, 300.0f) + glm::vec3(0, 130, 0), middle + glm::vec3(0, 20, 0));
+    cv::imwrite(outputDir + "/16_ninho_rival_lado.png", captureFrame(3.0f));
+    const glm::vec3 heading(std::sin(nest->site.yaw), 0, -std::cos(nest->site.yaw));
+    aimAt(nest->site.perch + heading * 150.0f + glm::vec3(0, 40, 0), nest->site.perch);
+    cv::imwrite(outputDir + "/17_ninho_rival_perto.png", captureFrame(3.0f));
 }
 
 // Simula um mergulho real para conferir o campo de visao em alta velocidade.

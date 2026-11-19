@@ -7,6 +7,7 @@
 #include "net/NetMatch.h"
 #include "net/Protocol.h"
 #include "net/RemoteTrack.h"
+#include "save/ProfileStore.h"
 #include "voice/VoiceChat.h"
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -731,6 +732,52 @@ void testSimulatedMatch(TestRun& t) {
     }());
     t.check("partida: o ninho do cliente nao e o do host", host.session().nest().tree != guest.session().nest().tree);
 }
+
+bool sameSite(const NestSite& a, const NestSite& b) {
+    return a.tree == b.tree && a.base == b.base && a.perch == b.perch && a.yaw == b.yaw;
+}
+
+// Host e cliente em loopback, cada um com o proprio Tamanho: cada lado sabe onde e de que tamanho e o ninho do outro.
+void testRivalNestsOverNetwork(TestRun& t) {
+    const World world(kWorld);
+    TempDir hostDir("ninho-host"), clientDir("ninho-cliente");
+    ProfileStore(hostDir.path()).save(Profile::restored("Host", 11, 0, 0, {}, {0, 0, 0, 1}));
+    ProfileStore(clientDir.path()).save(Profile::restored("Cliente", 22, 0, 0, {}, {0, 0, 0, 2}));
+    Room room;
+    Client& client = room.join({kWorld, "Cliente", 22});
+    if (!ready(client)) {
+        t.check("ninhos em rede: cliente entra", false);
+        return;
+    }
+    RehearsalPeer host(world, kWorld, CashewField(world, kWorld), hostDir.path(), room.host.authority, 0, false,
+                       room.host.authority.get());
+    RehearsalPeer guest(world, kWorld, CashewField(world, kWorld), clientDir.path(), client.authority, 1, false);
+    host.startProfile("Host");
+    guest.startProfile("Cliente");
+    const auto frame = [&](bool withGuest) {
+        room.host.authority->update(kDt);
+        if (withGuest) client.authority->update(kDt);
+        else client.udp.poll();
+        host.step(kDt);
+        if (withGuest) guest.step(kDt);
+        std::this_thread::sleep_for(300us);
+    };
+    for (int i = 0; i < 400 && !(host.session().rivalNests().find(1) && guest.session().rivalNests().find(0)); i++) frame(true);
+    for (int i = 0; i < 20; i++) frame(true);
+
+    const RivalNest* seenByHost = host.session().rivalNests().find(1);
+    const RivalNest* seenByGuest = guest.session().rivalNests().find(0);
+    t.check("ninhos em rede: o host sabe onde esta o ninho do cliente",
+            seenByHost && sameSite(seenByHost->site, guest.session().nest()) && seenByHost->sizeLevel == 2);
+    t.check("ninhos em rede: o cliente sabe onde esta o ninho do host",
+            seenByGuest && sameSite(seenByGuest->site, host.session().nest()) && seenByGuest->sizeLevel == 1);
+    t.check("ninhos em rede: cada lado so lista o ninho do outro",
+            host.session().rivalNests().nests().size() == 1 && guest.session().rivalNests().nests().size() == 1);
+
+    client.udp.leave();
+    for (int i = 0; i < 300 && host.session().rivalNests().find(1); i++) frame(false);
+    t.check("ninhos em rede: o ninho do cliente some quando ele sai", host.session().rivalNests().nests().empty());
+}
 } // namespace
 
 // O host desta maquina responde pelo broadcast e pelo loopback; a lista deve mostrar uma sala so.
@@ -817,5 +864,6 @@ int runMatchSelfTest() {
     testDiscoveryDedup(test);
     testVoiceOverNetwork(test);
     testSimulatedMatch(test);
+    testRivalNestsOverNetwork(test);
     return test.failures;
 }

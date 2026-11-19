@@ -58,6 +58,7 @@ private:
     void captureDiveShot(const std::string& outputDir);
     void captureCashewShots(const std::string& outputDir);
     void captureNestShots(const std::string& outputDir);
+    void captureRivalNestShots(const std::string& outputDir);
     void aimAt(glm::vec3 eye, glm::vec3 target);
     void measureFrames(const std::string& label);
     void captureUiShots(const std::string& outputDir);
@@ -81,5 +82,5 @@ private:
     cv::Mat previewBase_;
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;
     int width_ = 1280, height_ = 720;
-    int shownNestRevision_ = -1;
+    int shownNestRevision_ = -1, shownRivalRevision_ = -1;
 };
