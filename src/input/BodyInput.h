@@ -1,5 +1,6 @@
 #pragma once
 #include "input/FlightInput.h"
+#include "input/GestureControls.h"
 #include "vision/VisionPipeline.h"
 
 // Controla o passaro com o corpo, pela webcam.
@@ -15,6 +16,6 @@ private:
     VisionPipeline vision_;
     VisionSnapshot view_;
     uint64_t sequence_ = 0;
-    uint32_t lastFlapCount_ = 0, lastMenuCount_ = 0;
+    GestureControls controls_;
     bool fresh_ = false;
 };

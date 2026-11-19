@@ -30,6 +30,9 @@ public:
     void stepBird(float dt);                              // A cada passo fixo da fisica.
     void update(float frameSeconds);                      // Unico ponto que consome GameAuthority::pollEvents.
 
+    void publishLocalPlayer();                            // Informa a autoridade onde o jogador esta.
+    GameAuthority& authority() { return *authority_; }
+
     bool perched() const { return perched_; }
     const NestSite& nest() const { return nest_; }
     int nestSizeLevel() const;
@@ -67,7 +70,7 @@ private:
     std::vector<GameplayFeedback> feedback_;
 
     bool perched_ = false, landingArmed_ = true, deliveryPending_ = false;
-    float settle_ = 0, recordNotice_ = 0, menuHold_ = 0;
+    float settle_ = 0, recordNotice_ = 0, cargoLostNotice_ = 0, menuHold_ = 0;
     ArmSide menuArm_ = ArmSide::None;
     glm::vec3 landingFrom_{0};
     float landingYaw_ = 0, landingPitch_ = 0, landingRoll_ = 0;

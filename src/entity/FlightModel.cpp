@@ -5,7 +5,7 @@
 namespace {
 constexpr float kFlapLift = 14.0f, kFlapThrust = 3.0f, kMaxClimb = 22.0f, kMaxFlapSpeed = 44.0f;
 constexpr float kFlapClimb = 5.0f, kFlapSpeedBonus = 8.0f;
-constexpr float kGlideSink = 2.0f, kSwoopFactor = 0.55f;
+constexpr float kGlideSink = 2.5f, kSwoopFactor = 0.55f;
 constexpr float kDiveSink = 34.0f, kDiveSpeed = 46.0f;
 constexpr float kGroundFriction = 30.0f;
 constexpr float kTurnRate = glm::radians(60.0f), kMaxRoll = glm::radians(50.0f);
@@ -14,6 +14,8 @@ float approach(float value, float target, float rate, float dt) {
     return value + (target - value) * (1.0f - std::exp(-rate * dt));
 }
 }
+
+float FlightModel::fullDiveSpeed() const { return std::hypot(kDiveSpeed * stats_.speed, kDiveSink); }
 
 void FlightModel::place(glm::vec3 position, float yaw, float speed) {
     position_ = position;
@@ -60,7 +62,7 @@ void FlightModel::updateAttitude(const FlightControls& controls, float dt) {
     const float bank = controls.mode == FlightMode::Lost ? 0.0f : controls.bank;
     if (!grounded_) yaw_ += bank * kTurnRate * stats_.agility * dt;
     roll_ = approach(roll_, bank * kMaxRoll, 5.0f, dt);
-    pitch_ = approach(pitch_, targetPitch(controls.mode), 4.0f, dt);
+    pitch_ = approach(pitch_, (controls.bodyControlled ? std::atan2(verticalSpeed_, std::max(speed_, 8.0f)) : targetPitch(controls.mode)), 4.0f, dt);
 }
 
 // O nariz sobe ao bater, fica quase nivelado ao planar e aponta para baixo no mergulho.
@@ -81,7 +83,37 @@ void FlightModel::applyCeiling(float dt) {
 }
 
 void FlightModel::step(const FlightControls& controls, float dt) {
-    updateSpeeds(controls.mode, dt);
+    if (controls.bodyControlled && grounded_ && controls.stroke > 0.12f) {
+        grounded_ = false;
+        verticalSpeed_ = std::max(0.0f, verticalSpeed_);
+    }
+    if (controls.bodyControlled && !grounded_) {
+        const float cruise = kCruiseSpeed * stats_.speed;
+        const float excess = std::max(0.0f, speed_ - cruise);
+        const float climb = excess * kSwoopFactor * (1 - controls.dive);
+        const float sink = glm::mix(kGlideSink, kDiveSink, controls.dive);
+        const float thrust = std::min(controls.stroke, 1.0f) * (1 - controls.dive);
+        const float targetSpeed = glm::mix(cruise, kDiveSpeed * stats_.speed, controls.dive);
+        const float pull = controls.pullUp * (1 - controls.dive) * (1 - thrust);
+
+        // Ao puxar, a sustentacao gira a velocidade existente. A gravidade
+        // consome essa energia enquanto o passaro ganha altura.
+        const float propulsion = controls.stroke * (1 - controls.dive) * 24.0f * stats_.speed;
+        const float glideSpeed = approach(speed_, targetSpeed + propulsion, 0.8f, dt);
+        const float glideVertical = approach(verticalSpeed_, glm::mix(climb - sink, kFlapClimb, thrust),
+                                             glm::mix(1.6f, 0.9f, thrust), dt);
+        const float airspeed = std::hypot(speed_, verticalSpeed_);
+        const float angle = std::atan2(verticalSpeed_, speed_);
+        const float lift = glm::smoothstep(0.22f * cruise, 0.75f * cruise, airspeed);
+        const float targetAngle = glm::radians(77.0f) * pull;
+        const float rotated = approach(angle, targetAngle, 3.2f * lift, dt);
+        speed_ = glm::mix(glideSpeed, airspeed * std::cos(rotated), pull);
+        verticalSpeed_ = glm::mix(glideVertical, airspeed * std::sin(rotated) - 9.81f * dt, pull);
+        // A forca atua apenas durante o deslocamento descendente das asas.
+        verticalSpeed_ += std::min(std::max(0.0f, kMaxClimb - verticalSpeed_), 72.0f * controls.stroke * dt);
+    } else {
+        updateSpeeds(controls.mode, dt);
+    }
     updateAttitude(controls, dt);
     position_ += heading() * speed_ * dt + glm::vec3(0, verticalSpeed_ * dt, 0);
     applyCeiling(dt);

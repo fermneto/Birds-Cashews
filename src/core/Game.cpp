@@ -36,7 +36,7 @@ std::filesystem::path saveDirFor(const GameOptions& options) {
 Game::Game(const GameOptions& options)
     : options_(options), window_("Birds&Cashews", 1280, 720, options.hidden), world_(options.seed),
       renderer_(world_.buildMesh(), world_.buildCloudMesh(), world_.spawnPoint()), cashews_(world_, options.seed),
-      session_(world_, options.seed, cashews_, player_, saveDirFor(options), kLocalPlayer) {
+      session_(world_, options.seed, cashews_, player_, saveDirFor(options), kLocalPlayer), npcs_(world_, options.seed) {
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
     player_.spawn(world_.spawnPoint(), 0.0f);
@@ -81,6 +81,12 @@ bool Game::handleEvents() {
 // Todo evento confirmado passa pela sessao aqui, porque pollEvents entrega cada um uma unica vez.
 void Game::updateCashews(float frameSeconds) { session_.update(frameSeconds); }
 
+void Game::updateNpcs(float frameSeconds) {
+    session_.publishLocalPlayer();
+    GameAuthority& authority = session_.authority();
+    npcs_.advance(frameSeconds, authority.players(), cashews_, authority);
+}
+
 // A fisica usa passo fixo para se comportar igual em qualquer taxa de quadros.
 void Game::advance(float frameSeconds) {
     session_.applyControls(input_->poll());
@@ -90,6 +96,7 @@ void Game::advance(float frameSeconds) {
         accumulator_ -= kFixedStep;
     }
     updateCashews(frameSeconds);
+    updateNpcs(frameSeconds);
     player_.animate(frameSeconds);
     time_ += frameSeconds;
     telemetryTimer_ += frameSeconds;
@@ -139,6 +146,9 @@ Camera3D Game::buildCamera() const {
     camera.yaw = flight.yaw();
     camera.pitch = flight.pitch() + kick * 0.05f + shake * 0.04f * std::sin(time_ * 47.0f);
     camera.roll = flight.roll() + shake * 0.05f * std::sin(time_ * 61.0f);
+    const float vibration = player_.animation().speedVibration;
+    camera.pitch += vibration * 0.0020f * std::sin(time_ * 16.0f);
+    camera.roll += vibration * 0.0030f * std::sin(time_ * 12.0f);
     camera.fovDegrees = player_.animation().fov;
     camera.aspect = static_cast<float>(width_) / static_cast<float>(std::max(height_, 1));
     return camera;
@@ -159,10 +169,19 @@ void Game::prepareNest(const Camera3D& camera) {
     renderer_.setNestBeacon(nestBeaconTransform(session_.nest(), session_.nestSizeLevel(), camera.position, time_));
 }
 
+void Game::prepareBirds() {
+    std::vector<BirdInstance> birds;
+    birds.reserve(npcs_.birds().size());
+    for (const auto& npc : npcs_.birds())
+        birds.push_back({npc.seed, npc.position, npc.yaw, npc.pitch, npc.roll, 2.2f, npc.mode});
+    renderer_.setBirdInstances(std::move(birds));
+}
+
 void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareBirds();
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -171,6 +190,7 @@ cv::Mat Game::captureFrame(float time) {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareBirds();
     return renderer_.capture(camera, player_.animation(), time);
 }
 

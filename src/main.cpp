@@ -1,7 +1,10 @@
+#include "ai/NpcTests.h"
 #include "core/FlightTests.h"
 #include "core/Game.h"
 #include "game/CashewTests.h"
 #include "game/NestTests.h"
+#include "net/NetTests.h"
+#include "procedural/BirdFactoryTests.h"
 #include "save/SaveTests.h"
 #include "shared/ContractTests.h"
 #include "ui/UiTests.h"
@@ -53,7 +56,8 @@ private:
 
 int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
-                       + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest();
+                       + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest() + runNpcSelfTest()
+                       + runNetworkSelfTest() + runBirdFactorySelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }

@@ -31,6 +31,7 @@ struct GameplayView {
     std::string recordHolder;
     bool leadingRecord = false;
     bool recordBeatenNow = false;   // Verdadeiro enquanto o aviso deve aparecer.
+    bool cargoLostNow = false;      // Um cacador acabou de derrubar a carga.
     bool perchedOnNest = false;
     float nestDistance = 0;    // Metros ate o ninho.
     float nestBearing = 0;     // Radianos em relacao a frente do passaro; positivo e a direita.
@@ -38,7 +39,7 @@ struct GameplayView {
 };
 
 enum class GameplayFeedback { CashewCollected, CashewDelivered, UpgradeBought, UpgradeDenied,
-                              RecordBeaten, MenuMove, NestLanded, TakeOff };
+                              RecordBeaten, MenuMove, NestLanded, TakeOff, CargoLost };
 
 // Ligacao entre as regras da partida (N3) e a interface (N4).
 class GameplaySource {

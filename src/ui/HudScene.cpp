@@ -177,8 +177,7 @@ void drawNestMenu(UiKit& kit, const GameplayView& view) {
                 menu.raisedArm == ArmSide::Right, menu.holdProgress);
 }
 
-void drawBodyWarning(UiKit& kit) {
-    const std::string text = "Corpo fora do quadro: o pássaro plana nivelado";
+void drawWarning(UiKit& kit, const std::string& text) {
     const int width = kit.text.width(text, 22) + 40;
     const cv::Rect chip((kUiWidth - width) / 2, kUiHeight - 62, width, 44);
     kit.canvas.fill(chip, theme::kRed, 0.9f, 12);
@@ -193,6 +192,7 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     drawCompass(kit, view);
     kit.canvas.outline(kPreviewArea, theme::kGold, 2, 4);
     if (view.menu.page != NestMenuPage::Closed) drawNestMenu(kit, view);
-    if (scene.bodyLost) drawBodyWarning(kit);
+    if (scene.bodyLost) drawWarning(kit, "Corpo fora do quadro: o pássaro plana nivelado");
+    else if (view.cargoLostNow) drawWarning(kit, "Um caçador derrubou a sua carga!");
     drawBanner(kit, scene);
 }

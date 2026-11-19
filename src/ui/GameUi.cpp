@@ -369,7 +369,7 @@ std::string GameUi::frameKey() const {
 
     const GameplayView& v = gameplay_->view();
     key << '|' << v.carried << ',' << v.capacity << ',' << v.coins << ',' << v.totalDelivered << ',' << v.record << ','
-        << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << std::lround(v.nestDistance) << ','
+        << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << std::lround(v.nestDistance) << ','
         << quantized(v.nestBearing, 60.0f) << ',' << quantized(banner_.opacity(), 30.0f) << ','
         << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected());
     const NestMenuView& menu = v.menu;

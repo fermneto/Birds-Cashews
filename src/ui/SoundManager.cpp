@@ -79,6 +79,7 @@ UiSound soundFor(GameplayFeedback feedback) {
         case GameplayFeedback::MenuMove: return UiSound::NestMove;
         case GameplayFeedback::NestLanded: return UiSound::Landed;
         case GameplayFeedback::TakeOff: return UiSound::TakeOff;
+        case GameplayFeedback::CargoLost: return UiSound::Denied;
     }
     return UiSound::Move;
 }

@@ -37,7 +37,7 @@ void BirdViewModel::drawWing(const Shader& shader, const glm::mat4& cameraToWorl
     // As asas avancam um pouco para que a ponta continue visivel na tela.
     glm::mat4 model = glm::translate(cameraToWorld, glm::vec3(side * 0.34f, -0.56f, -1.0f));
     model = glm::scale(model, glm::vec3(side, 1, 1));
-    model = glm::rotate(model, glm::radians(animation.wingAngle), glm::vec3(0, 0, 1));
+    model = glm::rotate(model, glm::radians(side < 0 ? animation.leftWingAngle : animation.rightWingAngle), glm::vec3(0, 0, 1));
     model = glm::rotate(model, glm::radians(26.0f - animation.wingSweep), glm::vec3(0, 1, 0));
     shader.set("uModel", model);
     wing_->draw();

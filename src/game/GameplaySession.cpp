@@ -14,6 +14,7 @@ constexpr float kTakeoffSpeedFactor = 1.2f; // Velocidade de saida em relacao ao
 constexpr float kTakeoffFlap = 1.4f;        // Forca da batida que tira o passaro do ninho.
 constexpr float kPerchPitch = -0.42f;       // Pousado, o passaro olha para dentro do ninho.
 constexpr float kRecordNoticeSeconds = 6.0f;
+constexpr float kCargoLostNoticeSeconds = 3.0f;
 constexpr float kFullTurn = 6.2831853f;
 
 std::unique_ptr<GameAuthority> orLocal(std::unique_ptr<GameAuthority> authority) {
@@ -94,6 +95,7 @@ void GameplaySession::stepBird(float dt) {
 void GameplaySession::update(float frameSeconds) {
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
+    cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);
     if (perched_) holdPerch(frameSeconds);
     else watchForLanding();
 
@@ -108,7 +110,26 @@ void GameplaySession::handleEvent(const GameEvent& event) {
     const int carriedBefore = collector_.carried();
     collector_.handle(event);
     if (collector_.carried() > carriedBefore) feedback_.push_back(GameplayFeedback::CashewCollected);
+    if (event.type == GameEventType::CashewDropped && collector_.carried() < carriedBefore) {
+        feedback_.push_back(GameplayFeedback::CargoLost);
+        cargoLostNotice_ = kCargoLostNoticeSeconds;
+    }
     if (event.type == GameEventType::CashewDelivered && event.actor == localPlayer_) confirmDelivery(event);
+}
+
+// No ninho o jogador aparece sem carga, porque os cacadores nao atacam quem esta pousado.
+void GameplaySession::publishLocalPlayer() {
+    const FlightModel& flight = bird_.flight();
+    PlayerPublicState state;
+    state.id = localPlayer_;
+    state.position = flight.position();
+    state.yaw = flight.yaw();
+    state.pitch = flight.pitch();
+    state.roll = flight.roll();
+    state.carried = perched_ ? 0 : static_cast<uint8_t>(std::min(collector_.carried(), 255));
+    state.nestLevel = static_cast<uint8_t>(nestSizeLevel());
+    if (profile_) state.birdSeed = profile_->birdSeed();
+    authority_->publishLocalPlayer(state);
 }
 
 // Pedidos em andamento impedem entregar a mesma carga duas vezes.
@@ -261,6 +282,7 @@ void GameplaySession::refreshView() {
     view_.record = records_.record();
     view_.recordHolder = records_.holder();
     view_.recordBeatenNow = recordNotice_ > 0;
+    view_.cargoLostNow = cargoLostNotice_ > 0;
     view_.perchedOnNest = perched_;
     view_.nestDistance = glm::length(toNest);
     view_.nestBearing = std::remainder(std::atan2(toNest.x, -toNest.z) - flight.yaw(), kFullTurn);

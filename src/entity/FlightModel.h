@@ -32,6 +32,7 @@ public:
     float pitch() const { return pitch_; }
     float roll() const { return roll_; }
     float speed() const { return speed_; }
+    float fullDiveSpeed() const;
     float verticalSpeed() const { return verticalSpeed_; }
     bool grounded() const { return grounded_; }
     FlightStats& stats() { return stats_; }
