@@ -5,7 +5,8 @@ A entrega é em **07/12/2026**. As regras do jogo estão em [`PLANO.md`](PLANO.m
 
 ## Situação atual
 
-Atualizado em 18/11/2026, com a `main` no commit `8976ab6`. Ela compila e passa nas 369 verificações de `./birds --selftest`.
+Atualizado em 18/11/2026. A `main` reúne todas as tarefas concluídas, compila e passa nas 619 verificações de
+`./birds --selftest`.
 
 | Tarefa | Dono | Situação | Onde está | O que falta |
 |---|---|---|---|---|
@@ -13,31 +14,39 @@ Atualizado em 18/11/2026, com a `main` no commit `8976ab6`. Ela compila e passa 
 | N1 Cajus e carga | Neto | **Concluída** | PR #3 | Nada |
 | N2 Perfil e record | Neto | **Concluída** | PR #2 | Nada |
 | N3 Ninho e upgrades | Neto | **Concluída** | PR #4 | Nada |
-| N4 Menus, HUD e sons | Neto | **Aguardando validação** | PR #7, aberto | Testar com janela, webcam e som, depois fazer o merge |
-| N5 Roubo e colisões | Neto | Não iniciada | Nenhum | Pode começar com o substituto da D3 |
+| N4 Menus, HUD e sons | Neto | **Concluída** | PR #7 | Validar no teste integrado |
+| N5 Roubo e colisões | Neto | Não iniciada, **destravada em parte** | Nenhum | Pode começar com o substituto da D3 |
 | D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver `RESULTADOS_TESTE_REDE.md` |
-| D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Registrar os testes no `--selftest` |
+| D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
 | D3 Replicação de jogadores | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
-| D4 Ecossistema de NPCs | Daniel | **Em andamento** | Branch `daniel/d4-npcs`, sem PR | Resolver conflitos e abrir o PR |
+| D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
 | D5 Voz por proximidade | Daniel | Não iniciada, **destravada** | Nenhum | Implementar |
-| D6 NPCs em rede | Daniel | Bloqueada | Nenhum | Depende de D3 e D4 |
-| F1 Teste integrado | Ambos | Bloqueada | Nenhum | Depende de N4, N5, D5 e D6 |
-| F2 Documentos | Neto | Não iniciada | Nenhum | README, UML, uso de IA e créditos |
-| F3 Apresentação | Ambos | Bloqueada | Nenhum | Depende de F1 |
+| D6 NPCs em rede | Daniel | Bloqueada | Nenhum | Depende da D3 |
+| F1 Teste integrado | Ambos | Bloqueada | Nenhum | Depende de N5, D5 e D6 |
+| F2 Documentos | Neto | Não iniciada, **destravada** | Nenhum | README, UML, uso de IA e créditos |
+| F3 Apresentação | Ambos | Bloqueada | Nenhum | Depende da F1 |
+
+### O que validar no jogo integrado
+
+Os testes automáticos não cobrem a experiência real. Ainda precisam ser conferidos com janela, webcam e som:
+
+1. Navegação pelos menus com os braços e com o teclado.
+2. Calibração com o corpo inteiro na frente da câmera.
+3. Voo com o corpo: batidas, subida com os braços erguidos, mergulho, curvas e asas independentes.
+4. Ciclo completo: coletar cajus, pousar no ninho, comprar upgrades e decolar batendo os braços.
+5. NPCs: bando, disputa por cajus e caçador derrubando a carga.
+6. HUD, aviso de record e sons.
 
 ### Próximos passos
 
 **Neto**
-1. Testar o PR #7 no jogo real: navegação, calibração com webcam, HUD, menu do ninho e sons.
-2. Fazer o merge do PR #7.
-3. Iniciar a N5 e a F2 em paralelo, como prevê a Onda 3.
+1. Fazer a validação acima e registrar o que precisa de ajuste.
+2. Iniciar a N5 e a F2 em paralelo, como prevê a Onda 3.
 
 **Daniel**
-1. Esperar o merge do PR #7 e só então atualizar a branch `daniel/d4-npcs` com a `main`.
-2. Abrir o PR da D4. Hoje a branch conflita com a `main` em 6 arquivos e com o PR #7 em 8 arquivos.
-3. Explicar no PR da D4 as mudanças em pastas estáveis: voo, gestos e o arquivo `models/pose_trimmed.onnx`, que foi alterado.
-4. Registrar `runNetworkSelfTest` e `runBirdFactorySelfTest` em `runSelfTests`, em `src/main.cpp`.
-5. Iniciar a D3 e a D5.
+1. Atualizar o computador com a `main` e abandonar a branch `daniel/d4-npcs`, que já foi integrada.
+2. Iniciar a D3 e a D5 em paralelo.
+3. Fazer a D6 depois da D3.
 
 ## 1. Resumo
 
