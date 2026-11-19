@@ -72,6 +72,7 @@ private:
     bool perched_ = false, landingArmed_ = true, deliveryPending_ = false;
     float settle_ = 0, recordNotice_ = 0, cargoLostNotice_ = 0, menuHold_ = 0;
     ArmSide menuArm_ = ArmSide::None;
+    FlightMode flightMode_ = FlightMode::Glide;   // Replicado para os outros desenharem as asas.
     glm::vec3 landingFrom_{0};
     float landingYaw_ = 0, landingPitch_ = 0, landingRoll_ = 0;
     int nestRevision_ = 0, appliedSizeLevel_ = 0;

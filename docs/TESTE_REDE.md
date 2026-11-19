@@ -24,3 +24,25 @@ Se a descoberta falhar, obtenha o IPv4 da rede com `hostname -I` no A e tente o 
 ## Detecção de queda
 
 Após o terceiro eco, desative a conexão de rede do B. O computador A deve exibir `Desconexão detectada` em cerca de quatro segundos. Para repetir o teste, reconecte o B e reinicie o programa nos dois computadores.
+
+# Partida em rede sem janela (D3 e D6)
+
+O modo `--rede-teste` roda as regras reais da partida sem abrir janela nem webcam. Um processo hospeda e o outro entra,
+coleta 2 cajus, pousa no próprio ninho, entrega e sai. Serve na mesma máquina ou em dois computadores.
+
+```bash
+make -j8
+./birds --rede-teste host 60                 # terminal A: hospeda por até 60 s na porta 42917
+./birds --rede-teste entrar 127.0.0.1        # terminal B: troque pelo IP do A em outro computador
+./birds --rede-teste entrar 127.0.0.1 5      # mesma coisa com outra semente do mundo: deve ser recusado
+```
+
+O host mostra a entrada, cada caju coletado e a entrega do cliente, a posição dele uma vez por segundo e a saída. O
+cliente mostra os eventos confirmados e, no fim, se viu o host e quantos NPCs recebeu. Os dois terminam com código 0
+quando tudo foi visto. Sem host, o cliente termina com `Host não encontrado nesse endereço.`
+
+## Pelo jogo
+
+Na mesma máquina, abra `./birds` e escolha **Hospedar sala**. Em outro terminal, abra `./birds --teclado`, escolha
+**Entrar em sala** e digite `127.0.0.1` ou escolha a sala na lista. Cada um deve ver o outro como um pássaro, e os
+cajus coletados por um somem para o outro. Voltar ao menu sai da sala.

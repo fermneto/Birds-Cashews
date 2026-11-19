@@ -5,7 +5,7 @@ Projeto de Linguagem de Programação I, semestre 2026.2, prof. Derzu Omaia. **E
 ## 1. Resumo do jogo
 
 Você é um pássaro em primeira pessoa, controlado pelo próprio corpo diante da webcam, em uma ilha de cajueiros gigantes.
-Você coleta cajus, leva ao seu ninho e decide entre comer (melhora o pássaro) ou investir (melhora o ninho). Até 4
+Você coleta cajus, leva ao seu ninho e decide entre comer (melhora o pássaro) ou investir (melhora o ninho). Até 6
 jogadores dividem o mundo pela rede local, conversam por voz de proximidade e podem roubar cajus uns dos outros.
 
 ## 2. Decisões fechadas
@@ -13,7 +13,7 @@ jogadores dividem o mundo pela rede local, conversam por voz de proximidade e po
 | Tema | Decisão |
 |---|---|
 | Plataforma | App desktop Linux em C++17, com OpenGL, SDL2 e OpenCV DNN |
-| Rede | Um jogador hospeda, os outros encontram a sala na LAN. De 1 a 4 jogadores |
+| Rede | Um jogador hospeda, os outros encontram a sala na LAN. De 1 a 6 jogadores (host e até 5 clientes) |
 | Estrutura | Mundo aberto contínuo, sem fim de partida |
 | Interação | Roubo de cajus de ninhos rivais e colisão em mergulho derruba a carga |
 | Coleta | Automática por proximidade, com o bico abrindo sozinho |
@@ -145,7 +145,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
 | `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
 | `ai/` | `NpcEcosystem` |
-| `net/` | `UdpSession` (implementa `NetSession`) |
+| `net/` | `UdpSession`, `Protocol`, `HostAuthority`, `ClientAuthority`, `RemoteTrack` e `NetMatch` (implementa `NetSession`) |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
 | `voice/` | Planejado para a D5 |

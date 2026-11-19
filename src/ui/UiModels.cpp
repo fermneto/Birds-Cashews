@@ -57,11 +57,17 @@ bool RoomsModel::isValidAddress(const std::string& address) {
     return count == 4 && address.back() != '.';
 }
 
+// A rede explica a falha quando sabe o motivo, como sala cheia ou versao diferente.
+std::string RoomsModel::failure(const std::string& fallback) const {
+    const std::string reason = session_.lastError();
+    return reason.empty() ? fallback : reason;
+}
+
 bool RoomsModel::hostRoom(const std::string& rawName) {
     const std::string name = trimmed(rawName);
     error_.clear();
     if (name.empty()) error_ = "Digite um nome para a sala.";
-    else if (!session_.host(name)) error_ = "Não foi possível criar a sala.";
+    else if (!session_.host(name)) error_ = failure("Não foi possível criar a sala.");
     return error_.empty();
 }
 
@@ -69,7 +75,7 @@ bool RoomsModel::joinAddress(const std::string& rawAddress) {
     const std::string address = trimmed(rawAddress);
     error_.clear();
     if (!isValidAddress(address)) error_ = "IP inválido. Exemplo: 192.168.0.10";
-    else if (!session_.join(address)) error_ = "Não foi possível entrar nessa sala.";
+    else if (!session_.join(address)) error_ = failure("Não foi possível entrar nessa sala.");
     return error_.empty();
 }
 

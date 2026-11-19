@@ -1,8 +1,10 @@
 #include "ai/NpcTests.h"
 #include "core/FlightTests.h"
 #include "core/Game.h"
+#include "core/NetRehearsal.h"
 #include "game/CashewTests.h"
 #include "game/NestTests.h"
+#include "net/MatchTests.h"
 #include "net/NetTests.h"
 #include "procedural/BirdFactoryTests.h"
 #include "save/SaveTests.h"
@@ -29,7 +31,9 @@ void printUsage() {
               << "  ./birds --benchmark        mede a inferencia da pose\n"
               << "  ./birds --camera-test [segundos] [camera]\n"
               << "  ./birds --render-test PASTA\n"
-              << "  ./birds --soak [segundos]\n";
+              << "  ./birds --soak [segundos]\n"
+              << "  ./birds --rede-teste host [segundos]       hospeda uma sala sem janela\n"
+              << "  ./birds --rede-teste entrar IP [semente]   entra, coleta e entrega 2 cajus\n";
 }
 
 // O modelo fica ao lado do executavel, entao o jogo abre de qualquer pasta.
@@ -57,7 +61,7 @@ private:
 int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
                        + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest() + runNpcSelfTest()
-                       + runNetworkSelfTest() + runBirdFactorySelfTest();
+                       + runNetworkSelfTest() + runMatchSelfTest() + runBirdFactorySelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }
@@ -81,6 +85,7 @@ int main(int argc, char** argv) {
         ScratchSaves scratch;
         options.saveDir = scratch.path();
         if (command == "--render-test" && args.size() == 2) { options.hidden = true; return Game(options).renderTest(args[1]); }
+        if (command == "--rede-teste") return runNetworkRehearsal(args, scratch.path());
         if (command == "--soak") { options.hidden = true; return Game(options).soakTest(number(1, 15)); }
         printUsage();
         return 1;

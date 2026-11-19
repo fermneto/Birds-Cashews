@@ -5,6 +5,7 @@
 #include "gfx/Renderer.h"
 #include "gfx/Window.h"
 #include "input/FlightInput.h"
+#include "net/NetMatch.h"
 #include "ui/DemoGameplaySource.h"
 #include "ui/GameUi.h"
 #include <filesystem>
@@ -16,6 +17,7 @@ struct GameOptions {
     bool hidden = false;
     int cameraIndex = 0;
     uint32_t seed = 20261207;
+    uint16_t port = net::kLanPort;
     std::string modelPath;
     std::filesystem::path saveDir;   // Vazio usa a pasta saves/ ao lado do executavel.
 };
@@ -28,7 +30,9 @@ public:
     int run();
     int renderTest(const std::string& outputDir);
     int soakTest(int seconds);
-    GameplaySource& gameplay() { return session_; }
+    GameplaySource& gameplay() { return *session_; }
+    // Sala em uso. A autoridade de rede ativa e o VoiceLink: match().voice(), com match().localPlayer().
+    net::NetMatch& match() { return match_; }
 
 private:
     void createInput();
@@ -39,6 +43,8 @@ private:
     void advance(float frameSeconds);
     void updateCashews(float frameSeconds);
     void updateNpcs(float frameSeconds);
+    void syncMatch(float frameSeconds);
+    void rebuildSession();
     void prepareBirds();
     void refreshPreview();
     Camera3D buildCamera() const;
@@ -61,7 +67,8 @@ private:
     Renderer renderer_;
     PlayerBird player_;
     CashewField cashews_;
-    GameplaySession session_;
+    net::NetMatch match_;   // Declarada antes da sessao, que pode usar a autoridade dela.
+    std::unique_ptr<GameplaySession> session_;
     NpcEcosystem npcs_;
     std::unique_ptr<FlightInput> input_;
     std::unique_ptr<GameUi> ui_;

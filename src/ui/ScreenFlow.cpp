@@ -45,7 +45,7 @@ void ScreenFlow::calibrationFinished() {
     else show(UiScreen::MainMenu);
 }
 
-// Enquanto a rede real nao chega, entrar em uma sala leva ao jogo sozinho.
+// Com a sala pronta, segue para o jogo passando por perfil e calibracao se faltarem.
 void ScreenFlow::roomReady() {
     if (current_ == UiScreen::Rooms) routeToPlay();
 }

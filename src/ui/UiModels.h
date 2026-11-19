@@ -46,6 +46,8 @@ public:
     static bool isValidAddress(const std::string& address);
 
 private:
+    std::string failure(const std::string& fallback) const;
+
     NetSession& session_;
     std::vector<RoomInfo> rooms_;
     std::string error_;

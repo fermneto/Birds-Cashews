@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <set>
 #include <numeric>
 #include <utility>
 #include <vector>
@@ -13,7 +14,7 @@ constexpr float kPerchHeight = 9.0f;        // Acima da borda do ninho em qualqu
 constexpr float kFoliageBulge = 1.12f;      // Maior raio visivel de uma copa, por causa da rugosidade da malha.
 constexpr float kProbeStep = 2.0f, kClearAbove = 130.0f, kEscapeMargin = 25.0f;
 constexpr float kFullTurn = 6.2831853f;
-constexpr int kAttemptsPerTree = 24, kHeadings = 12, kMaxPlayers = 4;
+constexpr int kAttemptsPerTree = 24, kHeadings = 12;
 
 bool isFree(const World& world, glm::vec3 point) {
     return !world.resolve(point, PlayerBird::kRadius).hit();
@@ -92,19 +93,28 @@ std::vector<size_t> shuffledTrees(size_t count, uint32_t seed) {
 }
 }
 
-// A ordem embaralhada e a mesma para todos, entao cada jogador fica com uma arvore diferente.
+// Cada jogador anterior escolhe primeiro e reserva a sua arvore, entao nenhum ninho divide cajueiro,
+// mesmo quando uma arvore nao serve e o jogador precisa pular para a proxima da sua sequencia.
 NestSite chooseNestSite(const World& world, uint32_t seed, PlayerId player) {
     const size_t count = world.trees().size();
     const std::vector<size_t> order = shuffledTrees(count, seed);
+    std::set<size_t> taken;
     NestSite site;
-    for (size_t step = 0; step < count; step++) {
-        const size_t tree = order[(player + step * kMaxPlayers) % count];
-        Rng rng((uint64_t{seed} << 16) ^ (uint64_t{player} << 8) ^ (tree * 0x9E3779u));
-        if (placeOnTree(world, tree, rng, site)) return site;
+    for (PlayerId current = 0; current <= player; current++) {
+        bool placed = false;
+        for (size_t step = 0; step < count && !placed; step++) {
+            const size_t tree = order[(current + step * kMaxPlayers) % count];
+            if (taken.count(tree)) continue;
+            Rng rng((uint64_t{seed} << 16) ^ (uint64_t{current} << 8) ^ (tree * 0x9E3779u));
+            placed = placeOnTree(world, tree, rng, site);
+            if (placed) taken.insert(tree);
+        }
+        if (placed) continue;
+        // Ilha sem arvore utilizavel: o ninho fica no ar, no ponto de partida.
+        site = NestSite{};
+        site.tree = count;
+        site.perch = world.spawnPoint();
+        site.base = site.perch - glm::vec3(0, kPerchHeight, 0);
     }
-    // Ilha sem arvore utilizavel: o ninho fica no ar, no ponto de partida.
-    site.tree = count;
-    site.perch = world.spawnPoint();
-    site.base = site.perch - glm::vec3(0, kPerchHeight, 0);
     return site;
 }

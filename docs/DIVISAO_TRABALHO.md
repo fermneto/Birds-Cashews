@@ -20,10 +20,10 @@ As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida c
 | N5 Roubo e colisões | Neto | Não iniciada | Nenhum | Depende da D3 |
 | D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver `RESULTADOS_TESTE_REDE.md` |
 | D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
-| D3 Replicação de jogadores | **Neto** | **Em andamento** | Nenhum | Implementar |
+| D3 Replicação de jogadores | **Neto** | **Em revisão** | Branch `neto/d3-multiplayer` | Teste com dois computadores na F1 |
 | D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
 | D5 Voz por proximidade | **Neto** | **Em andamento** | Nenhum | Implementar, incluindo o efeito Doppler |
-| D6 NPCs em rede | **Neto** | **Em andamento** | Nenhum | Feita junto com a D3 |
+| D6 NPCs em rede | **Neto** | **Em revisão** | Branch `neto/d3-multiplayer` | Teste com dois computadores na F1 |
 | F1 Teste integrado | Neto | Bloqueada | Nenhum | Depende de N5, D3, D5 e D6, com dois computadores |
 | F2 Documentos | Neto | Não iniciada | Nenhum | README, UML, uso de IA e créditos |
 | F3 Apresentação | Neto | Bloqueada | Nenhum | Depende da F1 |

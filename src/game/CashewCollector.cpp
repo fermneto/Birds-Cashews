@@ -25,7 +25,10 @@ void CashewCollector::handle(const GameEvent& event) {
         carried_ = std::max(0, carried_ - event.value);
     if (event.type == GameEventType::CashewRespawned) {
         pendingRespawn_.erase(event.cashew);
-        field_.markRespawned(event.cashew);
+        // Pedido por outro jogador, o host da sala: o relogio dele pode estar alguns quadros a frente do nosso.
+        // O canal confiavel mantem a ordem, entao esse aviso nunca e de uma coleta anterior.
+        if (event.actor != localPlayer_ && event.actor != kNoPlayer) field_.forceRespawn(event.cashew);
+        else field_.markRespawned(event.cashew);
     }
 }
 

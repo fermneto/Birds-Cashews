@@ -1,6 +1,7 @@
 #include "ui/UiTests.h"
 #include "ui/UiTheme.h"
 #include "core/TestRun.h"
+#include "ui/FakeNetSession.h"
 #include "ui/UiShowcase.h"
 #include <opencv2/imgcodecs.hpp>
 #include <unistd.h>
@@ -30,7 +31,8 @@ private:
 };
 
 UiConfig testConfig(const TempDir& dir) {
-    return {assetsDirectory(), dir.path(), SoundManager::Output::Silent};
+    static FakeNetSession net;
+    return {assetsDirectory(), dir.path(), SoundManager::Output::Silent, &net};
 }
 
 FlightControls pressed(ArmSide side, bool gesture = true) {
@@ -106,7 +108,7 @@ void testFlowExit(TestRun& t) {
     ScreenFlow room;
     room.chooseMain(MainOption::JoinRoom);
     room.roomReady();
-    t.check("telas: entrar na sala segue para o jogo sozinho", room.current() == UiScreen::Profile);
+    t.check("telas: entrar na sala segue para o perfil", room.current() == UiScreen::Profile);
 }
 
 void testNavigationMapping(TestRun& t) {
@@ -341,6 +343,8 @@ void testRooms(TestRun& t) {
     t.check("salas: hospeda", rooms.hostRoom("Ilha") && net.hosted() == "Ilha");
     net.setAccept(false);
     t.check("salas: falha da rede vira mensagem", !rooms.joinAddress("10.0.0.2") && !rooms.error().empty());
+    net.setAccept(false, "A sala está cheia.");
+    t.check("salas: mostra o motivo dado pela rede", !rooms.joinAddress("10.0.0.2") && rooms.error() == "A sala está cheia.");
 }
 
 void testRoomScreen(TestRun& t) {
@@ -357,7 +361,7 @@ void testRoomScreen(TestRun& t) {
     for (int i = 0; i < 9; i++) sendKey(ui, SDLK_BACKSPACE);
     sendText(ui, "192.168.0.10");
     sendKey(ui, SDLK_RETURN);
-    t.check("salas: entrar segue para o jogo sozinho", ui.screen() == UiScreen::Profile);
+    t.check("salas: entrar segue para o perfil", ui.screen() == UiScreen::Profile);
 }
 
 void testAlphaComposition(TestRun& t) {

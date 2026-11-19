@@ -1,4 +1,5 @@
 #include "net/UdpSession.h"
+#include "shared/GameTypes.h"
 #include <algorithm>
 #include <array>
 #include <arpa/inet.h>
@@ -21,18 +22,19 @@ using namespace std::chrono_literals;
 using Bytes = std::vector<uint8_t>;
 
 constexpr size_t kHeaderSize = 13;
-constexpr size_t kMaxPayload = 1024;
 constexpr size_t kMaxRoomName = 64;
 constexpr size_t kMaxQueue = 128;
-constexpr uint8_t kMaxPlayers = 4;
+constexpr size_t kMaxDatagrams = 256;
 constexpr auto kRetry = 120ms;
 constexpr auto kHeartbeat = 500ms;
 constexpr auto kTimeout = 4s;
+constexpr auto kJoinTimeout = 1500ms;
 constexpr auto kDiscoveryRefresh = 500ms;
 constexpr auto kDiscoveryLifetime = 3s;
 constexpr std::array<uint8_t, 4> kSignature{'B', 'C', 'S', 1};
 
-enum class Kind : uint8_t { Discover, Room, Join, Accept, Reject, Ping, Leave, Message, Ack };
+// Datagram e o canal sem confirmacao nem ordem, usado para estado e voz.
+enum class Kind : uint8_t { Discover, Room, Join, Accept, Reject, Ping, Leave, Message, Ack, Datagram };
 
 struct Packet {
     Kind kind;
@@ -103,7 +105,7 @@ uint32_t read32(const uint8_t* bytes) {
 bool decode(const uint8_t* bytes, size_t size, Packet& out) {
     if (size < kHeaderSize || size > kHeaderSize + kMaxPayload ||
         !std::equal(kSignature.begin(), kSignature.end(), bytes) ||
-        bytes[4] > static_cast<uint8_t>(Kind::Ack)) return false;
+        bytes[4] > static_cast<uint8_t>(Kind::Datagram)) return false;
 
     const auto kind = static_cast<Kind>(bytes[4]);
     const size_t length = size - kHeaderSize;
@@ -112,7 +114,7 @@ bool decode(const uint8_t* bytes, size_t size, Packet& out) {
             bytes[kHeaderSize] > kMaxPlayers) return false;
     } else if (kind == Kind::Accept) {
         if (length != 1 || bytes[kHeaderSize] == kHostPeer || bytes[kHeaderSize] >= kMaxPlayers) return false;
-    } else if (kind != Kind::Message && length != 0) {
+    } else if (kind != Kind::Message && kind != Kind::Datagram && length != 0) {
         return false;
     }
 
@@ -204,6 +206,7 @@ struct UdpSession::State {
         case Kind::Reject:
             if (joining && packet.token == joinToken && sameAddress(joinAddress, from)) {
                 joining = false;
+                joinStatus = packet.kind == Kind::Accept ? JoinStatus::Connected : JoinStatus::Refused;
                 if (packet.kind == Kind::Accept) {
                     localId = packet.payload.front();
                     peers.push_back({kHostPeer, from, packet.token, now});
@@ -230,6 +233,9 @@ struct UdpSession::State {
                 peer->lastSend = Time{};
             }
             break;
+        case Kind::Datagram:
+            if (datagrams.size() < kMaxDatagrams) datagrams.push_back({peer->id, std::move(packet.payload)});
+            break;
         case Kind::Message:
             if (packet.sequence == peer->receiveSequence && messages.size() < kMaxQueue) {
                 messages.push_back({peer->id, std::move(packet.payload)});
@@ -249,8 +255,16 @@ struct UdpSession::State {
         if (socket < 0) return;
         const auto now = Clock::now();
         peers.erase(std::remove_if(peers.begin(), peers.end(), [&](const Peer& peer) {
-            return now - peer.lastHeard >= kTimeout;
+            return now - peer.lastHeard >= peerTimeout;
         }), peers.end());
+        if (joining && now >= joinDeadline) {
+            joining = false;
+            joinStatus = JoinStatus::NoAnswer;
+        }
+        if (joining && now >= nextJoinAttempt) {
+            sendPacket(socket, joinAddress, {Kind::Join, joinToken});
+            nextJoinAttempt = now + kRetry;
+        }
 
         std::array<uint8_t, kHeaderSize + kMaxPayload> bytes{};
         for (size_t count = 0; count < 256; ++count) {
@@ -276,6 +290,10 @@ struct UdpSession::State {
     }
 
     uint16_t port;
+    std::chrono::milliseconds peerTimeout = kTimeout, joinTimeout = kJoinTimeout;
+    JoinStatus joinStatus = JoinStatus::Idle;
+    Time joinDeadline{}, nextJoinAttempt{};
+    std::vector<Message> datagrams;
     int socket = -1;
     bool hosting = false;
     bool joining = false;
@@ -304,28 +322,46 @@ bool UdpSession::host(const std::string& roomName) {
     return true;
 }
 
-bool UdpSession::join(const std::string& input) {
+bool UdpSession::startJoin(const std::string& input) {
     sockaddr_in address{};
-    if (!parseAddress(input, state_->port, address)) return false;
+    if (!parseAddress(input, state_->port, address)) {
+        leave();
+        state_->joinStatus = JoinStatus::InvalidAddress;
+        return false;
+    }
     leave();
-    if (!state_->open(0)) return false;
+    if (!state_->open(0)) {
+        state_->joinStatus = JoinStatus::SocketError;
+        return false;
+    }
     state_->joinAddress = address;
     state_->joinToken = static_cast<uint32_t>(std::random_device{}()) | 1;
     state_->joining = true;
-    const auto deadline = Clock::now() + 1500ms;
-    auto nextAttempt = Time{};
-    while (state_->joining && Clock::now() < deadline) {
-        const auto now = Clock::now();
-        if (now >= nextAttempt) {
-            sendPacket(state_->socket, address, {Kind::Join, state_->joinToken});
-            nextAttempt = now + kRetry;
-        }
+    state_->joinStatus = JoinStatus::Pending;
+    state_->joinDeadline = Clock::now() + state_->joinTimeout;
+    state_->nextJoinAttempt = Time{};
+    poll();
+    return true;
+}
+
+bool UdpSession::join(const std::string& input) {
+    if (!startJoin(input)) return false;
+    while (state_->joining) {
+        std::this_thread::sleep_for(5ms);
         poll();
-        if (state_->joining) std::this_thread::sleep_for(5ms);
     }
     if (connected()) return true;
+    const JoinStatus status = state_->joinStatus;
     leave();
+    state_->joinStatus = status;
     return false;
+}
+
+JoinStatus UdpSession::joinStatus() const { return state_->joinStatus; }
+
+void UdpSession::setTimeouts(std::chrono::milliseconds peerTimeout, std::chrono::milliseconds joinTimeout) {
+    state_->peerTimeout = peerTimeout;
+    state_->joinTimeout = joinTimeout;
 }
 
 std::vector<RoomInfo> UdpSession::discoverRooms() {
@@ -357,9 +393,11 @@ void UdpSession::leave() {
     state_->joining = false;
     state_->localId = kHostPeer;
     state_->lastDiscovery = Time{};
+    state_->joinStatus = JoinStatus::Idle;
     state_->peers.clear();
     state_->rooms.clear();
     state_->messages.clear();
+    state_->datagrams.clear();
 }
 
 void UdpSession::poll() { state_->poll(); }
@@ -384,6 +422,21 @@ bool UdpSession::sendReliable(PeerId to, const std::vector<uint8_t>& payload) {
     if (found == state_->peers.end() || found->queue.size() >= kMaxQueue) return false;
     found->queue.push_back(payload);
     return true;
+}
+
+bool UdpSession::sendUnreliable(PeerId to, const std::vector<uint8_t>& payload) {
+    if (payload.size() > kMaxPayload || state_->socket < 0) return false;
+    const auto found = std::find_if(state_->peers.begin(), state_->peers.end(),
+                                    [to](const Peer& peer) { return peer.id == to; });
+    if (found == state_->peers.end()) return false;
+    sendPacket(state_->socket, found->address, {Kind::Datagram, found->token, 0, payload});
+    return true;
+}
+
+std::vector<Message> UdpSession::pollDatagrams() {
+    std::vector<Message> datagrams;
+    datagrams.swap(state_->datagrams);
+    return datagrams;
 }
 
 std::vector<Message> UdpSession::pollMessages() {

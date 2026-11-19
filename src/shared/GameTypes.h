@@ -9,6 +9,9 @@ using CashewId = uint16_t;
 constexpr PlayerId kNoPlayer = 255;
 constexpr CashewId kNoCashew = 65535;
 
+// Jogadores por sala, contando o host. PlayerId vai de 0 a kMaxPlayers - 1.
+constexpr uint8_t kMaxPlayers = 6;
+
 // O que todos os computadores precisam saber sobre um jogador.
 struct PlayerPublicState {
     PlayerId id = kNoPlayer;

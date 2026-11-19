@@ -135,6 +135,13 @@ bool CashewField::markRespawned(CashewId id) {
     return true;
 }
 
+// Em rede o relogio do host vale: o caju volta mesmo que o tempo local ainda nao tenha vencido.
+bool CashewField::forceRespawn(CashewId id) {
+    if (!contains(id) || states_[id].active) return false;
+    states_[id].active = true;
+    return true;
+}
+
 std::vector<CashewId> CashewField::dueForRespawn() const {
     std::vector<CashewId> due;
     for (size_t i = 0; i < states_.size(); i++)

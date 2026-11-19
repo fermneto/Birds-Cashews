@@ -1,7 +1,7 @@
 #pragma once
 #include "shared/NetSession.h"
 
-// Substituto da rede real ate a tarefa D3: aceita tudo e lista salas de exemplo.
+// Rede de mentira para os testes e as fotos da interface: aceita tudo e lista salas de exemplo.
 class FakeNetSession : public NetSession {
 public:
     bool host(const std::string& roomName) override { hosted_ = roomName; return accept_; }
@@ -11,11 +11,13 @@ public:
     }
     void leave() override { hosted_.clear(); joined_.clear(); }
 
-    void setAccept(bool accept) { accept_ = accept; }
+    std::string lastError() const override { return accept_ ? "" : error_; }
+
+    void setAccept(bool accept, const std::string& error = "") { accept_ = accept; error_ = error; }
     const std::string& hosted() const { return hosted_; }
     const std::string& joined() const { return joined_; }
 
 private:
     bool accept_ = true;
-    std::string hosted_, joined_;
+    std::string hosted_, joined_, error_;
 };

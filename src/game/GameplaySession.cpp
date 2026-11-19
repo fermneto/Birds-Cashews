@@ -73,6 +73,7 @@ std::vector<GameplayFeedback> GameplaySession::drainFeedback() {
 }
 
 void GameplaySession::applyControls(const FlightControls& controls) {
+    flightMode_ = perched_ || controls.mode == FlightMode::Lost ? FlightMode::Glide : controls.mode;
     if (!perched_) {
         bird_.applyControls(controls);
         return;
@@ -127,6 +128,7 @@ void GameplaySession::publishLocalPlayer() {
     state.yaw = flight.yaw();
     state.pitch = flight.pitch();
     state.roll = flight.roll();
+    state.mode = perched_ ? FlightMode::Glide : flightMode_;
     state.carried = perched_ ? 0 : static_cast<uint8_t>(std::min(collector_.carried(), 255));
     state.nestLevel = static_cast<uint8_t>(nestSizeLevel());
     if (profile_) state.birdSeed = profile_->birdSeed();
