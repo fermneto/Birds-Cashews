@@ -347,6 +347,29 @@ void testRooms(TestRun& t) {
     t.check("salas: mostra o motivo dado pela rede", !rooms.joinAddress("10.0.0.2") && rooms.error() == "A sala está cheia.");
 }
 
+// A descoberta real devolve o endereco com a porta, como "10.0.0.5:42917".
+class DiscoveredRoomSession : public NetSession {
+public:
+    bool host(const std::string&) override { return true; }
+    bool join(const std::string& address) override { joined = address; return true; }
+    std::vector<RoomInfo> discoverRooms() override { return {{"Sala real", "10.204.155.210:42917", 1}}; }
+    void leave() override {}
+    std::string joined;
+};
+
+void testRoomAddresses(TestRun& t) {
+    t.check("salas: endereco com porta e valido", RoomsModel::isValidAddress("10.204.155.210:42917"));
+    t.check("salas: virgula do teclado numerico vira ponto", RoomsModel::isValidAddress("127,0,0,1"));
+    for (const char* bad : {"10.0.0.5:", "10.0.0.5:0", "10.0.0.5:70000", "10.0.0.5:abc", ":42917"})
+        t.check(std::string("salas: endereco invalido '") + bad + "'", !RoomsModel::isValidAddress(bad));
+
+    DiscoveredRoomSession net;
+    RoomsModel rooms(net);
+    rooms.refresh();
+    t.check("salas: entra na sala descoberta na rede", rooms.joinRoom(0) && net.joined == "10.204.155.210:42917");
+    t.check("salas: IP digitado com virgula entra", rooms.joinAddress("127,0,0,1") && net.joined == "127.0.0.1");
+}
+
 void testRoomScreen(TestRun& t) {
     TempDir dir("telasala");
     DemoGameplaySource demo;
@@ -579,6 +602,7 @@ int runUiSelfTest() {
     testProfiles(t);
     testProfileScreen(t);
     testRooms(t);
+    testRoomAddresses(t);
     testRoomScreen(t);
     testAlphaComposition(t);
     testCleanHud(t);

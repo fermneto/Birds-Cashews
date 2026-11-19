@@ -98,7 +98,7 @@ private:
     MenuCursor cursor_;
     ProfilePicker profiles_;
     RoomsModel rooms_;
-    TextField profileName_{32}, roomName_{32}, hostAddress_{15};
+    TextField profileName_{32}, roomName_{32}, hostAddress_{21};
     CalibrationTracker tracker_;
     RecordBanner banner_;
     cv::Mat calibrationFrame_;

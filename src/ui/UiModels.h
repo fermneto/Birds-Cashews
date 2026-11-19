@@ -43,7 +43,10 @@ public:
     bool joinRoom(size_t index);
     void leave() { session_.leave(); }
 
+    // Aceita "IP" ou "IP:porta". A descoberta de salas devolve o endereco com a porta.
     static bool isValidAddress(const std::string& address);
+    // Tira espacos e troca a virgula do teclado numerico ABNT pelo ponto.
+    static std::string normalizedAddress(const std::string& address);
 
 private:
     std::string failure(const std::string& fallback) const;
