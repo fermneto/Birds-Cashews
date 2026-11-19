@@ -56,7 +56,21 @@ com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração con
 | Velocidade | Defesa: aumenta o tempo necessário para roubar |
 | Agilidade nas curvas | Alarme: avisa e mostra o ladrão |
 | Capacidade de carga | Cofre: parte dos cajus não pode ser roubada |
-| Alcance da coleta | Tamanho: visual do ninho e bônus de cajus próximos |
+| Alcance da coleta | Tamanho: ninho maior e bônus de moedas na entrega |
+
+No menu do ninho, a primeira escolha é entre comer (braço esquerdo) e investir (braço direito). Dentro de uma lista, o braço
+esquerdo passa para a próxima opção e o direito compra. Bater os braços decola.
+
+| Upgrade | Nível 1 | Nível 2 | Nível 3 | Nível 4 | Nível 5 | Efeito por nível |
+|---|---|---|---|---|---|---|
+| Velocidade | 3 | 6 | 10 | 15 | 22 | +8% de velocidade |
+| Agilidade | 2 | 5 | 9 | 14 | 20 | +12% de agilidade |
+| Capacidade | 4 | 8 | 13 | 19 | 26 | +1 caju de carga |
+| Alcance | 2 | 4 | 8 | 13 | 18 | +2,5 m de coleta |
+| Defesa | 3 | 6 | 10 | 15 | 22 | Sem efeito até a N5 |
+| Alarme | 3 | 6 | 10 | 15 | 22 | Sem efeito até a N5 |
+| Cofre | 4 | 8 | 13 | 19 | 26 | Sem efeito até a N5 |
+| Tamanho | 3 | 7 | 12 | 18 | 25 | Ninho 18% maior e +20% de moedas na entrega |
 
 ### 3.3 Roubo e colisões
 
@@ -116,7 +130,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `entity/` | `Bird`, `PlayerBird`, `NpcBird`, `FlightModel`, `Stats` |
 | `procedural/` | `BirdGenome`, `BirdMeshBuilder`, `PartLibrary`, `Palette` |
 | `ai/` | `Flock`, `NpcBrain`, `ForagerBehavior`, `HunterBehavior` |
-| `net/` | `NetSession`, `HostSession`, `ClientSession`, `Discovery`, `Protocol` |
+| `net/` | `UdpSession` (implementa `NetSession`) |
 | `audio/` | `SoundManager`, `VoiceChat`, `VoiceFilter`, `SpatialMixer` |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `Hud`, `Sprite` |
 | `save/` | `ProfileStore`, `WorldStore`, `RecordManager` |
@@ -126,24 +140,33 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 
 ## 5. Requisitos do enunciado
 
-| # | Requisito | Como será atendido |
-|---|---|---|
-| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final |
-| 2 | Bastante métodos | Classes pequenas por módulo |
-| 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair |
-| 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` |
-| 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa |
-| 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN |
-| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos |
-| 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho |
-| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração |
-| 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente |
-| Instrução 4 | Indicar uso de IA | `docs/USO_DE_IA.md` |
+| # | Requisito | Como será atendido | Situação |
+|---|---|---|---|
+| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Pendente (F2) |
+| 2 | Bastante métodos | Classes pequenas por módulo | Atendido |
+| 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair | No PR #7 |
+| 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Arquivo na `main`, tela no PR #7 |
+| 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa | No PR #7 |
+| 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN | Atendido |
+| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
+| 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
+| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | No PR #7 |
+| 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente | No PR #7 |
+| Instrução 4 | Indicar uso de IA | `docs/USO_DE_IA.md` | Pendente (F2) |
 
 ## 6. Cronograma
 
-M0 (prova técnica) e M1 (voo) estão concluídos. As etapas seguintes foram divididas entre Neto e Daniel em
-[`DIVISAO_TRABALHO.md`](DIVISAO_TRABALHO.md), com tarefas paralelas e dependências.
+As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`](DIVISAO_TRABALHO.md).
+
+| Marco | Situação em 18/11/2026 | O que falta |
+|---|---|---|
+| **M0** Prova técnica | Concluído | Nada |
+| **M1** Voo | Concluído | Nada |
+| **M2** Ciclo de jogo | Regras na `main`, interface no PR #7 | Validar e fazer o merge do PR #7 |
+| **M3** Multiplayer | Conexão UDP na `main` | Replicação de jogadores (D3), roubo (N5) e testes no hotspot |
+| **M4** Pássaros | Gerador procedural na `main` | Levar o ecossistema de NPCs (D4) para a `main` e sincronizar em rede (D6) |
+| **M5** Voz | Não iniciado | Voz por proximidade (D5) |
+| **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
 
@@ -156,8 +179,17 @@ Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alar
 | Gestos confundidos entre si | Máquina de estados com histerese e ajuste com pessoas diferentes |
 | Eco na voz | Fones e detecção de fala |
 | Escopo grande para 19 dias | Marcos independentes, com jogo funcional ao fim de cada um |
+| Conflitos entre a D4 e o PR #7 nos mesmos arquivos | Fazer o merge do PR #7 primeiro e depois atualizar a branch da D4 |
 
 ## 8. Pendências
 
-Nenhuma. O tema "Outro" foi aprovado pelo professor. A apresentação usará computadores próprios, conectados ao hotspot
-de um celular.
+O tema "Outro" foi aprovado pelo professor. A apresentação usará computadores próprios, conectados ao hotspot de um
+celular.
+
+1. Validar o PR #7 com janela visível, webcam e som.
+2. Levar a D4 para a `main`, revisando as mudanças de voo, gestos e no modelo de pose.
+3. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
+   [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
+4. Implementar D3, D5, D6 e N5.
+5. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
+6. Fazer o teste integrado e ensaiar a apresentação.
