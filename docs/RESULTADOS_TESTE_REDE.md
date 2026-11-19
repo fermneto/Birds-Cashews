@@ -79,3 +79,16 @@ detalhes de cada verificação não foram registrados.
 1. Repetir a queda desligando o Wi-Fi do cliente.
 2. Repetir o roteiro completo no hotspot do celular, que é a rede da apresentação.
 3. Testar com mais de dois jogadores conectados.
+
+## 7. Validação local da integração em 19/11/2026
+
+Branch `integracao/rede-voz`, base `a4a693e`, com os ajustes locais de voz. Os processos usaram o mesmo computador.
+
+| Cenário | Resultado observado |
+|---|---|
+| Descoberta e eco UDP | O cliente encontrou `Birds D1` em `127.0.0.1:42917` e recebeu os ecos 1, 2 e 3 em ordem. O host detectou a queda após o encerramento forçado do cliente. |
+| Três e quatro participantes | Um host de teste usando `UdpSession` atendeu primeiro dois e depois três clientes simultâneos. Cada cliente recebeu os três ecos em ordem. Essa verificação cobre a camada de rede local. |
+| Partida com duas instâncias de `./birds --rede-teste` | O host registrou entrada, coleta de dois cajus, entrega dos dois e saída. O cliente viu o host, recebeu nove NPCs e confirmou a entrega. Ambos encerraram com código zero. |
+| Voz | As 67 verificações de voz em memória passaram na versão com o ajuste de ganho e tom. |
+
+Para fechar a validação em campo, falta registrar a descoberta e os ecos no computador cliente, repetir a queda desligando o Wi-Fi e validar o grupo no hotspot da apresentação. Na partida com microfone e fones, conferir se as palavras continuam inteligíveis e sem saturação durante a aproximação e o afastamento.

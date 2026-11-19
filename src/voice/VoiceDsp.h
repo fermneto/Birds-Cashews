@@ -101,7 +101,7 @@ private:
 // e o ganho muda amostra a amostra para nao estalar. Um limitador suave evita saturar.
 class AutoGain {
 public:
-    explicit AutoGain(float targetDb = -16.0f, float maxGainDb = 26.0f, float startGainDb = 12.0f);
+    explicit AutoGain(float targetDb = -16.0f, float maxGainDb = 26.0f, float startGainDb = 0.0f);
     void process(float* frame, int count, bool voiced);
     float gainDb() const { return gainDb_; }
 

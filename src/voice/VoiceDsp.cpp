@@ -263,7 +263,7 @@ void AutoGain::process(float* frame, int count, bool voiced) {
         double energy = 0;
         for (int i = 0; i < count; i++) energy += static_cast<double>(frame[i]) * frame[i];
         const float levelDb = 10.0f * std::log10(static_cast<float>(energy / count) + 1e-12f);
-        const float wanted = std::clamp(targetDb_ - levelDb, 0.0f, maxGainDb_);
+        const float wanted = std::clamp(targetDb_ - levelDb, -24.0f, maxGainDb_);
         if (wanted < gainDb_) gainDb_ -= (gainDb_ - wanted) * kGainFallShare;
         else gainDb_ = std::min(wanted, gainDb_ + kGainRiseDbPerFrame);
     }

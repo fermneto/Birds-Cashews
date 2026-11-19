@@ -15,7 +15,7 @@ struct SpatialSettings {
     float fullDistance = 70.0f;        // Volume cheio ate aqui: os passaros voam rapido.
     float silentDistance = 300.0f;     // Silencio a partir daqui.
     float speedOfSound = 343.0f;
-    float dopplerExaggeration = 3.0f;  // Os passaros voam a 20-60 m/s: sem exagero o efeito mal se ouve.
+    float dopplerExaggeration = 4.5f;  // Os passaros voam a 20-60 m/s: sem exagero o efeito mal se ouve.
     float minDoppler = 0.6f, maxDoppler = 1.6f;
     bool doppler = true;
 };

@@ -16,11 +16,12 @@ struct VoiceSettings {
     bool audioThread = true;     // Com dispositivos, microfone e saida rodam numa thread propria.
     bool birdVoice = true;
     bool noiseSuppression = true;   // Reducao de ruido e reconhecimento de voz humana antes de transmitir.
-    float pitchSemitones = 8.0f;   // Bem mais aguda que a voz original.
+    static constexpr float kBirdSemitones = 2.0f;
+    float pitchSemitones = kBirdSemitones;
     int bitrate = 24000;
     int jitterFrames = 4;        // 80 ms de partida; cresce sozinho se a rede ficar irregular.
     int outputQueueMs = 60;      // Quanto audio fica na fila da saida.
-    float volume = 1.6f;           // A voz fica acima dos efeitos do jogo; o limitador evita saturar.
+    float volume = 0.85f;
     SpeechSettings speech;
     SpatialSettings spatial;
 };
@@ -55,7 +56,7 @@ public:
 
     void setMuted(bool muted) { muted_ = muted; }
     bool muted() const { return muted_.load(); }
-    void setBirdVoice(bool enabled, float semitones = 8.0f);
+    void setBirdVoice(bool enabled, float semitones = VoiceSettings::kBirdSemitones);
     void setVolume(float volume);
     const VoiceSettings& settings() const { return settings_; }
     bool hasMicrophone() const { return devices_.hasCapture(); }
