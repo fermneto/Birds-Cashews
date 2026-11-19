@@ -11,7 +11,11 @@
 // para que versoes diferentes ainda consigam recusar a entrada com uma mensagem clara.
 namespace net {
 
-inline constexpr uint8_t kProtocolVersion = 1;
+// Mude a versao sempre que o formato de qualquer mensagem mudar: assim versoes diferentes do jogo
+// sao recusadas com uma mensagem clara, em vez de conectar pela metade. O teste "formato fixo da
+// versao" falha se o formato mudar sem a versao mudar.
+// Versao 2: o NPC ganhou o byte de comportamento (papel e pouso).
+inline constexpr uint8_t kProtocolVersion = 2;
 inline constexpr size_t kMaxNameLength = 32;
 inline constexpr size_t kMaxNpcs = 24;
 inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.

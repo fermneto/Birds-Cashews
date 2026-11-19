@@ -3,10 +3,14 @@
 
 namespace net {
 
+namespace {
+constexpr int kUnreadableSnapshotLimit = 40;   // Cerca de 2 s de snapshots que nao se consegue ler.
+}
+
 std::string refuseMessage(RefuseReason reason) {
     switch (reason) {
         case RefuseReason::Full: return "A sala está cheia.";
-        case RefuseReason::Version: return "O host usa outra versão do jogo.";
+        case RefuseReason::Version: return "O host usa outra versão do jogo. Atualizem os dois para a mesma versão.";
         case RefuseReason::WorldSeed: return "O host usa outra ilha (semente do mundo diferente).";
     }
     return "O host recusou a entrada.";
@@ -84,7 +88,15 @@ void ClientAuthority::update(float seconds) {
         const auto header = peekHeader(message.payload);
         if (!header) continue;
         if (header->type == MessageType::Snapshot) {
-            if (const auto snapshot = decodeSnapshot(message.payload)) handleSnapshot(*snapshot);
+            if (const auto snapshot = decodeSnapshot(message.payload)) {
+                handleSnapshot(*snapshot);
+                unreadableSnapshots_ = 0;
+                readSnapshot_ = true;
+            } else if (!readSnapshot_ && ++unreadableSnapshots_ >= kUnreadableSnapshotLimit) {
+                // Conectou, mas nao entende o estado do host: e outra versao do jogo. Melhor sair com o motivo
+                // do que ficar na sala sem ver ninguem.
+                refuse(refuseMessage(RefuseReason::Version));
+            }
         } else if (header->type == MessageType::Voice) {
             const auto frame = decodeVoice(message.payload);
             if (!frame || frame->speaker == localPlayer_) continue;
