@@ -329,7 +329,7 @@ void testWholeIsland(TestRun& test, const World& world) {
         }
         penetrations += countPenetrations(ecosystem, world);
     }
-    test.check(withValue("NPCs: em 3 minutos com 4 jogadores, nenhum NPC entra em copa, chao ou mar (casos)",
+    test.check(withValue("NPCs: em 3 minutos com 5 jogadores, nenhum NPC entra em copa, chao ou mar (casos)",
                          static_cast<float>(penetrations)), penetrations == 0);
     test.check(withValue("NPCs: so o cacador derruba carga (quedas longe dele)", static_cast<float>(strayDrops)),
                drops > 0 && strayDrops == 0 && otherEvents == 0);
