@@ -44,6 +44,7 @@ void CashewCollector::update(float dt, glm::vec3 position) {
 
 // Pedidos em andamento reservam espaco, para a carga nunca passar do limite.
 void CashewCollector::requestNearby(glm::vec3 position) {
+    if (!collecting_) return;
     int free = stats_.capacity - carried_ - static_cast<int>(pendingCollect_.size());
     if (free <= 0) return;
     const float radius = stats_.collectRadius * stats_.collectRadius;
@@ -60,6 +61,12 @@ void CashewCollector::requestNearby(glm::vec3 position) {
         pendingCollect_[inRange[i].second] = kRequestTimeout;
         send(GameEventType::CashewCollected, inRange[i].second);
     }
+}
+
+int CashewCollector::unload(int amount) {
+    const int removed = std::clamp(amount, 0, carried_);
+    carried_ -= removed;
+    return removed;
 }
 
 void CashewCollector::requestRespawns() {

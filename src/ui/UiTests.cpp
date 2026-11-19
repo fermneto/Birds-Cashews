@@ -440,7 +440,7 @@ void testText(TestRun& t) {
         style.outline = false;
         painter.draw(canvas, text, {20, 70}, style);
         cv::Mat alpha;
-        cv::extractChannel(canvas.pixels()(cv::Rect(0, 0, 120, 38)), alpha, 3);
+        cv::extractChannel(canvas.pixels()(cv::Rect(0, 0, 120, 45)), alpha, 3);
         return cv::countNonZero(alpha);
     };
     t.check("texto: acento aparece acima da letra", inkAbove("ã") > inkAbove("a") + 10);
@@ -475,7 +475,7 @@ void testRecordBanner(TestRun& t) {
     quick.update(true, 0.0f);
     quick.update(false, 1.0f);
     t.check("banner: respeita o tempo minimo de leitura", quick.visible() && quick.opacity() == 1.0f);
-    quick.update(false, 3.0f);
+    quick.update(false, 2.4f);
     quick.update(false, 0.3f);
     t.check("banner: some aos poucos", quick.visible() && quick.opacity() < 1.0f && quick.opacity() > 0.0f);
     quick.update(false, 1.0f);

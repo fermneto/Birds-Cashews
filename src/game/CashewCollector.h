@@ -12,6 +12,8 @@ public:
     void handle(const GameEvent& event);   // Recebe cada evento vindo de GameAuthority::pollEvents.
     void update(float dt, glm::vec3 position);
     float beakTarget(glm::vec3 position) const;   // 1 com caju coletavel ao alcance do bico, senao 0.
+    void setCollecting(bool collecting) { collecting_ = collecting; }   // Pousado no ninho, o passaro nao coleta.
+    int unload(int amount);   // Tira cajus da carga e retorna quantos sairam de fato.
 
     int carried() const { return carried_; }
     CargoStats& stats() { return stats_; }
@@ -30,5 +32,6 @@ private:
     PlayerId localPlayer_;
     CargoStats stats_;
     int carried_ = 0;
+    bool collecting_ = true;
     PendingRequests pendingCollect_, pendingRespawn_;
 };

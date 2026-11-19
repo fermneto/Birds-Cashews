@@ -33,9 +33,9 @@ void drawStats(UiKit& kit, const GameplayView& view) {
     kit.text.draw(kit.canvas, "Record", {kStats.x + 14, kStats.y + 126}, style(20, theme::kMuted));
     const std::string record = std::to_string(view.record);
     kit.text.draw(kit.canvas, record, {right, kStats.y + 128}, style(30, theme::kGold, TextAlign::Right));
-    const int holderRoom = kStats.width - 120 - kit.text.width(record, 30) - 20;
+    const int holderRoom = kStats.width - 112 - kit.text.width(record, 30) - 26;
     if (!view.recordHolder.empty() && holderRoom > 30)
-        kit.text.drawFit(kit.canvas, view.recordHolder, {kStats.x + 96, kStats.y + 126}, holderRoom, style(18, theme::kMuted));
+        kit.text.drawFit(kit.canvas, view.recordHolder, {kStats.x + 112, kStats.y + 126}, holderRoom, style(18, theme::kMuted));
 }
 
 void drawRecordSeal(UiKit& kit) {
@@ -113,10 +113,10 @@ void drawNestOption(UiKit& kit, const UpgradeOptionView& option, const cv::Rect&
     if (icon) kit.canvas.image(kit.assets.icon(*icon, iconSize), {area.x + 6, area.y + (area.height - iconSize) / 2});
 
     const int textX = area.x + 60, textRoom = area.width - 150;
-    const bool twoLines = option.maxLevel > 0 && area.height >= 50;
-    const int baseline = twoLines ? area.y + 25 : area.y + area.height / 2 + 8;
+    const bool twoLines = option.maxLevel > 0;
+    const int baseline = twoLines ? area.y + 21 : area.y + area.height / 2 + 8;
     kit.text.drawFit(kit.canvas, option.name, {textX, baseline}, textRoom, style(20));
-    if (twoLines) drawLevelPips(kit, {textX, area.y + area.height - 19}, option.level, option.maxLevel);
+    if (twoLines) drawLevelPips(kit, {textX, area.y + area.height - 16}, option.level, option.maxLevel);
     drawPrice(kit, option, {area.x + area.width - 12, area.y + area.height / 2});
 }
 
@@ -126,6 +126,22 @@ void drawArmCard(UiKit& kit, const cv::Rect& area, const std::string& arm, const
     kit.text.draw(kit.canvas, arm, {area.x + 12, area.y + 24}, style(16, theme::kMuted));
     kit.text.drawFit(kit.canvas, action, {area.x + 112, area.y + 25}, area.width - 124, style(20));
     kit.canvas.progressBar({area.x + 12, area.y + 36, area.width - 24, 10}, active ? progress : 0.0f, theme::kGold);
+}
+
+// Na raiz, cada braco abre uma das duas listas.
+void drawNestChoice(UiKit& kit, const cv::Rect& area, UiIcon icon, const std::string& label, const std::string& arm) {
+    kit.canvas.fill(area, theme::kInk, 0.6f, 12);
+    kit.canvas.imageCentered(kit.assets.icon(icon, 84), {area.x + area.width / 2, area.y + 58});
+    kit.text.drawFit(kit.canvas, label, {area.x + area.width / 2, area.y + 134}, area.width - 16, style(26, theme::kGold, TextAlign::Center));
+    kit.text.drawFit(kit.canvas, arm, {area.x + area.width / 2, area.y + 164}, area.width - 16, style(17, theme::kMuted, TextAlign::Center));
+}
+
+void drawNestRoot(UiKit& kit, const NestMenuView& menu, int top) {
+    const int width = (kNestPanel.width - 34) / 2;
+    drawNestChoice(kit, {kNestPanel.x + 12, top, width, 180}, UiIcon::Cashew, menu.leftLabel, "Braço esquerdo");
+    drawNestChoice(kit, {kNestPanel.x + 22 + width, top, width, 180}, UiIcon::Nest, menu.rightLabel, "Braço direito");
+    kit.text.draw(kit.canvas, "Bata as asas para decolar", {kNestPanel.x + kNestPanel.width / 2, top + 212},
+                  style(19, theme::kWhite, TextAlign::Center));
 }
 
 std::string nestTitle(NestMenuPage page) {
@@ -146,6 +162,7 @@ void drawNestMenu(UiKit& kit, const GameplayView& view) {
     const int count = std::max(static_cast<int>(menu.options.size()), 1);
     const int room = kNestPanel.height - kHeader - kArmCards - 24;
     const int rowHeight = std::min((room - (count - 1) * kGap) / count, 64);
+    if (menu.page == NestMenuPage::Root) drawNestRoot(kit, menu, kNestPanel.y + kHeader);
     for (int i = 0; i < static_cast<int>(menu.options.size()); i++) {
         const cv::Rect area(kNestPanel.x + 12, kNestPanel.y + kHeader + i * (rowHeight + kGap), kNestPanel.width - 24, rowHeight);
         drawNestOption(kit, menu.options[i], area, i == menu.selected);

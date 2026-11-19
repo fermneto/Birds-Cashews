@@ -44,8 +44,9 @@ void drawRow(UiKit& kit, const MenuRow& row, const cv::Rect& area, bool selected
     }
     const int valueWidth = row.value.empty() ? 0 : std::min(kit.text.width(row.value, 20) + 16, area.width / 2);
     kit.text.drawFit(kit.canvas, row.label, {area.x + 18, baseline}, area.width - 36 - valueWidth, style(24));
-    kit.text.drawFit(kit.canvas, row.value, {area.x + area.width - valueWidth - 2, baseline}, valueWidth - 4,
-                     style(20, theme::kMuted));
+    if (valueWidth > 0)
+        kit.text.drawFit(kit.canvas, row.value, {area.x + area.width - valueWidth - 2, baseline}, valueWidth - 4,
+                         style(20, theme::kMuted));
 }
 
 void drawRows(UiKit& kit, const std::vector<MenuRow>& rows, int selected, const cv::Rect& area, int maxRows, bool caretOn) {

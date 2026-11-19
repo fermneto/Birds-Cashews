@@ -35,21 +35,20 @@ GameplayView DemoGameplaySource::nestRootSample() {
     view.perchedOnNest = true;
     view.nestDistance = 0.0f;
     view.menu.page = NestMenuPage::Root;
-    view.menu.options = {{"Comer", 0, 0, 0, true}, {"Investir", 0, 0, 0, true}, {"Decolar", 0, 0, 0, true}};
     view.menu.selected = 0;
-    view.menu.leftLabel = "Próxima opção";
-    view.menu.rightLabel = "Confirmar";
+    view.menu.leftLabel = "Comer";
+    view.menu.rightLabel = "Investir";
     return view;
 }
 
 GameplayView DemoGameplaySource::nestEatSample() {
     GameplayView view = nestRootSample();
     view.menu.page = NestMenuPage::Eat;
-    view.menu.options = {{"Velocidade", 2, 5, 6, true}, {"Agilidade nas curvas", 1, 5, 4, true},
-                         {"Capacidade de carga", 5, 5, 0, false}, {"Alcance da coleta", 3, 5, 18, false}};
+    view.menu.options = {{"Velocidade", 2, 5, 10, true}, {"Agilidade", 1, 5, 5, true}, {"Capacidade", 5, 5, 0, false},
+                         {"Alcance", 3, 5, 18, false}, {"Voltar", 0, 0, 0, true}};
     view.menu.selected = 1;
-    view.menu.leftLabel = "Próximo upgrade";
-    view.menu.rightLabel = "Comprar";
+    view.menu.leftLabel = "Próxima opção";
+    view.menu.rightLabel = "Comprar por 5";
     view.menu.raisedArm = ArmSide::Right;
     view.menu.holdProgress = 0.6f;
     return view;
@@ -58,11 +57,11 @@ GameplayView DemoGameplaySource::nestEatSample() {
 GameplayView DemoGameplaySource::nestInvestSample() {
     GameplayView view = nestRootSample();
     view.menu.page = NestMenuPage::Invest;
-    view.menu.options = {{"Defesa", 1, 5, 5, true}, {"Alarme", 0, 5, 3, true},
-                         {"Cofre", 4, 5, 22, false}, {"Tamanho do ninho", 2, 5, 9, true}};
-    view.menu.selected = 3;
-    view.menu.leftLabel = "Próximo upgrade";
-    view.menu.rightLabel = "Comprar";
+    view.menu.options = {{"Defesa", 1, 5, 6, true}, {"Alarme", 0, 5, 3, true}, {"Cofre", 4, 5, 26, false},
+                         {"Tamanho", 2, 5, 12, true}, {"Voltar", 0, 0, 0, true}};
+    view.menu.selected = 2;
+    view.menu.leftLabel = "Próxima opção";
+    view.menu.rightLabel = "Faltam 12 moedas";
     view.menu.raisedArm = ArmSide::Left;
     view.menu.holdProgress = 0.35f;
     return view;
