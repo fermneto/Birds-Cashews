@@ -190,9 +190,9 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Salas de até 6 jogadores, em validação | Roubo (N5) e testes no hotspot |
-| **M4** Pássaros | Gerador, ecossistema e NPCs em rede, em validação | Validar no jogo real |
-| **M5** Voz | Voz por proximidade com Doppler, em validação | Ouvir com microfone e fones |
+| **M3** Multiplayer | Salas de até 6 jogadores, testadas entre dois computadores | Roubo (N5) e teste completo no hotspot |
+| **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
+| **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
 | **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
@@ -217,6 +217,6 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Validar D3, D5 e D6 e implementar a N5.
+3. Implementar a N5.
 4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
 5. Fazer o teste integrado e ensaiar a apresentação.

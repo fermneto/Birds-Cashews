@@ -4,7 +4,7 @@ Registro do teste feito em 18/11/2026 com a branch `daniel/d1-rede`, no commit `
 pelo PR #6. O roteiro está em [`TESTE_REDE.md`](TESTE_REDE.md).
 
 **Situação: parcialmente aprovado.** As mensagens do cliente chegaram ao host entre dois computadores, e o host detectou
-a saída do cliente. Ainda faltam as confirmações listadas na seção 5.
+a saída do cliente. Ainda faltam as confirmações listadas na seção 6.
 
 ## 1. Ambiente
 
@@ -68,9 +68,14 @@ também não mostra se o cliente saiu por queda de rede ou por encerramento do p
 | Queda detectada sem pacote de saída | Aprovada |
 | Host remove a sessão expirada | Aprovada |
 
-## 5. Pendências
+## 5. Jogo completo entre dois computadores
 
-1. Daniel confirmar se o `discover` mostrou `Birds D1` e se apareceram `Eco recebido 1`, `2` e `3`.
-2. Repetir a queda desligando o Wi-Fi do cliente.
-3. Repetir o roteiro completo no hotspot do celular, que é a rede da apresentação.
-4. Testar 3 e 4 jogadores conectados, porque o teste usou apenas um cliente.
+Em 19/11/2026, o Neto e um amigo jogaram o Birds&Cashews em dois computadores diferentes, usando a branch
+`integracao/rede-voz` (commit `a4a693e`). A conexão, a sala e a voz por proximidade funcionaram. A rede usada e os
+detalhes de cada verificação não foram registrados.
+
+## 6. Pendências
+
+1. Repetir a queda desligando o Wi-Fi do cliente.
+2. Repetir o roteiro completo no hotspot do celular, que é a rede da apresentação.
+3. Testar com mais de dois jogadores conectados.

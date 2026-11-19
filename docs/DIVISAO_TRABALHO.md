@@ -20,10 +20,10 @@ As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida c
 | N5 Roubo e colisões | Neto | Não iniciada, **destravada** | Nenhum | Implementar |
 | D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver `RESULTADOS_TESTE_REDE.md` |
 | D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
-| D3 Replicação de jogadores | **Neto** | **Em validação** | PR de integração da rede e da voz | Testar duas instâncias e, na F1, dois computadores |
+| D3 Replicação de jogadores | **Neto** | **Concluída** | PR #13 | Nada |
 | D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
-| D5 Voz por proximidade | **Neto** | **Em validação** | PR de integração da rede e da voz | Ouvir com microfone e fones de verdade |
-| D6 NPCs em rede | **Neto** | **Em validação** | PR de integração da rede e da voz | Testar duas instâncias e, na F1, dois computadores |
+| D5 Voz por proximidade | **Neto** | **Concluída** | PR #13 | Nada |
+| D6 NPCs em rede | **Neto** | **Concluída** | PR #13 | Nada |
 | F1 Teste integrado | Neto | Bloqueada | Nenhum | Depende de N5, D3, D5 e D6, com dois computadores |
 | F2 Documentos | Neto | Não iniciada | Nenhum | README, UML, uso de IA e créditos |
 | F3 Apresentação | Neto | Bloqueada | Nenhum | Depende da F1 |
@@ -41,11 +41,9 @@ Os testes automáticos não cobrem a experiência real. Ainda precisam ser confe
 
 ### Próximos passos
 
-1. **D3, D5 e D6:** validar o multiplayer com duas instâncias no mesmo computador e a voz com microfone e fones.
-2. **N5:** roubo de ninhos, cajus caindo e ninhos dos outros jogadores no mapa.
-4. **F2:** documentos de entrega.
-5. **F1 e F3:** teste com dois computadores no hotspot e ensaio da apresentação. Como o Daniel pausou, o segundo
-   computador precisa ser combinado.
+1. **N5:** roubo de ninhos, cajus caindo e ninhos dos outros jogadores no mapa.
+2. **F2:** documentos de entrega.
+3. **F1 e F3:** teste completo com dois computadores no hotspot e ensaio da apresentação.
 
 ## 1. Resumo
 
