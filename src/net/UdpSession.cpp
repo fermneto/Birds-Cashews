@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <charconv>
 #include <chrono>
 #include <deque>
@@ -132,6 +133,20 @@ void sendPacket(int socket, const sockaddr_in& address, const Packet& packet) {
 }
 } // namespace
 
+// Verdadeiro para 127.x e para qualquer IPv4 das interfaces deste computador.
+static bool isThisMachine(uint32_t networkOrderAddress) {
+    if ((ntohl(networkOrderAddress) >> 24) == 127) return true;
+    ifaddrs* list = nullptr;
+    if (getifaddrs(&list) != 0) return false;
+    bool found = false;
+    for (const ifaddrs* item = list; item && !found; item = item->ifa_next) {
+        if (!item->ifa_addr || item->ifa_addr->sa_family != AF_INET) continue;
+        found = reinterpret_cast<const sockaddr_in*>(item->ifa_addr)->sin_addr.s_addr == networkOrderAddress;
+    }
+    freeifaddrs(list);
+    return found;
+}
+
 struct UdpSession::State {
     explicit State(uint16_t serverPort) : port(serverPort) {}
     ~State() { if (socket >= 0) close(socket); }
@@ -176,9 +191,13 @@ struct UdpSession::State {
         sendPacket(socket, from, {Kind::Accept, packet.token, 0, {peer->id}});
     }
 
+    // A procura vai por broadcast e tambem direto ao proprio computador, entao um host local responde
+    // duas vezes, por enderecos diferentes. Enderecos desta maquina viram 127.0.0.1 e a sala aparece uma vez.
     void recordRoom(const sockaddr_in& from, const Packet& packet, Time now) {
         if (now - lastDiscovery >= kDiscoveryLifetime) return;
-        const std::string address = displayAddress(from);
+        sockaddr_in canonical = from;
+        if (isThisMachine(from.sin_addr.s_addr)) canonical.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        const std::string address = displayAddress(canonical);
         RoomInfo room{std::string(packet.payload.begin() + 1, packet.payload.end()), address, packet.payload.front()};
         const auto existing = std::find_if(rooms.begin(), rooms.end(), [&](const DiscoveredRoom& item) {
             return item.room.address == address;

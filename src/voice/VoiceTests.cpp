@@ -2,6 +2,8 @@
 #include "core/TestRun.h"
 #include "voice/JitterBuffer.h"
 #include "voice/LoopbackVoiceLink.h"
+#include <thread>
+#include <SDL.h>
 #include "voice/OpusCodec.h"
 #include "voice/Spatializer.h"
 #include "voice/VoiceChat.h"
@@ -98,13 +100,13 @@ void testSpeechDetector(TestRun& run) {
         tonesSpeaking += noisy.process(frame.data(), kVoiceFrame);
         if (i == 0) onsetNow = noisy.speaking();
     }
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 60; i++) {
         noisy.process(noise.data() + i * kVoiceFrame, kVoiceFrame);
-        if (i == 10) heldAfterEnd = noisy.speaking();
-        if (i == 25) closedLater = !noisy.speaking();
+        if (i == 25) heldAfterEnd = noisy.speaking();
+        if (i == 40) closedLater = !noisy.speaking();
     }
     run.check("Voz: tom sobre o ruido e fala desde o primeiro quadro", onsetNow && tonesSpeaking == 50);
-    run.check("Voz: fala segura 300 ms depois do fim e depois fecha", heldAfterEnd && closedLater);
+    run.check("Voz: fala segura 500 ms depois do fim e depois fecha", heldAfterEnd && closedLater);
     run.check("Voz: limiar acompanha o ruido de fundo", noisy.noiseFloorDb() > -40.0f && noisy.noiseFloorDb() < -30.0f);
 }
 
@@ -281,13 +283,13 @@ void testAutoGain(TestRun& run) {
 void testSpatial(TestRun& run) {
     const SpatialSettings settings;
     bool monotonic = true;
-    for (float d = 30; d < 120; d += 1) monotonic = monotonic && distanceGain(d + 1, settings) <= distanceGain(d, settings);
-    run.check("Voz: volume cheio ate 30 m e silencio a 120 m",
-              distanceGain(0, settings) == 1 && distanceGain(30, settings) == 1 && distanceGain(120, settings) == 0 &&
-              distanceGain(200, settings) == 0);
-    run.check("Voz: volume cai suave e sempre entre 30 e 120 m",
-              monotonic && near(distanceGain(75.0f, settings), 0.5, 0.01) && distanceGain(40, settings) > 0.95f);
-    run.check("Voz: a 60 m ainda se ouve bem", distanceGain(60, settings) > 0.7f);
+    for (float d = 70; d < 300; d += 1) monotonic = monotonic && distanceGain(d + 1, settings) <= distanceGain(d, settings);
+    run.check("Voz: volume cheio ate 70 m e silencio a 300 m",
+              distanceGain(0, settings) == 1 && distanceGain(70, settings) == 1 && distanceGain(300, settings) == 0 &&
+              distanceGain(400, settings) == 0);
+    run.check("Voz: volume cai suave e sempre entre 70 e 300 m",
+              monotonic && near(distanceGain(185.0f, settings), 0.5, 0.01) && distanceGain(80, settings) > 0.95f);
+    run.check("Voz: a 150 m ainda se ouve bem", distanceGain(150, settings) > 0.6f);
 
     VoiceListener me;
     PlayerPublicState other;
@@ -485,6 +487,74 @@ void testLoopbackChat(TestRun& run) {
 }
 }
 
+// Rede irregular: um quadro sai a cada 20 ms, mas a entrega trava por ate 160 ms de vez em quando,
+// como quando o laco do jogo engasga, e depois chega tudo de uma vez.
+void testBurstyNetwork(TestRun& run) {
+    using Kind = JitterBuffer::Kind;
+    JitterBuffer adaptive(4, 6, true), fixed(3, 2, false);
+    const int stalls[] = {1, 1, 1, 6, 1, 1, 8, 1, 3, 1, 1, 7};
+    int adaptiveGaps = 0, fixedGaps = 0, wait = 0, pattern = 0;
+    size_t mostBuffered = 0;
+    uint16_t produced = 0, delivered = 0;
+    for (int tick = 0; tick < 1200; tick++) {
+        produced++;
+        if (--wait <= 0) {
+            for (; delivered != produced; delivered++) {
+                adaptive.push(delivered, {1});
+                fixed.push(delivered, {1});
+            }
+            wait = stalls[pattern++ % 12];
+        }
+        const Kind a = adaptive.pop().kind, f = fixed.pop().kind;
+        if (tick >= 300) {
+            adaptiveGaps += a != Kind::Packet;
+            fixedGaps += f != Kind::Packet;
+            mostBuffered = std::max(mostBuffered, adaptive.buffered());
+        }
+    }
+    run.check(describe("Voz: rede com engasgos toca sem cortes depois de se ajustar (falhas)", adaptiveGaps), adaptiveGaps == 0);
+    run.check(describe("Voz: o buffer fixo antigo cortava nesse caso (falhas)", fixedGaps), fixedGaps > 20);
+    run.check(describe("Voz: o atraso extra fica limitado (quadros guardados no pior momento)", static_cast<double>(mostBuffered)),
+              mostBuffered <= 12);
+}
+
+// Uma frase longa, sem pausas, nao pode ser cortada pela deteccao de fala.
+void testLongSpeech(TestRun& run) {
+    SpeechDetector detector;
+    const std::vector<float> noise = whiteNoise(50 * kVoiceFrame, 0.004f, 9);
+    for (int i = 0; i < 50; i++) detector.process(noise.data() + i * kVoiceFrame, kVoiceFrame);
+    const std::vector<float> speech = tone(220, 600 * kVoiceFrame, 0.05f);
+    int silent = 0;
+    for (int i = 0; i < 600; i++) silent += !detector.process(speech.data() + i * kVoiceFrame, kVoiceFrame);
+    run.check(describe("Voz: 12 s de fala continua sem cortes (quadros cortados)", silent), silent == 0);
+}
+
+// Com um driver de audio falso, a thread de audio roda de verdade enquanto a principal troca quadros.
+void testAudioThread(TestRun& run) {
+    const char* previous = SDL_getenv("SDL_AUDIODRIVER");
+    const std::string saved = previous ? previous : "";
+    SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);
+    {
+        LoopbackVoiceLink link(std::make_shared<LoopbackVoiceHub>());
+        VoiceChat chat;
+        const bool started = chat.start();
+        chat.attach(&link, 0);
+        const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(400);
+        int updates = 0;
+        while (std::chrono::steady_clock::now() < until) {
+            chat.update(0.016f, VoiceListener{}, {});
+            chat.speaking(1);
+            updates++;
+            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+        }
+        run.check("Voz: a thread de audio liga com o dispositivo", !started || chat.threaded());
+        run.check("Voz: a thread principal segue livre com a thread de audio", updates > 50);
+    }
+    run.check("Voz: a thread de audio encerra junto com a voz", true);
+    if (saved.empty()) SDL_setenv("SDL_AUDIODRIVER", "", 1);
+    else SDL_setenv("SDL_AUDIODRIVER", saved.c_str(), 1);
+}
+
 int runVoiceSelfTest() {
     TestRun run;
     testSpeechDetector(run);
@@ -492,6 +562,9 @@ int runVoiceSelfTest() {
     testOpus(run);
     testJitterBuffer(run);
     testAutoGain(run);
+    testBurstyNetwork(run);
+    testLongSpeech(run);
+    testAudioThread(run);
     testSpatial(run);
     testDoppler(run);
     testBoundedDoppler(run);

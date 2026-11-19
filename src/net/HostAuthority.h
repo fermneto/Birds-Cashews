@@ -13,7 +13,7 @@
 namespace net {
 
 inline constexpr float kStateInterval = 1.0f / 20.0f;   // Estado e snapshots a 20 Hz.
-inline constexpr float kVoiceRange = 120.0f;            // Alem disso a voz ja e silencio (PLANO 3.6).
+inline constexpr float kVoiceRange = 300.0f;            // Alem disso a voz ja e silencio (PLANO 3.6).
 inline constexpr float kSpeakingHold = 0.3f;            // Segundos de "falando" depois do ultimo quadro.
 inline constexpr size_t kMaxVoiceQueue = 64;
 

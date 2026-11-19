@@ -16,23 +16,30 @@ public:
         std::vector<uint8_t> next;      // Lost: o quadro seguinte, se ja chegou, para usar o FEC.
     };
     struct Stats {
-        int received = 0, duplicates = 0, late = 0, lost = 0, overflow = 0, talkspurts = 0;
+        int received = 0, duplicates = 0, late = 0, lost = 0, overflow = 0, talkspurts = 0, underruns = 0;
     };
 
-    explicit JitterBuffer(int targetFrames = 3, int maxConceal = 2);
+    // adaptive: quando o buffer esvazia no meio da fala, espera em vez de pular o quadro e aumenta o alvo;
+    // com a rede estavel, o alvo volta devagar ao valor inicial.
+    explicit JitterBuffer(int targetFrames = 3, int maxConceal = 2, bool adaptive = false);
 
     void push(uint16_t sequence, std::vector<uint8_t> payload);
     Item pop();   // Um tique de 20 ms.
     void reset();
 
     bool playing() const { return playing_; }
+    int target() const { return target_; }
     size_t buffered() const { return packets_.size(); }
     const Stats& stats() const { return stats_; }
 
 private:
     int64_t unwrap(uint16_t sequence) const;
 
-    int target_, maxConceal_, maxFrames_;
+    void adapt(bool underrun);
+
+    int base_, target_, maxConceal_, maxFrames_;
+    bool adaptive_;
+    int stableTicks_ = 0;
     std::map<int64_t, std::vector<uint8_t>> packets_;
     int64_t refAbs_ = 1 << 20;   // Sequencia sem a volta dos 16 bits, ancorada em refSeq_.
     uint16_t refSeq_ = 0;

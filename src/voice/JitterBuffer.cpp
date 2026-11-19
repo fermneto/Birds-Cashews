@@ -3,10 +3,28 @@
 
 namespace {
 constexpr int64_t kNewTalkspurtGap = 64;   // Um salto maior que isso e uma fala nova, nao um quadro adiantado.
+constexpr int kMaxTarget = 12;             // 240 ms: rede muito irregular ainda toca sem cortes.
+constexpr int kStableTicksToShrink = 250;  // 5 s sem esvaziar: o alvo pode diminuir um quadro.
+
+int maxFramesFor(int target, bool adaptive) { return adaptive ? 2 * target + 4 : target + 4; }
 }
 
-JitterBuffer::JitterBuffer(int targetFrames, int maxConceal)
-    : target_(std::max(targetFrames, 1)), maxConceal_(maxConceal), maxFrames_(target_ + 4) {}
+JitterBuffer::JitterBuffer(int targetFrames, int maxConceal, bool adaptive)
+    : base_(std::max(targetFrames, 1)), target_(base_), maxConceal_(maxConceal),
+      maxFrames_(maxFramesFor(target_, adaptive)), adaptive_(adaptive) {}
+
+void JitterBuffer::adapt(bool underrun) {
+    if (!adaptive_) return;
+    if (underrun) {
+        stats_.underruns++;
+        stableTicks_ = 0;
+        target_ = std::min(target_ + 1, kMaxTarget);
+    } else if (++stableTicks_ >= kStableTicksToShrink && target_ > base_) {
+        stableTicks_ = 0;
+        target_--;
+    }
+    maxFrames_ = maxFramesFor(target_, adaptive_);
+}
 
 void JitterBuffer::reset() {
     packets_.clear();
@@ -70,6 +88,14 @@ JitterBuffer::Item JitterBuffer::pop() {
         item.payload = std::move(found->second);
         packets_.erase(found);
         misses_ = 0;
+        adapt(false);
+    } else if (adaptive_ && packets_.empty() && misses_ < maxConceal_) {
+        // Buffer vazio no meio da fala: a rede atrasou. Cobre com a ocultacao sem avancar a sequencia,
+        // para o quadro que esta chegando ainda tocar, e guarda mais folga dai em diante.
+        item.kind = Kind::Lost;
+        misses_++;
+        adapt(true);
+        return item;
     } else if (!packets_.empty() || misses_ < maxConceal_) {
         // Perdido, ou a pessoa acabou de parar: a ocultacao suaviza o fim.
         item.kind = Kind::Lost;

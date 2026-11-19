@@ -578,8 +578,8 @@ void testPlayerLeft(TestRun& t) {
 void testVoiceRelay(TestRun& t) {
     Room room;
     for (int i = 1; i < kMaxPlayers; i++) room.join({kWorld, "V" + std::to_string(i), 0});
-    // Do jogador 1: host a 10 m, 2 a 119 m, 3 a 121 m; 4 e 5 longe de todos, mas perto um do outro.
-    const glm::vec3 spots[] = {{0, 50, 0}, {10, 50, 0}, {10, 50, 119}, {10, 50, -121}, {500, 50, 500}, {530, 50, 500}};
+    // Do jogador 1: host a 10 m, 2 a 299 m, 3 a 301 m; 4 e 5 longe de todos, mas perto um do outro.
+    const glm::vec3 spots[] = {{0, 50, 0}, {10, 50, 0}, {10, 50, 299}, {10, 50, -301}, {900, 50, 900}, {930, 50, 900}};
     const auto place = [&] {
         room.host.authority->publishLocalPlayer(stateAt(0, spots[0]));
         for (int i = 1; i < kMaxPlayers; i++) room.clients[i - 1]->authority->publishLocalPlayer(stateAt(i, spots[i]));
@@ -715,6 +715,22 @@ void testSimulatedMatch(TestRun& t) {
 }
 } // namespace
 
+// O host desta maquina responde pelo broadcast e pelo loopback; a lista deve mostrar uma sala so.
+void testDiscoveryDedup(TestRun& t) {
+    Room room;
+    UdpSession finder(room.port);
+    std::vector<RoomInfo> found;
+    for (int i = 0; i < 120; i++) {
+        found = finder.discoverRooms();
+        room.step();
+    }
+    const auto same = std::count_if(found.begin(), found.end(), [](const RoomInfo& r) { return r.name == "Sala de teste"; });
+    t.check("salas: o host deste computador aparece uma unica vez", same == 1);
+    t.check("salas: a sala local usa o endereco 127.0.0.1",
+            same == 1 && std::find_if(found.begin(), found.end(), [](const RoomInfo& r) {
+                return r.name == "Sala de teste" && r.address.rfind("127.0.0.1:", 0) == 0; }) != found.end());
+}
+
 // Voz de ponta a ponta: microfone simulado no host, rede real em loopback e o som saindo no cliente.
 float voiceEnergy(Room& room, Client& client, VoiceChat& speaker, VoiceChat& listener, glm::vec3 listenerAt, int frames) {
     const glm::vec3 speakerAt(0, 100, 0);
@@ -766,7 +782,7 @@ void testVoiceOverNetwork(TestRun& t) {
     const bool heardSpeaking = listener.speaking(0);
     t.check("voz em rede: quem esta perto ouve o host", near > 0.02f && heardSpeaking);
     t.check("voz em rede: falar marca o host como falando", speaker.localSpeaking() && speaker.stats().framesSent > 50);
-    const float far = voiceEnergy(room, client, speaker, listener, {300, 100, 0}, 150);
+    const float far = voiceEnergy(room, client, speaker, listener, {600, 100, 0}, 150);
     t.check("voz em rede: longe a voz some", far < near * 0.05f);
 }
 
@@ -780,6 +796,7 @@ int runMatchSelfTest() {
     testSnapshotFlow(test);
     testPlayerLeft(test);
     testVoiceRelay(test);
+    testDiscoveryDedup(test);
     testVoiceOverNetwork(test);
     testSimulatedMatch(test);
     return test.failures;

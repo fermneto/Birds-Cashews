@@ -2,12 +2,13 @@
 #include <algorithm>
 
 namespace {
+constexpr int kMaxConcealTicks = 6;    // Ate 120 ms de atraso coberto antes de encerrar a fala.
 constexpr int kTailTicks = 10;          // Depois de parar, ainda toca 200 ms para esvaziar o Doppler.
 constexpr int kForgetTicks = 30 * 50;   // Falante calado por 30 s sai da mixagem.
 constexpr float kGainSmoothing = 0.002f;   // Cerca de 10 ms: volume e pan mudam sem degrau.
 }
 
-RemoteVoice::RemoteVoice(int jitterFrames) : jitter_(jitterFrames) {}
+RemoteVoice::RemoteVoice(int jitterFrames) : jitter_(jitterFrames, kMaxConcealTicks, true) {}
 
 void RemoteVoice::receive(const VoiceFrame& frame) { jitter_.push(frame.sequence, frame.payload); }
 

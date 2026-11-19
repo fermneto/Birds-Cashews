@@ -44,10 +44,12 @@ bool SpeechDetector::process(const float* frame, int count) {
     } else if (levelDb_ < floorDb_) {
         floorDb_ = levelDb_;
     } else {
-        floorDb_ = std::min(levelDb_, floorDb_ + settings_.floorRiseDbPerSecond * kFrameSeconds);
+        const float rise = speaking_ ? settings_.floorRiseWhileSpeaking : settings_.floorRiseDbPerSecond;
+        floorDb_ = std::min(levelDb_, floorDb_ + rise * kFrameSeconds);
     }
     const int hangoverFrames = static_cast<int>(std::lround(settings_.hangoverSeconds / kFrameSeconds));
-    if (levelDb_ > thresholdDb()) {
+    const float threshold = speaking_ ? thresholdDb() - settings_.releaseDb : thresholdDb();
+    if (levelDb_ > threshold) {
         speaking_ = true;
         hangover_ = hangoverFrames;
     } else if (hangover_ > 0) {

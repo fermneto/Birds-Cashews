@@ -10,8 +10,10 @@ constexpr int kVoiceFrame = 960;
 struct SpeechSettings {
     float marginDb = 10.0f;            // Quanto acima do ruido de fundo conta como fala.
     float minimumDb = -55.0f;          // Limiar absoluto: abaixo disso nunca e fala.
-    float hangoverSeconds = 0.3f;      // Espera depois da ultima fala, para nao cortar o fim das palavras.
-    float floorRiseDbPerSecond = 2.0f; // Velocidade com que o ruido de fundo estimado sobe.
+    float hangoverSeconds = 0.6f;      // Espera depois da ultima fala, para nao cortar o fim das palavras.
+    float floorRiseDbPerSecond = 2.0f; // Velocidade com que o ruido de fundo estimado sobe nas pausas.
+    float floorRiseWhileSpeaking = 0.2f; // Durante a fala o ruido quase nao sobe: uma frase longa nao se corta.
+    float releaseDb = 5.0f;            // Histerese: para continuar falando basta ficar 5 dB abaixo do limiar.
 };
 
 // Deteccao de fala por energia. O ruido de fundo e estimado por um seguidor assimetrico:

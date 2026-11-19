@@ -116,14 +116,17 @@ Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro.
 
 O áudio é capturado em 48 kHz e passa por detecção de fala. Um ganho automático leva a voz a um volume alvo, mesmo com
 microfone baixo. Depois a voz recebe o filtro de pássaro, 8 semitons acima, e é comprimida com Opus. O host repassa cada
-pacote apenas aos jogadores a até 120 m. Quem recebe aplica:
+pacote apenas aos jogadores a até 300 m. Quem recebe guarda a voz em um buffer que cresce sozinho quando a rede fica
+irregular, para não cortar, e aplica:
 
-1. **Volume por distância:** voz cheia até 30 m, ainda bem audível a 60 m e silêncio a partir de 120 m.
+1. **Volume por distância:** voz cheia até 70 m, ainda bem audível a 150 m e silêncio a partir de 300 m, porque os
+   pássaros voam rápido.
 2. **Posição estéreo:** a voz vem do lado em que o outro pássaro está.
 3. **Efeito Doppler:** a voz fica mais aguda quando os pássaros se aproximam e mais grave quando se afastam, calculada pela
    velocidade relativa entre quem fala e quem ouve.
 
-O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
+Microfone, codificação, mixagem e saída rodam em uma thread de áudio própria, separada do jogo, para um quadro lento não
+cortar a voz. O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
 
 ## 4. Arquitetura
 

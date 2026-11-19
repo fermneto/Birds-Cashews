@@ -2,11 +2,12 @@
 #include "shared/VoiceLink.h"
 #include "voice/OpusCodec.h"
 #include "voice/VoiceDsp.h"
+#include <deque>
 #include <vector>
 
 // Caminho da voz local: deteccao de fala -> voz de passaro -> Opus.
 // Codifica todos os quadros (o Opus precisa do historico), mas so devolve os que tem fala.
-// Na abertura da fala tambem devolve o quadro anterior, para nao perder o comeco da palavra.
+// Na abertura da fala tambem devolve os ultimos quadros (60 ms), para nao perder o comeco da palavra.
 class VoiceSender {
 public:
     VoiceSender(const SpeechSettings& speech, bool birdVoice, float semitones, int bitrate);
@@ -30,6 +31,6 @@ private:
     bool birdVoice_;
     bool speaking_ = false;
     uint16_t sequence_ = 0;
-    std::vector<uint8_t> previous_;
+    std::deque<std::vector<uint8_t>> previous_;
     std::vector<float> shifted_, boosted_;
 };

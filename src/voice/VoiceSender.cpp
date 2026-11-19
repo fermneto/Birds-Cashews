@@ -1,5 +1,9 @@
 #include "voice/VoiceSender.h"
 
+namespace {
+constexpr size_t kPreRollFrames = 3;
+}
+
 VoiceSender::VoiceSender(const SpeechSettings& speech, bool birdVoice, float semitones, int bitrate)
     : detector_(speech), shifter_(semitones), encoder_(bitrate), birdVoice_(birdVoice), shifted_(kVoiceFrame), boosted_(kVoiceFrame) {}
 
@@ -24,9 +28,11 @@ std::vector<VoiceFrame> VoiceSender::process(const float* frame, PlayerId speake
 
     std::vector<VoiceFrame> frames;
     if (speaking_) {
-        if (!wasSpeaking && !previous_.empty()) frames.push_back({speaker, sequence_++, previous_});
+        if (!wasSpeaking)
+            for (const auto& earlier : previous_) frames.push_back({speaker, sequence_++, earlier});
         frames.push_back({speaker, sequence_++, packet});
     }
-    previous_ = std::move(packet);
+    previous_.push_back(std::move(packet));
+    while (previous_.size() > kPreRollFrames) previous_.pop_front();
     return frames;
 }
