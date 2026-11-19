@@ -1,7 +1,7 @@
 #pragma once
 #include "shared/GameplayView.h"
 
-// Partida de exemplo usada enquanto a GameplaySession da N3 nao chega, e nas fotos do --render-test.
+// Partida de exemplo usada apenas nos testes e nas fotos do --render-test.
 class DemoGameplaySource : public GameplaySource {
 public:
     DemoGameplaySource() : view_(flightSample()) {}

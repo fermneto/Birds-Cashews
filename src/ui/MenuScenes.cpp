@@ -144,9 +144,10 @@ void drawSkeleton(UiKit& kit, const Pose& pose, cv::Size frame, const cv::Rect& 
 
 void drawVideoStatus(UiKit& kit, const cv::Rect& video, const CalibrationTracker& tracker) {
     const bool visible = tracker.bodyVisibleNow();
-    const std::string text = visible ? "Corpo inteiro visível" : "Afaste-se até o corpo inteiro aparecer no vídeo";
+    const std::string text = visible ? "Corpo inteiro visível" : "Afaste-se: mostre o corpo inteiro";
     const int width = kit.text.width(text, 22) + 40;
-    const cv::Rect chip(video.x + (video.width - width) / 2, video.y + video.height / 2 - 24, width, 48);
+    const int bottomBand = static_cast<int>(video.height * kCalRegionBand);
+    const cv::Rect chip(video.x + (video.width - width) / 2, video.y + video.height - bottomBand - 58, width, 48);
     kit.canvas.fill(chip, visible ? theme::kInk : theme::kRed, 0.82f, 12);
     kit.text.draw(kit.canvas, text, {chip.x + width / 2, chip.y + 32}, style(22, theme::kWhite, TextAlign::Center));
 }

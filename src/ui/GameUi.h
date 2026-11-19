@@ -76,6 +76,7 @@ private:
     std::string menuTitle() const;
     std::string menuSubtitle() const;
     std::string mainFooter() const;
+    std::string pauseFooter() const;
     HudScene hudScene() const;
     std::string frameKey() const;
     void redraw();
@@ -83,7 +84,7 @@ private:
     UiKit kit_;
     SoundManager sound_;
     GameplaySource* gameplay_;
-    FakeNetSession net_;   // Trocar pela sessao real quando a tarefa D1 chegar.
+    FakeNetSession net_;   // A integracao com a rede real e da tarefa D3.
     PoseSource* poseSource_ = nullptr;
     std::filesystem::path savesDir_;
 

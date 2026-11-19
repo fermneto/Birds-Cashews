@@ -93,13 +93,14 @@ void drawLevelPips(UiKit& kit, cv::Point origin, int level, int maxLevel) {
     }
 }
 
-void drawPrice(UiKit& kit, const UpgradeOptionView& option, cv::Point rightCenter) {
+void drawPrice(UiKit& kit, const UpgradeOptionView& option, cv::Point rightCenter, bool selected) {
     if (option.maxLevel > 0 && option.level >= option.maxLevel) {
         kit.text.draw(kit.canvas, "MÁX", rightCenter + cv::Point(0, 8), style(20, theme::kGreen, TextAlign::Right));
     } else if (option.price > 0) {
         const std::string price = std::to_string(option.price);
-        kit.text.draw(kit.canvas, price, rightCenter + cv::Point(0, 9),
-                      style(24, option.affordable ? theme::kGold : theme::kRed, TextAlign::Right));
+        // O vermelho perde contraste sobre a linha destacada, que ja explica a falta de moedas.
+        const cv::Scalar color = selected ? theme::kWhite : option.affordable ? theme::kGold : theme::kRed;
+        kit.text.draw(kit.canvas, price, rightCenter + cv::Point(0, 9), style(24, color, TextAlign::Right));
         const int x = rightCenter.x - kit.text.width(price, 24) - 32;
         kit.canvas.image(kit.assets.icon(UiIcon::Coin, 26), {x, rightCenter.y - 13});
     }
@@ -117,7 +118,7 @@ void drawNestOption(UiKit& kit, const UpgradeOptionView& option, const cv::Rect&
     const int baseline = twoLines ? area.y + 21 : area.y + area.height / 2 + 8;
     kit.text.drawFit(kit.canvas, option.name, {textX, baseline}, textRoom, style(20));
     if (twoLines) drawLevelPips(kit, {textX, area.y + area.height - 16}, option.level, option.maxLevel);
-    drawPrice(kit, option, {area.x + area.width - 12, area.y + area.height / 2});
+    drawPrice(kit, option, {area.x + area.width - 12, area.y + area.height / 2}, selected);
 }
 
 void drawArmCard(UiKit& kit, const cv::Rect& area, const std::string& arm, const std::string& action, bool active, float progress) {
@@ -140,8 +141,8 @@ void drawNestRoot(UiKit& kit, const NestMenuView& menu, int top) {
     const int width = (kNestPanel.width - 34) / 2;
     drawNestChoice(kit, {kNestPanel.x + 12, top, width, 180}, UiIcon::Cashew, menu.leftLabel, "Braço esquerdo");
     drawNestChoice(kit, {kNestPanel.x + 22 + width, top, width, 180}, UiIcon::Nest, menu.rightLabel, "Braço direito");
-    kit.text.draw(kit.canvas, "Bata as asas para decolar", {kNestPanel.x + kNestPanel.width / 2, top + 212},
-                  style(19, theme::kWhite, TextAlign::Center));
+    kit.text.drawFit(kit.canvas, "Bata as asas (Espaço) para decolar", {kNestPanel.x + kNestPanel.width / 2, top + 212},
+                     kNestPanel.width - 32, style(19, theme::kWhite, TextAlign::Center));
 }
 
 std::string nestTitle(NestMenuPage page) {

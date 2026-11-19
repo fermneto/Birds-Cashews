@@ -308,6 +308,11 @@ std::string GameUi::mainFooter() const {
     return profile + "   |   " + recordFooter_;
 }
 
+std::string GameUi::pauseFooter() const {
+    const GameplayView& view = gameplay_->view();
+    return "Pontuação: " + std::to_string(view.totalDelivered) + "   |   Record: " + std::to_string(view.record);
+}
+
 MenuScene GameUi::menuScene() const {
     MenuScene scene;
     scene.title = menuTitle();
@@ -317,6 +322,7 @@ MenuScene GameUi::menuScene() const {
     scene.error = error_;
     if (flow_.current() == UiScreen::Rooms) scene.notice = kMultiplayerNotice;
     if (flow_.current() == UiScreen::MainMenu) scene.footer = mainFooter();
+    if (flow_.current() == UiScreen::Pause) scene.footer = pauseFooter();
     scene.caretOn = activeField() && static_cast<int>(clock_ * 2.0f) % 2 == 0;
     scene.gesture = {raisedArm_, armProgress_, true};
     return scene;
@@ -334,7 +340,7 @@ HudScene GameUi::hudScene() const {
 void GameUi::redraw() {
     kit_.canvas.clear();
     const UiScreen screen = flow_.current();
-    if (screen == UiScreen::Playing || screen == UiScreen::Pause) drawHudScene(kit_, hudScene());
+    if (screen == UiScreen::Playing) drawHudScene(kit_, hudScene());
     if (screen == UiScreen::Calibration) {
         CalibrationScene scene;
         scene.hasCamera = poseSource_ != nullptr;
