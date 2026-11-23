@@ -352,13 +352,13 @@ class DiscoveredRoomSession : public NetSession {
 public:
     bool host(const std::string&) override { return true; }
     bool join(const std::string& address) override { joined = address; return true; }
-    std::vector<RoomInfo> discoverRooms() override { return {{"Sala real", "10.204.155.210:42917", 1}}; }
+    std::vector<RoomInfo> discoverRooms() override { return {{"Sala real", "192.168.0.10:42917", 1}}; }
     void leave() override {}
     std::string joined;
 };
 
 void testRoomAddresses(TestRun& t) {
-    t.check("salas: endereco com porta e valido", RoomsModel::isValidAddress("10.204.155.210:42917"));
+    t.check("salas: endereco com porta e valido", RoomsModel::isValidAddress("192.168.0.10:42917"));
     t.check("salas: virgula do teclado numerico vira ponto", RoomsModel::isValidAddress("127,0,0,1"));
     for (const char* bad : {"10.0.0.5:", "10.0.0.5:0", "10.0.0.5:70000", "10.0.0.5:abc", ":42917"})
         t.check(std::string("salas: endereco invalido '") + bad + "'", !RoomsModel::isValidAddress(bad));
@@ -366,7 +366,7 @@ void testRoomAddresses(TestRun& t) {
     DiscoveredRoomSession net;
     RoomsModel rooms(net);
     rooms.refresh();
-    t.check("salas: entra na sala descoberta na rede", rooms.joinRoom(0) && net.joined == "10.204.155.210:42917");
+    t.check("salas: entra na sala descoberta na rede", rooms.joinRoom(0) && net.joined == "192.168.0.10:42917");
     t.check("salas: IP digitado com virgula entra", rooms.joinAddress("127,0,0,1") && net.joined == "127.0.0.1");
 }
 
