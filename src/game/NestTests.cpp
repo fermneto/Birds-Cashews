@@ -2,6 +2,7 @@
 #include "core/TestRun.h"
 #include "game/GameplaySession.h"
 #include "game/NestEconomy.h"
+#include "game/NameTags.h"
 #include "game/NestModel.h"
 #include "game/RivalNests.h"
 #include "input/GestureControls.h"
@@ -888,6 +889,28 @@ void testTreeHit(TestRun& run, const World& world) {
     run.check("arvore: raspar na mesma batida nao derruba outro", rig.session.view().carried == 1);
 }
 
+void testNameTags(TestRun& run) {
+    const auto at = [](PlayerId id, glm::vec3 position) {
+        PlayerPublicState state;
+        state.id = id;
+        state.position = position;
+        return state;
+    };
+    const auto nameOf = [](PlayerId id) -> std::string { return id == 4 ? "" : "Jogador " + std::to_string(id); };
+    const glm::vec3 camera(0, 100, 0);
+    const std::vector<PlayerPublicState> players = {at(kMe, camera), at(1, camera + glm::vec3(30, 0, 0)),
+                                                    at(2, camera + glm::vec3(0, 0, -110)), at(3, camera + glm::vec3(0, 0, 200)),
+                                                    at(4, camera + glm::vec3(10, 0, 0))};
+    const std::vector<NameTag> tags = visibleNameTags(camera, players, kMe, nameOf);
+    run.check("nomes: so os jogadores por perto, sem o proprio e sem nome desconhecido",
+              tags.size() == 2 && tags[0].player == 2 && tags[1].player == 1);
+    run.check("nomes: perto aparece inteiro e acima do passaro",
+              tags[1].name == "Jogador 1" && tags[1].opacity == 1.0f && tags[1].anchor == players[1].position + glm::vec3(0, 5.5f, 0));
+    run.check("nomes: perto do limite vai sumindo", tags[0].opacity > 0.0f && tags[0].opacity < 1.0f);
+    run.check("nomes: o mais perto e desenhado por cima", tags.back().distance < tags.front().distance);
+    run.check("nomes: longe nao aparece", visibleNameTags(camera, {at(1, camera + glm::vec3(0, 0, 130))}, kMe, nameOf).empty());
+}
+
 int runNestSelfTest() {
     TestRun run;
     const World world(kSeed);
@@ -910,5 +933,6 @@ int runNestSelfTest() {
     testRobberyLimits(run, world);
     testVictim(run, world);
     testTreeHit(run, world);
+    testNameTags(run);
     return run.failures;
 }

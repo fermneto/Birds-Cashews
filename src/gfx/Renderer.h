@@ -8,9 +8,19 @@
 #include "entity/FlightControls.h"
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+// Etiqueta 2D presa a um ponto do mundo, como o nome acima de outro jogador. A imagem chega
+// pre-multiplicada em BGRA, em pixels da resolucao logica, e vira textura uma unica vez por chave.
+struct WorldLabel {
+    std::string key;
+    cv::Mat image;
+    glm::vec3 anchor{0};   // A borda de baixo da etiqueta fica centrada aqui.
+    float opacity = 1;
+};
 
 // Desenha ceu, mundo, mar, passaro em primeira pessoa e a imagem da webcam.
 class Renderer {
@@ -34,6 +44,7 @@ public:
     void setRivalNestMesh(const MeshBuilder& nests);
     void setRivalBeaconMesh(const MeshBuilder& beacon);
     void setRivalBeacons(std::vector<glm::mat4> transforms) { rivalBeacons_ = std::move(transforms); }
+    void setLabels(std::vector<WorldLabel> labels);   // Desenhadas na ordem recebida; a ultima fica por cima.
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
 
 private:
@@ -47,11 +58,18 @@ private:
     void drawViewModel(const Camera3D& camera, const BirdAnimation& animation);
     void drawWind(const BirdAnimation& animation);
     void drawPreview();
+    void drawLabels(const Camera3D& camera);
     void drawOverlay();
     glm::vec4 logicalRect(float x, float y, float width, float height) const;
     void createTarget();
 
-    Shader worldShader_, skyShader_, waterShader_, previewShader_, overlayShader_, windShader_;
+    Shader worldShader_, skyShader_, waterShader_, previewShader_, overlayShader_, windShader_, labelShader_;
+    struct LabelTexture {
+        GLuint texture = 0;
+        int width = 0, height = 0;
+    };
+    std::unordered_map<std::string, LabelTexture> labelTextures_;
+    std::vector<WorldLabel> labels_;
     Mesh worldMesh_, cloudMesh_, waterMesh_;
     std::unique_ptr<Mesh> cashewFruit_, cashewFarFruit_, cashewStems_;
     std::vector<glm::mat4> nearbyCashews_, distantCashews_;

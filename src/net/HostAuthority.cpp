@@ -57,7 +57,25 @@ std::vector<PlayerId> HostAuthority::remotePlayers() const {
 }
 
 std::string HostAuthority::playerName(PlayerId id) const {
+    if (id == kHostPlayer) return localName_;
     return id < kMaxPlayers && remotes_[id].joined ? remotes_[id].name : "";
+}
+
+void HostAuthority::setLocalName(const std::string& name) {
+    if (name == localName_) return;
+    localName_ = name;
+    rosterDirty_ = true;
+}
+
+// Todos recebem a lista inteira: e pequena e so muda quando alguem entra, sai ou troca de perfil.
+void HostAuthority::sendRoster() {
+    rosterDirty_ = false;
+    const std::vector<PlayerId> ids = remotePlayers();
+    if (ids.empty()) return;
+    RosterMessage roster{{kHostPlayer, localName_}};
+    for (PlayerId id : ids) roster.push_back({id, remotes_[id].name});
+    const auto bytes = encodeRoster(roster);
+    for (PlayerId id : ids) udp_.sendReliable(id, bytes);
 }
 
 // ---- Regras ----
@@ -187,6 +205,7 @@ void HostAuthority::update(float seconds) {
     spill_.advance(seconds);
     checkDiveHits();
     flushConfirmed();
+    if (rosterDirty_) sendRoster();
     snapshotTimer_ += std::max(0.0f, seconds);
     if (snapshotTimer_ >= kStateInterval) {
         snapshotTimer_ = std::min(snapshotTimer_ - kStateInterval, kStateInterval);
@@ -244,6 +263,7 @@ void HostAuthority::welcome(PeerId peer, const HelloMessage& hello) {
     std::cout << "Rede: " << (hello.name.empty() ? "jogador" : hello.name) << " entrou como jogador "
               << static_cast<int>(peer) << "\n";
     confirm(eventOf(GameEventType::PlayerJoined, peer), false, kHostPlayer);
+    rosterDirty_ = true;
 }
 
 void HostAuthority::dropPlayer(PlayerId id) {
@@ -252,6 +272,7 @@ void HostAuthority::dropPlayer(PlayerId id) {
     lastRobAt_[id] = -1.0e9;
     std::cout << "Rede: jogador " << static_cast<int>(id) << " saiu\n";
     confirm(eventOf(GameEventType::PlayerLeft, id), false, kHostPlayer);
+    rosterDirty_ = true;
 }
 
 void HostAuthority::handleDatagram(const Message& message) {

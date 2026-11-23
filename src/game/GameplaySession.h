@@ -33,6 +33,7 @@ public:
 
     void publishLocalPlayer();                            // Informa a autoridade onde o jogador esta.
     GameAuthority& authority() { return *authority_; }
+    PlayerId localPlayer() const { return localPlayer_; }
 
     bool perched() const { return perched_; }
     bool robbing() const { return perched_ && perchRival_ != kNoPlayer; }   // Pousado no ninho de um rival.

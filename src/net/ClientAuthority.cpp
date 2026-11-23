@@ -59,6 +59,11 @@ void ClientAuthority::publishLocalPlayer(const PlayerPublicState& state) {
     hasLocal_ = true;
 }
 
+std::string ClientAuthority::playerName(PlayerId id) const {
+    if (id == localPlayer_) return config_.name;
+    return id < kMaxPlayers ? names_[id] : "";
+}
+
 std::vector<NpcPublicState> ClientAuthority::npcs() const {
     std::vector<NpcPublicState> list;
     for (size_t i = 0; i < npcs_.size() && i < lastNpcs_.size(); i++) {
@@ -152,6 +157,13 @@ void ClientAuthority::handleReliable(const Message& message) {
                 }
                 pending_.push_back(event);
             }
+            return;
+        }
+        case MessageType::Roster: {
+            const auto roster = decodeRoster(message.payload);
+            if (status_ != ClientStatus::Ready || !roster) return;
+            names_.fill("");
+            for (const RosterEntry& entry : *roster) names_[entry.player] = entry.name;
             return;
         }
         default:

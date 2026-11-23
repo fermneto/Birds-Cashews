@@ -52,7 +52,8 @@ public:
     void setNpcs(std::vector<NpcPublicState> npcs) { npcs_ = std::move(npcs); }
 
     std::vector<PlayerId> remotePlayers() const;   // Clientes que ja se apresentaram.
-    std::string playerName(PlayerId id) const;
+    std::string playerName(PlayerId id) const override;   // O 0 e o proprio host.
+    void setLocalName(const std::string& name);           // Avisa a sala quando o host troca de perfil.
     double clock() const { return now_; }
 
 private:
@@ -77,6 +78,7 @@ private:
     bool stateOf(PlayerId id, PlayerPublicState& state) const;   // Local ou remoto ja com estado.
     void checkDiveHits();
     void flushConfirmed();
+    void sendRoster();
     void sendSnapshot();
     void relayVoice(const VoiceFrame& frame);
     bool positionOf(PlayerId id, glm::vec3& position) const;
@@ -88,6 +90,8 @@ private:
     float snapshotTimer_ = 0;
     bool hasLocal_ = false;
     PlayerPublicState local_;
+    std::string localName_;
+    bool rosterDirty_ = false;
     double localSpeakingUntil_ = -1;
     std::array<Remote, kMaxPlayers> remotes_{};
     std::array<uint8_t, kMaxPlayers> carried_{};   // Carga segundo os eventos confirmados.

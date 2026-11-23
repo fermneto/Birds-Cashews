@@ -7,6 +7,29 @@ mesmo mundo pela rede local e conversam por voz de proximidade.
 A pose do jogador vem do modelo YOLOv8n-pose, executado pelo módulo DNN do OpenCV na CPU. O mundo é desenhado com OpenGL,
 e a janela, o som e o microfone usam SDL2.
 
+## Começo rápido
+
+Em um Linux Ubuntu ou Debian:
+
+```bash
+# 1. Instalar as dependências
+sudo apt install git g++ make pkg-config libopencv-dev libsdl2-dev libgl-dev libopus-dev libglm-dev
+
+# 2. Baixar o código
+git clone https://github.com/fermneto/Birds-Cashews.git
+cd Birds-Cashews
+
+# 3. Compilar
+make -j8
+
+# 4. Jogar
+./birds            # com o corpo, pela webcam
+./birds --teclado  # sem webcam, pelo teclado
+```
+
+No menu, escolha **Jogar sozinho**, **Hospedar sala** ou **Entrar em sala**. Os detalhes de cada passo estão nas seções
+abaixo.
+
 ## Situação
 
 O jogo está em desenvolvimento. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer e voz já estão na
@@ -132,6 +155,9 @@ Um jogador hospeda e os outros entram, até 6 no total. Todos precisam estar na 
 O jogo usa UDP na porta 42917. Se a sala não for encontrada, verifique se a rede permite comunicação entre os
 dispositivos e se o firewall libera essa porta. Redes de celular em modo hotspot às vezes bloqueiam a descoberta
 automática, e nesse caso o IP digitado resolve.
+
+Na sala, o nome de cada jogador aparece acima do pássaro dele quando ele está a menos de 130 m, sumindo aos poucos a
+partir de 90 m. As copas e o relevo escondem o nome de quem está atrás deles.
 
 A voz por proximidade funciona só dentro de uma sala. Ela é transmitida quando o jogador fala, com filtro de voz de
 pássaro, volume pela distância e posição estéreo. Use fones para evitar eco.

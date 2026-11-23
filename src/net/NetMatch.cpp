@@ -105,7 +105,10 @@ void NetMatch::becomeSolo(const std::string& error) {
 }
 
 void NetMatch::update(float seconds) {
-    if (host_) host_->update(seconds);
+    if (host_) {
+        host_->setLocalName(name_);
+        host_->update(seconds);
+    }
     if (client_) {
         client_->update(seconds);
         if (client_->status() != ClientStatus::Ready) becomeSolo(client_->error());

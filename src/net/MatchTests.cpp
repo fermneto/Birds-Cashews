@@ -868,6 +868,57 @@ void testRobberyNeedsPerch(TestRun& t) {
             farRefused && countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
 }
 
+void testRosterProtocol(TestRun& t) {
+    const Bytes bytes = encodeRoster({{0, "Ana"}, {4, "Bruno Ávila"}});
+    const auto back = decodeRoster(bytes);
+    t.check("nomes: a lista vai e volta igual", back && back->size() == 2 && (*back)[0].player == 0 &&
+                                                   (*back)[0].name == "Ana" && (*back)[1].player == 4 && (*back)[1].name == "Bruno Ávila");
+    const auto longName = decodeRoster(encodeRoster({{1, std::string(80, 'x')}}));
+    t.check("nomes: nome longo chega cortado", longName && (*longName)[0].name.size() == kMaxNameLength);
+    t.check("nomes: lista vazia e valida", decodeRoster(encodeRoster({})) && decodeRoster(encodeRoster({}))->empty());
+    t.check("nomes: recusa mensagem cortada ou com sobra", rejectsTruncated(bytes, [](const Bytes& b) { return decodeRoster(b); }));
+    t.check("nomes: recusa jogador fora da sala", !decodeRoster(encodeRoster({{kMaxPlayers, "X"}})));
+    Bytes control = encodeRoster({{1, "Ana"}});
+    control.back() = '\n';
+    t.check("nomes: recusa caractere de controle", !decodeRoster(control));
+    t.check("nomes: ruido nunca vira nome invalido", survivesNoise(bytes, [](const Bytes& b) { return decodeRoster(b); },
+                                                                   [](const RosterMessage& r) {
+                                                                       return r.size() <= kMaxPlayers && std::all_of(r.begin(), r.end(), [](const RosterEntry& e) {
+                                                                           return e.player < kMaxPlayers && e.name.size() <= kMaxNameLength;
+                                                                       });
+                                                                   }));
+}
+
+void testNamesOverNetwork(TestRun& t) {
+    Room room;
+    room.host.authority->setLocalName("Anfitriã");
+    Client& ana = room.join({kWorld, "Ana", 1});
+    Client& bia = room.join({kWorld, "Bia", 2});
+    if (!ready(ana) || !ready(bia)) {
+        t.check("nomes em rede: clientes entram", false);
+        return;
+    }
+    const PlayerId idAna = ana.authority->localPlayer(), idBia = bia.authority->localPlayer();
+    const auto knowsAll = [&] {
+        return ana.authority->playerName(0) == "Anfitriã" && ana.authority->playerName(idBia) == "Bia" &&
+               bia.authority->playerName(idAna) == "Ana";
+    };
+    t.check("nomes em rede: cada um sabe o nome dos outros", room.pumpUntil(knowsAll, 200));
+    t.check("nomes em rede: o host sabe o nome de todos",
+            room.host.authority->playerName(0) == "Anfitriã" && room.host.authority->playerName(idAna) == "Ana" &&
+                ana.authority->playerName(idAna) == "Ana");
+    SharedAuthority shared(ana.authority);
+    t.check("nomes em rede: a sessao ve os nomes pela autoridade compartilhada", shared.playerName(idBia) == "Bia");
+
+    room.host.authority->setLocalName("Host novo");
+    t.check("nomes em rede: trocar de perfil atualiza o nome",
+            room.pumpUntil([&] { return bia.authority->playerName(0) == "Host novo"; }, 200));
+    bia.udp.leave();
+    bia.paused = true;
+    t.check("nomes em rede: quem sai perde o nome na lista",
+            room.pumpUntil([&] { return ana.authority->playerName(idBia).empty(); }, 600));
+}
+
 void testDiveKnock(TestRun& t) {
     Room room;
     Client& prey = room.join({kWorld, "Presa", 7});
@@ -953,7 +1004,8 @@ uint32_t wireFingerprint() {
     event.position = {5.0f, 6.0f, 7.0f};
     std::vector<Bytes> all = {encodeHello({kProtocolVersion, kWorld, "Ana", 99}), encodeWelcome({kProtocolVersion, kWorld, 3}),
                               encodeRefuse(RefuseReason::Full), encodeEvents(MessageType::EventConfirmed, {event}),
-                              encodeState({2.0f, player}), encodeSnapshot(snapshot), encodeVoice({2, 7, Bytes(5, 9)})};
+                              encodeState({2.0f, player}), encodeSnapshot(snapshot), encodeVoice({2, 7, Bytes(5, 9)}),
+                              encodeRoster({{0, "Ana"}, {3, "Bia"}})};
     uint32_t hash = 2166136261u;
     for (const Bytes& bytes : all)
         for (uint8_t b : bytes) hash = (hash ^ b) * 16777619u;
@@ -961,11 +1013,11 @@ uint32_t wireFingerprint() {
 }
 
 void testWireFormatLocked(TestRun& t) {
-    constexpr uint32_t kVersion3Fingerprint = 124672947u;
+    constexpr uint32_t kVersion4Fingerprint = 785067226u;
     const uint32_t fingerprint = wireFingerprint();
-    if (fingerprint != kVersion3Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
-    t.check("protocolo: formato fixo da versao 3 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
-            kProtocolVersion == 3 && fingerprint == kVersion3Fingerprint);
+    if (fingerprint != kVersion4Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
+    t.check("protocolo: formato fixo da versao 4 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
+            kProtocolVersion == 4 && fingerprint == kVersion4Fingerprint);
 }
 
 // Um host de outra versao que conecta, mas manda um estado que o cliente nao consegue ler.
@@ -1087,5 +1139,7 @@ int runMatchSelfTest() {
     testRobberyOverNetwork(test);
     testRobberyNeedsPerch(test);
     testDiveKnock(test);
+    testRosterProtocol(test);
+    testNamesOverNetwork(test);
     return test.failures;
 }

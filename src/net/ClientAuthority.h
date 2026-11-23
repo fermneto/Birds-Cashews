@@ -33,6 +33,7 @@ public:
     std::vector<GameEvent> pollEvents() override;
     std::vector<PlayerPublicState> players() const override;
     void publishLocalPlayer(const PlayerPublicState& state) override;
+    std::string playerName(PlayerId id) const override;
 
     void sendVoice(const VoiceFrame& frame) override;
     std::vector<VoiceFrame> receiveVoice() override;
@@ -65,6 +66,7 @@ private:
     double speakingUntil_ = -1;
     std::array<RemoteTrack, kMaxPlayers> players_{};
     std::array<bool, kMaxPlayers> present_{};
+    std::array<std::string, kMaxPlayers> names_{};   // Ultima lista de nomes enviada pelo host.
     std::vector<RemoteTrack> npcs_;
     std::vector<NpcPublicState> lastNpcs_;
     float lastSnapshotTime_ = -1;

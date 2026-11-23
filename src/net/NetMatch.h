@@ -75,6 +75,7 @@ public:
     std::vector<GameEvent> pollEvents() override { return target_->pollEvents(); }
     std::vector<PlayerPublicState> players() const override { return target_->players(); }
     void publishLocalPlayer(const PlayerPublicState& state) override { target_->publishLocalPlayer(state); }
+    std::string playerName(PlayerId id) const override { return target_->playerName(id); }
 
 private:
     std::shared_ptr<GameAuthority> target_;
