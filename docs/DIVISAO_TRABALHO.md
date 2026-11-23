@@ -8,7 +8,7 @@ no [`README.md`](../README.md).
 ## Situação atual
 
 Atualizado em 23/11/2026. **Daniel pausou a participação no projeto**, e as tarefas que eram dele passaram para o Neto.
-A `main` reúne todas as tarefas concluídas, compila e passa nas 842 verificações de `./birds --selftest`.
+A `main` reúne todas as tarefas concluídas, compila e passa nas 911 verificações de `./birds --selftest`.
 
 As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida como histórico.
 
@@ -19,15 +19,15 @@ As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida c
 | N2 Perfil e record | Neto | **Concluída** | PR #2 | Nada |
 | N3 Ninho e upgrades | Neto | **Concluída** | PR #4 | Nada |
 | N4 Menus, HUD e sons | Neto | **Concluída** | PRs #7 e #10 | Validar no teste integrado |
-| N5 Roubo e colisões | Neto | Em andamento | Branch `neto/n5-roubo` | Concluir e abrir o PR |
+| N5 Roubo e colisões | Neto | **Concluída** | Branch `neto/n5-roubo` | Validar no teste integrado |
 | D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md) |
 | D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
 | D3 Replicação de jogadores | **Neto** | **Concluída** | PRs #12 e #13 | Nada |
 | D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
 | D5 Voz por proximidade | **Neto** | **Concluída** | PRs #11 e #13 | Nada |
 | D6 NPCs em rede | **Neto** | **Concluída** | PRs #12 e #13 | Nada |
-| F1 Teste integrado | Neto | Bloqueada | Nenhum | Depende da N5. D3, D5 e D6 já estão na `main` |
-| F2 Documentos | Neto | Em andamento | Branch `neto/docs-publico` | Diagrama UML, depois da N5 |
+| F1 Teste integrado | Neto | **Destravada** | Nenhum | Dois computadores no hotspot |
+| F2 Documentos | Neto | Em andamento | Branch `neto/docs-publico` | Diagrama UML |
 | F3 Apresentação | Neto | Bloqueada | Nenhum | Depende da F1 |
 
 ### O que validar no jogo integrado
@@ -40,12 +40,13 @@ Os testes automáticos não cobrem a experiência real. Ainda precisam ser confe
 4. Ciclo completo: coletar cajus, pousar no ninho, comprar upgrades e decolar batendo os braços.
 5. NPCs: bando, disputa por cajus e caçador derrubando a carga.
 6. HUD, aviso de record e sons.
+7. Roubo: pousar no ninho de um rival, ver a barra encher, Defesa, Cofre e Alarme do lado da vítima.
+8. Mergulho em quem carrega cajus, batida em árvore e cajus caindo no chão.
 
 ### Próximos passos
 
-1. **N5:** roubo de ninhos, colisão em mergulho e cajus caindo no mundo. Os ninhos dos outros jogadores já aparecem no
-   mapa desde o PR #16.
-2. **F2:** diagrama UML, depois da N5.
+1. **F2:** diagrama UML de classes, agora que a arquitetura está fechada.
+2. **Validação local:** itens 1 a 8 acima, com janela, webcam e som.
 3. **F1 e F3:** teste completo com dois computadores no hotspot e ensaio da apresentação.
 
 ## 1. Resumo
