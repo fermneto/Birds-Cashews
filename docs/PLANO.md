@@ -2,6 +2,9 @@
 
 Projeto de Linguagem de Programação I, semestre 2026.2, prof. Derzu Omaia. **Entrega: 07/12/2026.**
 
+Este documento define o jogo: regras, mecânicas, arquitetura, requisitos do enunciado e cronograma. Para compilar e
+jogar, veja o [`README.md`](../README.md).
+
 ## 1. Resumo do jogo
 
 Você é um pássaro em primeira pessoa, controlado pelo próprio corpo diante da webcam, em uma ilha de cajueiros gigantes.
@@ -174,7 +177,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 
 | # | Requisito | Como será atendido | Situação |
 |---|---|---|---|
-| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Pendente (F2) |
+| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Em produção, depois da N5 |
 | 2 | Bastante métodos | Classes pequenas por módulo | Atendido |
 | 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair | Atendido |
 | 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Atendido |
@@ -184,21 +187,21 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
 | 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente | Falta validar o áudio |
-| Instrução 4 | Indicar uso de IA | `docs/USO_DE_IA.md` | Pendente (F2) |
+| Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma
 
 As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`](DIVISAO_TRABALHO.md).
 
-| Marco | Situação em 18/11/2026 | O que falta |
+| Marco | Situação em 23/11/2026 | O que falta |
 |---|---|---|
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Salas de até 6 jogadores, testadas entre dois computadores | Roubo (N5) e teste completo no hotspot |
+| **M3** Multiplayer | Salas de até 6 jogadores, testadas entre dois computadores | Roubo (N5, em andamento) e teste completo no hotspot |
 | **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
 | **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
-| **M6** Fechamento | Não iniciado | Teste integrado, README, UML, uso de IA, créditos e apresentação |
+| **M6** Fechamento | README, créditos e uso de IA escritos | Teste integrado, UML e apresentação |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
 
@@ -222,6 +225,7 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Implementar a N5.
-4. Produzir README, diagrama UML, registro de uso de IA e créditos, incluindo a licença do YOLOv8n-pose.
+3. Concluir a N5, em andamento na branch `neto/n5-roubo`.
+4. Produzir o diagrama UML depois da N5. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já
+   estão escritos.
 5. Fazer o teste integrado e ensaiar a apresentação.

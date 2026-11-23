@@ -1,18 +1,25 @@
-# Validação da D1 em dois computadores
+# Birds&Cashews: roteiro do teste de rede
+
+Este documento explica como testar a rede local do jogo em um ou dois computadores, em três níveis: a camada UDP
+sozinha, uma partida sem janela e o jogo completo. Os resultados já obtidos estão em
+[`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
+
+## Camada UDP em dois computadores (D1)
 
 Conecte dois computadores Linux à mesma rede Wi-Fi ou ao mesmo hotspot. O teste usa o protocolo UDP da D1 pela porta 42917 e roda pelo terminal, independentemente do menu do jogo.
 
-## Preparação
+### Preparação
 
-Na raiz do repositório, em cada computador, rode:
+Na raiz do repositório, na `main`, em cada computador, rode:
 
 ```bash
-git fetch origin daniel/d1-rede
-git switch --detach FETCH_HEAD
-g++ -std=c++17 -Wall -Wextra -pthread -Isrc tests/birds-lan.cpp src/net/UdpSession.cpp -o /tmp/birds-lan
+g++ -std=c++17 -Wall -Wextra -pthread -Isrc $(pkg-config --cflags opencv4) tests/birds-lan.cpp src/net/UdpSession.cpp \
+    -o /tmp/birds-lan
 ```
 
-## Descoberta e troca de mensagens
+O `pkg-config` é necessário porque os tipos compartilhados incluem cabeçalhos do OpenCV.
+
+### Descoberta e troca de mensagens
 
 1. No computador A, execute `/tmp/birds-lan host` e deixe o programa rodando.
 2. No computador B, execute `/tmp/birds-lan discover`. A sala deve aparecer com o nome `Birds D1` e o endereço do host, por exemplo `192.168.1.42:42917`.
@@ -21,11 +28,11 @@ g++ -std=c++17 -Wall -Wextra -pthread -Isrc tests/birds-lan.cpp src/net/UdpSessi
 
 Se a descoberta falhar, obtenha o IPv4 da rede com `hostname -I` no A e tente o comando `join` com esse endereço. Se funcionar, registre a conexão por IP como aprovada e a descoberta como pendente naquela rede. Se ambos falharem, verifique se a rede permite comunicação entre os dispositivos e se o firewall do A permite UDP na porta 42917.
 
-## Detecção de queda
+### Detecção de queda
 
 Após o terceiro eco, desative a conexão de rede do B. O computador A deve exibir `Desconexão detectada` em cerca de quatro segundos. Para repetir o teste, reconecte o B e reinicie o programa nos dois computadores.
 
-# Partida em rede sem janela (D3 e D6)
+## Partida em rede sem janela (D3 e D6)
 
 O modo `--rede-teste` roda as regras reais da partida sem abrir janela nem webcam. Um processo hospeda e o outro entra,
 coleta 2 cajus, pousa no próprio ninho, entrega e sai. Serve na mesma máquina ou em dois computadores.
