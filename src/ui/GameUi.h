@@ -25,6 +25,9 @@ class GameUi {
 public:
     GameUi(const UiConfig& config, GameplaySource& gameplay);
 
+    // Som de ambiente: o Game informa a cada quadro o que o passaro deve ouvir.
+    void setAmbience(const AmbientMix& mix) { sound_.setAmbience(mix); }
+
     void attachPoseSource(PoseSource* source) { poseSource_ = source; }
     // O Game recria a sessao ao entrar ou sair de uma sala; a interface passa a mostrar a nova.
     void setGameplay(GameplaySource& gameplay) { gameplay_ = &gameplay; }

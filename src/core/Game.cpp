@@ -214,6 +214,13 @@ void Game::updateScreens(float frameSeconds) {
         telemetryTimer_ += frameSeconds;
     }
     ui_->update(frameSeconds);
+    const FlightModel& flight = player_.flight();
+    AmbientListener listener;
+    listener.position = flight.position();
+    listener.speed = glm::length(flight.velocity());
+    listener.groundHeight = world_.island().heightAt(listener.position.x, listener.position.z);
+    listener.playing = ui_->playing();
+    ui_->setAmbience(ambientMixFor(listener));
 }
 
 void Game::presentUi(float frameSeconds) {

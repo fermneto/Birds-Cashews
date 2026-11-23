@@ -1,7 +1,9 @@
 #pragma once
 #include "shared/GameplayView.h"
+#include "ui/Ambience.h"
 #include <SDL.h>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -24,6 +26,9 @@ public:
     bool hasDevice() const { return device_ != 0; }
     void play(UiSound sound);
     void play(GameplayFeedback feedback) { play(soundFor(feedback)); }
+    // Volume desejado de cada camada do ambiente. A mistura chega nele aos poucos, sem estalos.
+    void setAmbience(const AmbientMix& mix);
+    AmbientMix ambience() const;
 
     static std::vector<int16_t> synthesize(UiSound sound);
     static int sampleRate();
@@ -37,6 +42,7 @@ private:
 
     static void audioCallback(void* self, Uint8* stream, int bytes);
     void mix(int16_t* output, int count);
+    void mixAmbience(int count);
     void openDevice();
 
     SDL_AudioDeviceID device_ = 0;
@@ -44,4 +50,8 @@ private:
     std::array<std::vector<int16_t>, static_cast<size_t>(UiSound::Count)> bank_;
     std::array<Voice, kVoices> voices_{};
     std::vector<int> mixBuffer_;
+    std::array<std::vector<int16_t>, kAmbientLayers> ambientLoops_;
+    std::array<std::atomic<float>, kAmbientLayers> ambientTarget_{};
+    std::array<float, kAmbientLayers> ambientGain_{};     // So a thread de audio mexe.
+    std::array<size_t, kAmbientLayers> ambientPosition_{};
 };

@@ -8,6 +8,7 @@ constexpr int kSampleRate = 44100;
 constexpr int kBufferSamples = 1024;
 constexpr float kTwoPi = 6.2831853f;
 constexpr float kMasterVolume = 0.5f;
+constexpr float kAmbientFollow = 1.0f / 22050.0f;   // Meio segundo para o ambiente chegar ao volume novo.
 
 enum class Wave { Sine, Triangle, Square };
 
@@ -112,6 +113,7 @@ std::vector<int16_t> SoundManager::synthesize(UiSound sound) {
 SoundManager::SoundManager(Output output) : mixBuffer_(kBufferSamples * 4, 0) {
     if (output == Output::Silent) return;
     for (size_t i = 0; i < bank_.size(); i++) bank_[i] = synthesize(static_cast<UiSound>(i));
+    for (int i = 0; i < kAmbientLayers; i++) ambientLoops_[i] = synthesizeAmbientLoop(static_cast<AmbientLayer>(i), kSampleRate);
     openDevice();
 }
 
@@ -157,6 +159,35 @@ void SoundManager::play(UiSound sound) {
     SDL_UnlockAudioDevice(device_);
 }
 
+void SoundManager::setAmbience(const AmbientMix& mix) {
+    for (int i = 0; i < kAmbientLayers; i++)
+        ambientTarget_[i].store(std::clamp(mix[static_cast<AmbientLayer>(i)], 0.0f, 1.0f), std::memory_order_relaxed);
+}
+
+AmbientMix SoundManager::ambience() const {
+    AmbientMix mix;
+    for (int i = 0; i < kAmbientLayers; i++) mix[static_cast<AmbientLayer>(i)] = ambientTarget_[i].load(std::memory_order_relaxed);
+    return mix;
+}
+
+// Cada camada toca em loop; o volume anda um pouco a cada amostra em direcao ao pedido.
+void SoundManager::mixAmbience(int count) {
+    for (int layer = 0; layer < kAmbientLayers; layer++) {
+        const std::vector<int16_t>& loop = ambientLoops_[layer];
+        if (loop.empty()) continue;
+        const float target = ambientTarget_[layer].load(std::memory_order_relaxed);
+        float gain = ambientGain_[layer];
+        size_t position = ambientPosition_[layer];
+        for (int i = 0; i < count; i++) {
+            gain += (target - gain) * kAmbientFollow * 2.0f;
+            mixBuffer_[i] += static_cast<int>(loop[position] * gain);
+            if (++position >= loop.size()) position = 0;
+        }
+        ambientGain_[layer] = gain;
+        ambientPosition_[layer] = position;
+    }
+}
+
 void SoundManager::audioCallback(void* self, Uint8* stream, int bytes) {
     static_cast<SoundManager*>(self)->mix(reinterpret_cast<int16_t*>(stream), bytes / static_cast<int>(sizeof(int16_t)));
 }
@@ -165,6 +196,7 @@ void SoundManager::audioCallback(void* self, Uint8* stream, int bytes) {
 void SoundManager::mix(int16_t* output, int count) {
     const int samples = std::min(count, static_cast<int>(mixBuffer_.size()));
     std::fill(mixBuffer_.begin(), mixBuffer_.begin() + samples, 0);
+    mixAmbience(samples);
     for (Voice& voice : voices_) {
         if (!voice.samples) continue;
         const size_t left = voice.samples->size() - voice.position;

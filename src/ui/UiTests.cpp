@@ -587,6 +587,43 @@ void testSounds(TestRun& t) {
 }
 }
 
+void testAmbience(TestRun& t) {
+    for (int i = 0; i < kAmbientLayers; i++) {
+        const std::vector<int16_t> loop = synthesizeAmbientLoop(static_cast<AmbientLayer>(i), SoundManager::sampleRate());
+        const auto [low, high] = std::minmax_element(loop.begin(), loop.end());
+        const bool long8s = loop.size() == static_cast<size_t>(8 * SoundManager::sampleRate());
+        const bool calm = !loop.empty() && *high > 1500 && *high < 12000 && *low > -12000;
+        const int seam = std::abs(static_cast<int>(loop.back()) - static_cast<int>(loop.front()));
+        t.check("ambiente: camada " + std::to_string(i) + " tem 8 s, fica baixa e emenda sem estalo",
+                long8s && calm && seam < 600);
+    }
+    AmbientListener menu;
+    const AmbientMix calm = ambientMixFor(menu);
+    t.check("ambiente: nos menus fica um fundo calmo", calm.wind < 0.3f && calm.sea > 0 && calm.birds > 0);
+
+    AmbientListener slow;
+    slow.playing = true;
+    slow.position = glm::vec3(0, 40, 0);
+    slow.speed = 15;
+    AmbientListener fast = slow;
+    fast.speed = 60;
+    t.check("ambiente: o vento cresce com a velocidade", ambientMixFor(fast).wind > ambientMixFor(slow).wind + 0.5f);
+    AmbientListener coast = slow;
+    coast.position = glm::vec3(950, 20, 0);
+    t.check("ambiente: o mar so aparece perto da costa", ambientMixFor(coast).sea > 0.8f && ambientMixFor(slow).sea == 0.0f);
+    AmbientListener high = slow;
+    high.position.y = 400;
+    t.check("ambiente: os passaros ficam perto das copas", ambientMixFor(slow).birds > 0.5f && ambientMixFor(high).birds == 0.0f);
+
+    SoundManager silent(SoundManager::Output::Silent);
+    AmbientMix wanted;
+    wanted.wind = 2.0f;
+    wanted.sea = 0.4f;
+    silent.setAmbience(wanted);
+    t.check("ambiente: sem audio guarda o pedido, limitado a 1",
+            silent.ambience().wind == 1.0f && std::abs(silent.ambience().sea - 0.4f) < 1e-6f);
+}
+
 int runUiSelfTest() {
     TestRun t;
     testFlowToPlay(t);
@@ -597,6 +634,7 @@ int runUiSelfTest() {
     testUiNavigation(t);
     testUiPauseSaves(t);
     testUiFeedback(t);
+    testAmbience(t);
     testCalibrationRegions(t);
     testCalibrationTracker(t);
     testCalibrationScreen(t);
