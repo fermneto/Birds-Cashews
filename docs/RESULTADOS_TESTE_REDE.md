@@ -1,7 +1,10 @@
-# Resultados do teste de rede da D1
+# Birds&Cashews: resultados dos testes de rede
 
-Registro do teste feito em 18/11/2026 com a branch `daniel/d1-rede`, no commit `f98ae6d`, que depois entrou na `main`
-pelo PR #6. O roteiro está em [`TESTE_REDE.md`](TESTE_REDE.md).
+Este documento registra os testes de rede já feitos, do primeiro teste da camada UDP (D1) até as partidas completas, e o
+que ainda falta validar. O roteiro dos testes está em [`TESTE_REDE.md`](TESTE_REDE.md).
+
+O primeiro teste foi feito em 18/11/2026 com a branch `daniel/d1-rede`, no commit `f98ae6d`, que depois entrou na `main`
+pelo PR #6. Os registros seguintes são de 19/11/2026.
 
 **Situação: parcialmente aprovado.** As mensagens do cliente chegaram ao host entre dois computadores, e o host detectou
 a saída do cliente. Ainda faltam as confirmações listadas na seção 6.
