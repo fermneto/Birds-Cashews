@@ -23,7 +23,7 @@ jogadores dividem o mundo pela rede local, conversam por voz de proximidade e po
 | Bico | Também abre enquanto o jogador fala |
 | Ninho | Menu por postura, segurando para confirmar |
 | NPCs | Ecossistema: pequenos em bando, médios competem por cajus, grandes caçam |
-| Salvamento | Pássaro e ninho no perfil local, estado do mundo no host |
+| Salvamento | Pássaro e ninho no perfil local, estado do mundo no host (`saves/mundo.txt`, a cada 30 s e ao sair) |
 | Record | Total acumulado de cajus entregues |
 | Voz | Microfone aberto por detecção de fala, com filtro de voz de pássaro |
 | Esforço | Bater os braços livremente, sem barra de energia |
@@ -197,7 +197,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
-| 10 | Som em eventos | Coleta, entrega, roubo, upgrade, record e ambiente | Falta validar o áudio |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e ambiente (vento pela velocidade, mar perto da costa e pássaros perto das copas) | Falta validar o áudio |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma

@@ -49,6 +49,11 @@ void HostAuthority::publishLocalPlayer(const PlayerPublicState& state) {
     hasLocal_ = true;
 }
 
+void HostAuthority::restoreCollected(const std::vector<CashewId>& cashews) {
+    for (CashewId id : cashews)
+        if (id < config_.cashewCount) collected_.insert(id);
+}
+
 std::vector<PlayerId> HostAuthority::remotePlayers() const {
     std::vector<PlayerId> ids;
     for (PlayerId id = 1; id < kMaxPlayers; id++)
@@ -220,6 +225,14 @@ void HostAuthority::handleReliable(const Message& message) {
     if (!header) return;
     if (header->type == MessageType::Hello) {
         if (const auto hello = decodeHello(message.payload)) welcome(sender, *hello);
+        return;
+    }
+    if (header->type == MessageType::Identity && remotes_[sender].joined) {
+        if (const auto identity = decodeIdentity(message.payload)) {
+            remotes_[sender].name = identity->name;
+            remotes_[sender].birdSeed = identity->birdSeed;
+            rosterDirty_ = true;
+        }
         return;
     }
     if (header->type != MessageType::EventRequest || !remotes_[sender].joined) return;

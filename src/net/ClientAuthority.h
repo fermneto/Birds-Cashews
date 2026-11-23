@@ -39,6 +39,8 @@ public:
     std::vector<VoiceFrame> receiveVoice() override;
 
     void update(float seconds);   // Uma vez por quadro, inclusive nos menus.
+    // Perfil local atual. Se mudou depois da entrada, avisa o host para os outros verem o nome novo.
+    void setIdentity(const std::string& name, uint32_t birdSeed);
 
     ClientStatus status() const { return status_; }
     const std::string& error() const { return error_; }   // Motivo da recusa ou da queda, para a tela.

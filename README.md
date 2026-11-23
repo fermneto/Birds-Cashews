@@ -68,8 +68,8 @@ O executável `birds` fica na raiz do repositório. `make clean` apaga a compila
 ./birds --teclado  # voa com o teclado, sem webcam
 ```
 
-O jogo procura `models/` e `assets/` ao lado do executável. Os perfis e o record ficam em `saves/`, também ao lado do
-executável. Se a webcam não abrir, a calibração oferece continuar pelo teclado.
+O jogo procura `models/` e `assets/` ao lado do executável. Os perfis, o record e o mundo (`mundo.txt`, com os cajus
+já colhidos) ficam em `saves/`, também ao lado do executável. Só quem joga sozinho ou hospeda salva o mundo. Se a webcam não abrir, a calibração oferece continuar pelo teclado.
 
 | Opção | O que faz |
 |---|---|

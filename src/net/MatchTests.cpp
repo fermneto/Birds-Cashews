@@ -868,6 +868,25 @@ void testRobberyNeedsPerch(TestRun& t) {
             farRefused && countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
 }
 
+void testRestoredWorld(TestRun& t) {
+    Room room;
+    room.host.authority->restoreCollected({4, 7, 5000});
+    Client& guest = room.join({kWorld, "Ana", 1});
+    room.pump(20);
+    const auto synced = [&](CashewId id) {
+        return std::any_of(guest.log.begin(), guest.log.end(), [&](const GameEvent& e) {
+            return e.type == GameEventType::CashewCollected && e.cashew == id;
+        });
+    };
+    t.check("mundo salvo: quem entra recebe os cajus ja colhidos", ready(guest) && synced(4) && synced(7) && !synced(5000));
+    const PlayerId me = guest.authority ? guest.authority->localPlayer() : kNoPlayer;
+    if (guest.authority) guest.authority->request(eventOf(GameEventType::CashewCollected, me, 4));
+    room.host.authority->request(eventOf(GameEventType::CashewRespawned, 0, 7));
+    room.pump(20);
+    t.check("mundo salvo: caju colhido antes nao e colhido de novo, e volta quando o host decide",
+            countOf(room.host.log, GameEventType::CashewCollected, me) == 0 && countOf(room.host.log, GameEventType::CashewRespawned, 0) == 1);
+}
+
 void testRosterProtocol(TestRun& t) {
     const Bytes bytes = encodeRoster({{0, "Ana"}, {4, "Bruno Ávila"}});
     const auto back = decodeRoster(bytes);
@@ -909,6 +928,14 @@ void testNamesOverNetwork(TestRun& t) {
                 ana.authority->playerName(idAna) == "Ana");
     SharedAuthority shared(ana.authority);
     t.check("nomes em rede: a sessao ve os nomes pela autoridade compartilhada", shared.playerName(idBia) == "Bia");
+
+    const auto identity = decodeIdentity(encodeIdentity({"Ana Clara", 99}));
+    t.check("nomes: a troca de perfil vai e volta igual", identity && identity->name == "Ana Clara" && identity->birdSeed == 99 &&
+                                                            !decodeIdentity(encodeRoster({})));
+    ana.authority->setIdentity("Ana Clara", 99);
+    t.check("nomes em rede: cliente que troca de perfil aparece com o nome novo para todos",
+            room.pumpUntil([&] { return bia.authority->playerName(idAna) == "Ana Clara"; }, 200) &&
+                room.host.authority->playerName(idAna) == "Ana Clara" && ana.authority->playerName(idAna) == "Ana Clara");
 
     room.host.authority->setLocalName("Host novo");
     t.check("nomes em rede: trocar de perfil atualiza o nome",
@@ -1005,7 +1032,7 @@ uint32_t wireFingerprint() {
     std::vector<Bytes> all = {encodeHello({kProtocolVersion, kWorld, "Ana", 99}), encodeWelcome({kProtocolVersion, kWorld, 3}),
                               encodeRefuse(RefuseReason::Full), encodeEvents(MessageType::EventConfirmed, {event}),
                               encodeState({2.0f, player}), encodeSnapshot(snapshot), encodeVoice({2, 7, Bytes(5, 9)}),
-                              encodeRoster({{0, "Ana"}, {3, "Bia"}})};
+                              encodeRoster({{0, "Ana"}, {3, "Bia"}}), encodeIdentity({"Caio", 77})};
     uint32_t hash = 2166136261u;
     for (const Bytes& bytes : all)
         for (uint8_t b : bytes) hash = (hash ^ b) * 16777619u;
@@ -1013,11 +1040,11 @@ uint32_t wireFingerprint() {
 }
 
 void testWireFormatLocked(TestRun& t) {
-    constexpr uint32_t kVersion4Fingerprint = 785067226u;
+    constexpr uint32_t kVersion5Fingerprint = 4186852064u;
     const uint32_t fingerprint = wireFingerprint();
-    if (fingerprint != kVersion4Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
-    t.check("protocolo: formato fixo da versao 4 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
-            kProtocolVersion == 4 && fingerprint == kVersion4Fingerprint);
+    if (fingerprint != kVersion5Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
+    t.check("protocolo: formato fixo da versao 5 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
+            kProtocolVersion == 5 && fingerprint == kVersion5Fingerprint);
 }
 
 // Um host de outra versao que conecta, mas manda um estado que o cliente nao consegue ler.
@@ -1140,6 +1167,7 @@ int runMatchSelfTest() {
     testRobberyNeedsPerch(test);
     testDiveKnock(test);
     testRosterProtocol(test);
+    testRestoredWorld(test);
     testNamesOverNetwork(test);
     return test.failures;
 }

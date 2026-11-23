@@ -59,6 +59,13 @@ void ClientAuthority::publishLocalPlayer(const PlayerPublicState& state) {
     hasLocal_ = true;
 }
 
+void ClientAuthority::setIdentity(const std::string& name, uint32_t birdSeed) {
+    if (name.empty() || (name == config_.name && birdSeed == config_.birdSeed)) return;
+    config_.name = name;
+    config_.birdSeed = birdSeed;
+    if (status_ == ClientStatus::Ready) udp_.sendReliable(kHostPeer, encodeIdentity({name, birdSeed}));
+}
+
 std::string ClientAuthority::playerName(PlayerId id) const {
     if (id == localPlayer_) return config_.name;
     return id < kMaxPlayers ? names_[id] : "";

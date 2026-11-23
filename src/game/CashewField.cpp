@@ -170,6 +170,22 @@ glm::vec3 CashewField::restingPoint(glm::vec3 from) const {
 }
 
 // Um caju novo na mesma vaga substitui o antigo: a autoridade so reusa vagas de cajus que ja sumiram.
+std::vector<UnavailableCashew> CashewField::unavailable() const {
+    std::vector<UnavailableCashew> list;
+    for (size_t i = 0; i < states_.size(); i++)
+        if (!states_[i].active)
+            list.push_back({static_cast<CashewId>(i), static_cast<float>(std::max(0.0, states_[i].respawnAt - clock_))});
+    return list;
+}
+
+void CashewField::restoreUnavailable(const std::vector<UnavailableCashew>& cashews) {
+    for (const UnavailableCashew& cashew : cashews) {
+        if (cashew.id >= spots_.size()) continue;
+        states_[cashew.id].active = false;
+        states_[cashew.id].respawnAt = clock_ + std::clamp(cashew.secondsLeft, 0.0f, kMaxCashewRespawnSeconds);
+    }
+}
+
 bool CashewField::collectableBy(CashewId id, PlayerId player) const {
     if (!isActive(id)) return false;
     const LooseCashew* fallen = loose(id);

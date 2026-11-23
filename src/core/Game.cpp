@@ -28,6 +28,7 @@ constexpr float kFixedStep = 1.0f / 120.0f;
 constexpr float kTelemetryInterval = 0.1f;
 const cv::Size kPreviewSize(320, 240);
 constexpr PlayerId kLocalPlayer = 0;
+constexpr float kWorldSaveInterval = 30.0f;   // Salva o mundo de tempos em tempos, caso o jogo feche de repente.
 const char* const kDefaultProfile = "Jogador";
 
 // Jogo local com um jogador parado a mais, para fotografar o ninho de um rival sem abrir a rede.
@@ -163,17 +164,50 @@ void Game::syncMatch(float frameSeconds) {
 void Game::rebuildSession() {
     const std::string profile = session_->profile() ? session_->profile()->name() : "";
     session_->saveNow();
+    saveWorld();
     cashews_ = CashewField(world_, options_.seed);
     std::unique_ptr<GameAuthority> authority;
     if (auto shared = match_.authority()) authority = std::make_unique<net::SharedAuthority>(std::move(shared));
     session_ = std::make_unique<GameplaySession>(world_, options_.seed, cashews_, player_, saveDirFor(options_),
                                                  match_.localPlayer(), std::move(authority));
     if (!profile.empty()) session_->startProfile(profile);
+    restoreWorld();
     if (ui_) ui_->setGameplay(*session_);
     shownNestRevision_ = shownRivalRevision_ = -1;
     const char* const modes[] = {"sozinho", "hospedando a sala", "na sala como cliente"};
     std::cout << "Partida refeita: " << modes[static_cast<int>(match_.mode())] << ", jogador "
               << static_cast<int>(match_.localPlayer()) << "\n";
+}
+
+// So quem e dono do mundo carrega mundo.txt: o cliente recebe os cajus colhidos do host.
+// Um arquivo de outra ilha (outra semente) e ignorado.
+void Game::restoreWorld() {
+    ownsWorld_ = match_.mode() != net::MatchMode::Client;
+    worldSaveTimer_ = 0;
+    if (!ownsWorld_) return;
+    const WorldState state = WorldStore(saveDirFor(options_)).load(options_.seed);
+    if (state.seed != options_.seed) return;
+    worldElapsed_ = state.elapsedSeconds;
+    cashews_.restoreUnavailable(state.unavailable);
+    if (net::HostAuthority* host = match_.hostAuthority()) {
+        std::vector<CashewId> ids;
+        for (const UnavailableCashew& cashew : state.unavailable) ids.push_back(cashew.id);
+        host->restoreCollected(ids);
+    }
+}
+
+void Game::saveWorld() {
+    if (!ownsWorld_) {
+        worldSaveTimer_ = 0;
+        return;
+    }
+    WorldState state;
+    state.seed = options_.seed;
+    state.elapsedSeconds = worldElapsed_ + worldSaveTimer_;
+    state.unavailable = cashews_.unavailable();
+    worldElapsed_ = state.elapsedSeconds;
+    worldSaveTimer_ = 0;
+    if (!WorldStore(saveDirFor(options_)).save(state)) std::cerr << "Nao foi possivel salvar o mundo\n";
 }
 
 // A fisica usa passo fixo para se comportar igual em qualquer taxa de quadros.
@@ -214,6 +248,13 @@ void Game::updateScreens(float frameSeconds) {
         telemetryTimer_ += frameSeconds;
     }
     ui_->update(frameSeconds);
+    const FlightModel& flight = player_.flight();
+    AmbientListener listener;
+    listener.position = flight.position();
+    listener.speed = glm::length(flight.velocity());
+    listener.groundHeight = world_.island().heightAt(listener.position.x, listener.position.z);
+    listener.playing = ui_->playing();
+    ui_->setAmbience(ambientMixFor(listener));
 }
 
 void Game::presentUi(float frameSeconds) {
@@ -340,11 +381,14 @@ int Game::run() {
     createInput();
     createUi(saveDirFor(options_), SoundManager::Output::Device);
     startVoice();
+    restoreWorld();
     double last = nowSeconds();
     while (handleEvents()) {
         const double now = nowSeconds();
         const float frameSeconds = static_cast<float>(now - last);
         last = now;
+        worldSaveTimer_ += frameSeconds;
+        if (worldSaveTimer_ >= kWorldSaveInterval) saveWorld();
         syncMatch(frameSeconds);
         updateScreens(frameSeconds);
         updateVoice(frameSeconds);
@@ -354,6 +398,7 @@ int Game::run() {
         renderFrame();
     }
     session_->saveNow();
+    saveWorld();
     if (voice_) voice_->attach(nullptr, kNoPlayer);
     match_.leave();
     return 0;
