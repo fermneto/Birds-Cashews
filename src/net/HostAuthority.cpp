@@ -227,6 +227,14 @@ void HostAuthority::handleReliable(const Message& message) {
         if (const auto hello = decodeHello(message.payload)) welcome(sender, *hello);
         return;
     }
+    if (header->type == MessageType::Identity && remotes_[sender].joined) {
+        if (const auto identity = decodeIdentity(message.payload)) {
+            remotes_[sender].name = identity->name;
+            remotes_[sender].birdSeed = identity->birdSeed;
+            rosterDirty_ = true;
+        }
+        return;
+    }
     if (header->type != MessageType::EventRequest || !remotes_[sender].joined) return;
     if (const auto events = decodeEvents(MessageType::EventRequest, message.payload))
         for (const GameEvent& event : *events) confirm(event, true, sender);

@@ -17,7 +17,8 @@ namespace net {
 // Versao 2: o NPC ganhou o byte de comportamento (papel e pouso).
 // Versao 3: o jogador publica a Defesa e as moedas roubaveis do ninho, e existe o evento CashewSpilled.
 // Versao 4: o host envia a lista de nomes dos jogadores (Roster).
-inline constexpr uint8_t kProtocolVersion = 4;
+// Versao 5: o cliente avisa quando troca de perfil dentro da sala (Identity).
+inline constexpr uint8_t kProtocolVersion = 5;
 inline constexpr size_t kMaxNameLength = 32;
 inline constexpr size_t kMaxNpcs = 24;
 inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.
@@ -33,6 +34,7 @@ enum class MessageType : uint8_t {
     Snapshot,            // Host -> clientes, nao confiavel: todos os jogadores e os NPCs.
     Voice,               // Ida e volta pelo host, nao confiavel: um quadro de voz.
     Roster,              // Host -> clientes, confiavel: o nome de cada jogador na sala.
+    Identity,            // Cliente -> host, confiavel: novo nome e birdSeed depois de trocar de perfil.
 };
 
 enum class RefuseReason : uint8_t { Full = 1, Version, WorldSeed };
@@ -65,6 +67,12 @@ struct StateMessage {
     PlayerPublicState state;
 };
 
+// Perfil atual de um cliente que ja esta na sala.
+struct IdentityMessage {
+    std::string name;
+    uint32_t birdSeed = 0;
+};
+
 // Nome de cada jogador na sala, para aparecer acima do passaro dele.
 struct RosterEntry {
     PlayerId player = kNoPlayer;
@@ -92,7 +100,8 @@ std::vector<uint8_t> encodeEvents(MessageType type, const std::vector<GameEvent>
 std::vector<uint8_t> encodeState(const StateMessage& message);
 std::vector<uint8_t> encodeSnapshot(const SnapshotMessage& message);
 std::vector<uint8_t> encodeVoice(const VoiceFrame& frame);
-std::vector<uint8_t> encodeRoster(const RosterMessage& roster);   // Ate kMaxPlayers nomes, cortados em kMaxNameLength.
+std::vector<uint8_t> encodeRoster(const RosterMessage& roster);
+std::vector<uint8_t> encodeIdentity(const IdentityMessage& identity);   // Ate kMaxPlayers nomes, cortados em kMaxNameLength.
 
 // Cada decodificador confere versao, tipo, tamanho exato e faixas validas, e falha em qualquer desvio.
 // Hello, Welcome e Refuse aceitam qualquer versao, para que quem recebe possa comparar.
@@ -104,6 +113,7 @@ std::optional<StateMessage> decodeState(const std::vector<uint8_t>& bytes);
 std::optional<SnapshotMessage> decodeSnapshot(const std::vector<uint8_t>& bytes);
 std::optional<VoiceFrame> decodeVoice(const std::vector<uint8_t>& bytes);
 std::optional<RosterMessage> decodeRoster(const std::vector<uint8_t>& bytes);
+std::optional<IdentityMessage> decodeIdentity(const std::vector<uint8_t>& bytes);
 
 // Divide uma lista longa em mensagens que cabem no limite do UdpSession.
 std::vector<std::vector<uint8_t>> encodeEventBatches(MessageType type, const std::vector<GameEvent>& events);

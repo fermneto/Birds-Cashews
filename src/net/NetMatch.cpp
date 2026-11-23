@@ -27,6 +27,7 @@ NetMatch::~NetMatch() { leave(); }
 void NetMatch::setLocalIdentity(const std::string& name, uint32_t birdSeed) {
     name_ = name;
     birdSeed_ = birdSeed;
+    if (client_) client_->setIdentity(name, birdSeed);
 }
 
 void NetMatch::setTimeouts(std::chrono::milliseconds peerTimeout, std::chrono::milliseconds joinTimeout) {

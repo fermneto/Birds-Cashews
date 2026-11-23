@@ -184,7 +184,7 @@ NpcPublicState readNpc(Reader& in) {
 
 std::optional<MessageHeader> peekHeader(const Bytes& bytes) {
     if (bytes.size() < 2 || bytes[1] < static_cast<uint8_t>(MessageType::Hello) ||
-        bytes[1] > static_cast<uint8_t>(MessageType::Roster)) return std::nullopt;
+        bytes[1] > static_cast<uint8_t>(MessageType::Identity)) return std::nullopt;
     return MessageHeader{bytes[0], static_cast<MessageType>(bytes[1])};
 }
 
@@ -375,6 +375,27 @@ std::optional<RosterMessage> decodeRoster(const Bytes& bytes) {
     }
     if (!in.atEnd()) return std::nullopt;
     return roster;
+}
+
+Bytes encodeIdentity(const IdentityMessage& identity) {
+    Writer out(MessageType::Identity);
+    const std::string name = identity.name.substr(0, kMaxNameLength);
+    out.u8(static_cast<uint8_t>(name.size()));
+    out.raw(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+    out.u32(identity.birdSeed);
+    return out.take();
+}
+
+std::optional<IdentityMessage> decodeIdentity(const Bytes& bytes) {
+    if (!expect(bytes, MessageType::Identity)) return std::nullopt;
+    Reader in(bytes, 2);
+    IdentityMessage identity;
+    const uint8_t length = in.u8();
+    if (length > kMaxNameLength) return std::nullopt;
+    identity.name = in.text(length);
+    identity.birdSeed = in.u32();
+    if (!in.atEnd()) return std::nullopt;
+    return identity;
 }
 
 static_assert(2 + 1 + kMaxPlayers * (2 + kMaxNameLength) <= kMaxPayload, "A lista de nomes cabe em uma mensagem");
