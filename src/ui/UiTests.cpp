@@ -1,4 +1,6 @@
 #include "ui/UiTests.h"
+#include "entity/PlayerBird.h"
+#include "ui/BirdChorus.h"
 #include "ui/UiTheme.h"
 #include "core/TestRun.h"
 #include "ui/FakeNetSession.h"
@@ -592,36 +594,114 @@ void testAmbience(TestRun& t) {
         const std::vector<int16_t> loop = synthesizeAmbientLoop(static_cast<AmbientLayer>(i), SoundManager::sampleRate());
         const auto [low, high] = std::minmax_element(loop.begin(), loop.end());
         const bool long8s = loop.size() == static_cast<size_t>(8 * SoundManager::sampleRate());
-        const bool calm = !loop.empty() && *high > 1500 && *high < 12000 && *low > -12000;
+        const bool calm = !loop.empty() && *high > 3000 && *high < 15000 && *low > -15000;
+        // A emenda nao pode saltar mais que o maior passo entre duas amostras dentro do proprio loop.
+        int largestStep = 0;
+        for (size_t k = 1; k < loop.size(); k++) largestStep = std::max(largestStep, std::abs(loop[k] - loop[k - 1]));
         const int seam = std::abs(static_cast<int>(loop.back()) - static_cast<int>(loop.front()));
-        t.check("ambiente: camada " + std::to_string(i) + " tem 8 s, fica baixa e emenda sem estalo",
-                long8s && calm && seam < 600);
+        t.check("ambiente: camada " + std::to_string(i) + " tem 8 s, volume contido e emenda sem estalo",
+                long8s && calm && seam <= largestStep);
     }
     AmbientListener menu;
     const AmbientMix calm = ambientMixFor(menu);
-    t.check("ambiente: nos menus fica um fundo calmo", calm.wind < 0.3f && calm.sea > 0 && calm.birds > 0);
+    t.check("ambiente: nos menus so vento e mar, baixos", calm.wind > 0 && calm.wind < 0.3f && calm.rush == 0 && calm.climb == 0);
 
-    AmbientListener slow;
-    slow.playing = true;
-    slow.position = glm::vec3(0, 40, 0);
-    slow.speed = 15;
-    AmbientListener fast = slow;
-    fast.speed = 60;
-    t.check("ambiente: o vento cresce com a velocidade", ambientMixFor(fast).wind > ambientMixFor(slow).wind + 0.5f);
-    AmbientListener coast = slow;
+    AmbientListener cruise;
+    cruise.playing = true;
+    cruise.position = glm::vec3(0, 60, 0);
+    cruise.speed = 24;
+    const AmbientMix level = ambientMixFor(cruise);
+    t.check("ambiente: o vento de fundo esta sempre presente no voo", level.wind >= 0.45f);
+    AmbientListener fast = cruise;
+    fast.speed = 70;
+    t.check("ambiente: o vento e o chiado crescem com a velocidade, o chiado sem dominar",
+            ambientMixFor(fast).rush > level.rush + 0.5f && ambientMixFor(fast).rush <= 0.6f && ambientMixFor(fast).wind > level.wind);
+    AmbientListener rising = cruise;
+    rising.verticalSpeed = 8;
+    AmbientListener diving = fast;
+    diving.verticalSpeed = -30;
+    t.check("ambiente: subir liga o tom de subida, e so ele", ambientMixFor(rising).climb > 0.7f && ambientMixFor(rising).dive == 0 &&
+                                                               level.climb == 0);
+    t.check("ambiente: mergulhar liga o assobio, e so ele", ambientMixFor(diving).dive > 0.9f && ambientMixFor(diving).climb == 0);
+    bool fluid = true;
+    float previous = ambientMixFor(cruise).climb;
+    for (float vy = 0; vy <= 12; vy += 0.25f) {
+        AmbientListener step = cruise;
+        step.verticalSpeed = vy;
+        const float now = ambientMixFor(step).climb;
+        fluid = fluid && now >= previous && now - previous < 0.08f;
+        previous = now;
+    }
+    t.check("ambiente: a subida aumenta aos poucos, sem saltos", fluid);
+    AmbientListener coast = cruise;
     coast.position = glm::vec3(950, 20, 0);
-    t.check("ambiente: o mar so aparece perto da costa", ambientMixFor(coast).sea > 0.8f && ambientMixFor(slow).sea == 0.0f);
-    AmbientListener high = slow;
-    high.position.y = 400;
-    t.check("ambiente: os passaros ficam perto das copas", ambientMixFor(slow).birds > 0.5f && ambientMixFor(high).birds == 0.0f);
+    t.check("ambiente: o mar so aparece perto da costa", ambientMixFor(coast).sea > 0.8f && level.sea == 0.0f);
 
     SoundManager silent(SoundManager::Output::Silent);
     AmbientMix wanted;
     wanted.wind = 2.0f;
     wanted.sea = 0.4f;
     silent.setAmbience(wanted);
+    silent.play(UiSound::Flap, 0.5f);
     t.check("ambiente: sem audio guarda o pedido, limitado a 1",
             silent.ambience().wind == 1.0f && std::abs(silent.ambience().sea - 0.4f) < 1e-6f);
+}
+
+void testBirdChorus(TestRun& t) {
+    BirdChorus chorus;
+    const glm::vec3 me(0, 50, 0);
+    int far = 0;
+    for (int i = 0; i < 1200; i++) far += static_cast<int>(chorus.update(1.0f / 60.0f, me, {{1, me + glm::vec3(200, 0, 0), BirdVoice::Small}}).size());
+    t.check("passaros: longe nao canta nenhum", far == 0);
+
+    std::vector<SingingBird> flock;
+    for (uint32_t i = 0; i < 12; i++) flock.push_back({i, me + glm::vec3(10.0f + i, 0, 0), BirdVoice::Small});
+    std::vector<ChirpRequest> heard;
+    float lastAt = -10, smallestGap = 100, time = 0;
+    for (int i = 0; i < 60 * 30; i++) {
+        time += 1.0f / 60.0f;
+        for (const ChirpRequest& chirp : chorus.update(1.0f / 60.0f, me, flock)) {
+            heard.push_back(chirp);
+            smallestGap = std::min(smallestGap, time - lastAt);
+            lastAt = time;
+        }
+    }
+    t.check("passaros: um bando por perto canta, mas com folga entre os cantos",
+            heard.size() >= 10 && heard.size() <= 45 && smallestGap >= BirdChorus::kMinGap - 1e-3f);
+    const bool smallTypes = std::all_of(heard.begin(), heard.end(), [](const ChirpRequest& c) {
+        return c.sound == UiSound::ChirpTweet || c.sound == UiSound::ChirpTrill;
+    });
+    t.check("passaros: os pequenos piam ou trinam", smallTypes && chirpFor(BirdVoice::Small, 1) != chirpFor(BirdVoice::Small, 2));
+    t.check("passaros: cada porte tem o proprio canto",
+            chirpFor(BirdVoice::Medium, 1) == UiSound::ChirpWhistle && chirpFor(BirdVoice::Large, 1) == UiSound::ChirpCaw);
+
+    BirdChorus near, distant;
+    float nearVolume = 0, distantVolume = 1;
+    for (int i = 0; i < 60 * 20; i++) {
+        for (const ChirpRequest& c : near.update(1.0f / 60.0f, me, {{1, me + glm::vec3(5, 0, 0), BirdVoice::Medium}})) nearVolume = c.volume;
+        for (const ChirpRequest& c : distant.update(1.0f / 60.0f, me, {{1, me + glm::vec3(70, 0, 0), BirdVoice::Medium}})) distantVolume = c.volume;
+    }
+    t.check("passaros: de perto o canto e mais alto", nearVolume > 0.8f && distantVolume < 0.3f);
+}
+
+void testFlapSound(TestRun& t) {
+    PlayerBird bird;
+    FlightControls key;
+    key.flaps = 1;
+    key.flapStrength = 0.8f;
+    bird.applyControls(key);
+    const float keyboard = bird.takeFlap();
+    t.check("batida: o Espaco faz o som da asa uma vez", keyboard > 0.7f && bird.takeFlap() == 0.0f);
+
+    FlightControls body;
+    body.bodyControlled = true;
+    int flaps = 0;
+    for (float stroke : {0.0f, 0.2f, 0.6f, 0.9f, 0.7f, 0.1f, 0.0f, 0.5f, 0.8f, 0.0f}) {
+        body.stroke = stroke;
+        bird.applyControls(body);
+        flaps += bird.takeFlap() > 0 ? 1 : 0;
+    }
+    t.check("batida: cada descida dos bracos soa uma unica vez", flaps == 2);
 }
 
 int runUiSelfTest() {
@@ -635,6 +715,8 @@ int runUiSelfTest() {
     testUiPauseSaves(t);
     testUiFeedback(t);
     testAmbience(t);
+    testBirdChorus(t);
+    testFlapSound(t);
     testCalibrationRegions(t);
     testCalibrationTracker(t);
     testCalibrationScreen(t);

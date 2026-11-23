@@ -7,6 +7,7 @@
 #include "input/FlightInput.h"
 #include "net/NetMatch.h"
 #include "voice/VoiceChat.h"
+#include "ui/BirdChorus.h"
 #include "ui/DemoGameplaySource.h"
 #include "ui/GameUi.h"
 #include "ui/TextPainter.h"
@@ -49,6 +50,8 @@ private:
     void startVoice();
     void updateVoice(float frameSeconds);
     void syncMatch(float frameSeconds);
+    void updateFlightSounds(float frameSeconds);
+    std::vector<SingingBird> singingBirds() const;
     void rebuildSession();
     void restoreWorld();
     void saveWorld();
@@ -84,6 +87,7 @@ private:
     std::unique_ptr<GameUi> ui_;
     std::unique_ptr<VoiceChat> voice_;   // So existe no jogo de verdade; os testes rodam sem audio.
     VoiceLink* voiceLink_ = nullptr;
+    BirdChorus chorus_;
     PoseSource* poseSource_ = nullptr;
     cv::Mat previewBase_;
     std::unique_ptr<TextPainter> labelText_;                  // Criado no primeiro nome mostrado.

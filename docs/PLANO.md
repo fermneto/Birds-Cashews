@@ -197,7 +197,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e ambiente (vento pela velocidade, mar perto da costa e pássaros perto das copas) | Falta validar o áudio |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Falta validar o áudio |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma

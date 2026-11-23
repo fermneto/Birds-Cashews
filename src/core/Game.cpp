@@ -248,13 +248,49 @@ void Game::updateScreens(float frameSeconds) {
         telemetryTimer_ += frameSeconds;
     }
     ui_->update(frameSeconds);
+    updateFlightSounds(frameSeconds);
+}
+
+static BirdVoice voiceOf(uint8_t role) {
+    switch (static_cast<NpcRole>(role)) {
+        case NpcRole::Flock:
+        case NpcRole::Skittish: return BirdVoice::Small;
+        case NpcRole::Hunter:
+        case NpcRole::Glider: return BirdVoice::Large;
+        default: return BirdVoice::Medium;
+    }
+}
+
+// Os NPCs que podem cantar: no cliente vem do host, como no desenho.
+std::vector<SingingBird> Game::singingBirds() const {
+    std::vector<SingingBird> birds;
+    if (const net::ClientAuthority* client = match_.clientAuthority()) {
+        const auto npcs = client->npcs();
+        for (size_t i = 0; i < npcs.size(); i++) birds.push_back({static_cast<uint32_t>(i), npcs[i].position, voiceOf(npcs[i].role)});
+    } else {
+        for (size_t i = 0; i < npcs_.birds().size(); i++) {
+            const NpcBird& bird = npcs_.birds()[i];
+            birds.push_back({static_cast<uint32_t>(i), bird.position, voiceOf(static_cast<uint8_t>(bird.role))});
+        }
+    }
+    return birds;
+}
+
+// Som do voo: camadas continuas guiadas pela fisica, sopro a cada batida e cantos so de quem esta perto.
+void Game::updateFlightSounds(float frameSeconds) {
     const FlightModel& flight = player_.flight();
     AmbientListener listener;
     listener.position = flight.position();
     listener.speed = glm::length(flight.velocity());
+    listener.verticalSpeed = flight.verticalSpeed();
     listener.groundHeight = world_.island().heightAt(listener.position.x, listener.position.z);
-    listener.playing = ui_->playing();
+    listener.playing = ui_->playing() && !session_->perched();
     ui_->setAmbience(ambientMixFor(listener));
+    const float flap = player_.takeFlap();
+    if (!ui_->playing()) return;
+    if (flap > 0) ui_->playSound(UiSound::Flap, 0.45f + 0.45f * flap);
+    for (const ChirpRequest& chirp : chorus_.update(frameSeconds, listener.position, singingBirds()))
+        ui_->playSound(chirp.sound, chirp.volume);
 }
 
 void Game::presentUi(float frameSeconds) {

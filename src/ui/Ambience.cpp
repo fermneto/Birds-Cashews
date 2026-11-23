@@ -1,5 +1,6 @@
 #include "ui/Ambience.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <random>
 
@@ -8,19 +9,18 @@ constexpr float kTwoPi = 6.2831853f;
 constexpr float kLoopSeconds = 8.0f;
 constexpr float kSeamSeconds = 0.75f;   // Trecho do fim que se funde com o comeco.
 
-// Volumes de cada camada no loop gerado, antes do volume do AmbientMix.
-constexpr float kWindPeak = 0.30f, kSeaPeak = 0.28f, kBirdsPeak = 0.22f;
+// Pico de cada camada no loop gerado, antes do volume do AmbientMix.
+constexpr float kWindPeak = 0.36f, kRushPeak = 0.14f, kClimbPeak = 0.24f, kDivePeak = 0.26f, kSeaPeak = 0.30f;
 
 // Distancias da ilha: a costa fica por volta de 820 m do centro.
 constexpr float kSeaFrom = 620.0f, kSeaFull = 900.0f;
-constexpr float kBirdsInland = 780.0f, kBirdsCoast = 950.0f;
 
 float smooth(float edge0, float edge1, float x) {
     const float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
 }
 
-// Gera "total" amostras com a funcao e funde o excesso do fim no comeco, para o loop nao estalar.
+// Gera o loop e mais um trecho, e funde esse trecho no comeco, para o loop nao estalar.
 template <class Generate>
 std::vector<float> seamless(int sampleRate, Generate generate) {
     const int length = static_cast<int>(kLoopSeconds * sampleRate);
@@ -35,18 +35,91 @@ std::vector<float> seamless(int sampleRate, Generate generate) {
     return loop;
 }
 
-// Ruido marrom suave, com rajadas lentas que repetem em periodos inteiros do loop.
+// Filtro passa-faixa de dois polos: da cor a um ruido branco.
+class Resonator {
+public:
+    Resonator(float hz, float q, int sampleRate) { tune(hz, q, sampleRate); }
+    void tune(float hz, float q, int sampleRate) {
+        const float w = kTwoPi * hz / static_cast<float>(sampleRate), alpha = std::sin(w) / (2.0f * q);
+        const float a0 = 1.0f + alpha;
+        b0_ = alpha / a0;
+        a1_ = -2.0f * std::cos(w) / a0;
+        a2_ = (1.0f - alpha) / a0;
+    }
+    float operator()(float in) {
+        const float out = b0_ * (in - x2_) - a1_ * y1_ - a2_ * y2_;
+        x2_ = x1_;
+        x1_ = in;
+        y2_ = y1_;
+        y1_ = out;
+        return out;
+    }
+
+private:
+    float b0_ = 0, a1_ = 0, a2_ = 0, x1_ = 0, x2_ = 0, y1_ = 0, y2_ = 0;
+};
+
+// Vento de fundo: sopro arejado, sem ronco grave. As rajadas sobem e descem devagar, e o tom do sopro
+// acompanha a rajada, como vento passando pelas folhas. Todas as ondas repetem em periodos inteiros do loop.
 std::vector<float> wind(int sampleRate) {
     std::mt19937 random(0xB1D5u);
     std::uniform_real_distribution<float> white(-1.0f, 1.0f);
-    float low = 0, lower = 0;
+    Resonator band(500.0f, 1.1f, sampleRate);
+    float soft = 0;
     const float length = kLoopSeconds * sampleRate;
     return seamless(sampleRate, [&](int i) {
-        low += (white(random) - low) * 0.035f;
-        lower += (low - lower) * 0.08f;
         const float phase = static_cast<float>(i) / length;
-        const float gust = 0.6f + 0.25f * std::sin(kTwoPi * phase) + 0.15f * std::sin(kTwoPi * 3.0f * phase + 1.3f);
-        return lower * 9.0f * gust;
+        const float gust = std::clamp(0.45f + 0.30f * std::sin(kTwoPi * phase + 0.4f) + 0.15f * std::sin(kTwoPi * 3.0f * phase + 1.7f)
+                                          + 0.10f * std::sin(kTwoPi * 5.0f * phase + 2.9f), 0.0f, 1.0f);
+        if (i % 32 == 0) band.tune(380.0f + 420.0f * gust, 1.1f, sampleRate);
+        soft += (band(white(random)) - soft) * 0.25f;   // Tira o chiado mais agudo.
+        return soft * (0.25f + 0.75f * gust * gust);
+    });
+}
+
+// Chiado leve do ar em alta velocidade: so as frequencias altas do ruido, sem faixa fixa de motor.
+std::vector<float> rush(int sampleRate) {
+    std::mt19937 random(0x2A5Bu);
+    std::uniform_real_distribution<float> white(-1.0f, 1.0f);
+    float low = 0, smooth = 0;
+    const float length = kLoopSeconds * sampleRate;
+    return seamless(sampleRate, [&](int i) {
+        const float noise = white(random);
+        low += (noise - low) * 0.08f;
+        smooth += ((noise - low) - smooth) * 0.35f;   // Agudo, mas sem aspereza.
+        const float phase = static_cast<float>(i) / length;
+        return smooth * (0.8f + 0.2f * std::sin(kTwoPi * 2.0f * phase + 0.9f));
+    });
+}
+
+// Subida: sopro grave e quente, sem nota definida. Em cada uma das quatro ondas do loop a faixa do ruido
+// sobe de leve, dando a sensacao de ganhar altura sem nenhum tom agudo.
+std::vector<float> climb(int sampleRate) {
+    std::mt19937 random(0xC11Bu);
+    std::uniform_real_distribution<float> white(-1.0f, 1.0f);
+    Resonator band(260.0f, 0.9f, sampleRate);
+    float soft = 0;
+    const float length = kLoopSeconds * sampleRate;
+    return seamless(sampleRate, [&](int i) {
+        const float swell = std::fmod(4.0f * static_cast<float>(i) / length, 1.0f);   // Quatro ondas por loop.
+        const float rise = std::sin(3.14159265f * swell);
+        if (i % 32 == 0) band.tune(220.0f + 220.0f * swell, 0.9f, sampleRate);
+        soft += (band(white(random)) - soft) * 0.2f;
+        return soft * (0.35f + 0.65f * rise);
+    });
+}
+
+// Assobio do mergulho: faixa estreita de ruido agudo que oscila de leve, como vento numa fresta.
+std::vector<float> dive(int sampleRate) {
+    std::mt19937 random(0xD1BEu);
+    std::uniform_real_distribution<float> white(-1.0f, 1.0f);
+    Resonator whistle(1250.0f, 9.0f, sampleRate), body(500.0f, 0.7f, sampleRate);
+    const float length = kLoopSeconds * sampleRate;
+    return seamless(sampleRate, [&](int i) {
+        const float phase = static_cast<float>(i) / length;
+        whistle.tune(1250.0f + 120.0f * std::sin(kTwoPi * 3.0f * phase), 9.0f, sampleRate);
+        const float noise = white(random);
+        return whistle(noise) * 3.0f + body(noise) * 0.5f;
     });
 }
 
@@ -58,36 +131,9 @@ std::vector<float> sea(int sampleRate) {
     const float length = kLoopSeconds * sampleRate;
     return seamless(sampleRate, [&](int i) {
         low += (white(random) - low) * 0.06f;
-        const float swell = std::fmod(2.0f * static_cast<float>(i) / length, 1.0f);   // Duas ondas por loop.
+        const float swell = std::fmod(2.0f * static_cast<float>(i) / length, 1.0f);
         const float wave = std::pow(std::sin(3.14159265f * swell), 3.0f);
-        return low * 6.0f * (0.25f + 0.75f * wave);
-    });
-}
-
-// Passaros distantes: piados curtos, sorteados uma vez e sempre iguais.
-std::vector<float> birds(int sampleRate) {
-    struct Chirp { float start, seconds, fromHz, toHz; };
-    std::mt19937 random(0xC41Cu);
-    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
-    std::vector<Chirp> chirps;
-    for (float t = 0.3f; t < kLoopSeconds - 0.4f; t += 0.5f + unit(random) * 1.3f) {
-        const int notes = 1 + static_cast<int>(unit(random) * 3.0f);
-        const float base = 2200.0f + unit(random) * 1800.0f;
-        for (int n = 0; n < notes; n++)
-            chirps.push_back({t + n * 0.11f, 0.07f + unit(random) * 0.05f, base * (1.0f + 0.1f * n), base * (1.25f + 0.1f * n)});
-    }
-    return seamless(sampleRate, [&](int i) {
-        const float t = std::fmod(static_cast<float>(i) / sampleRate, kLoopSeconds);
-        float value = 0;
-        for (const Chirp& chirp : chirps) {
-            const float local = t - chirp.start;
-            if (local < 0 || local > chirp.seconds) continue;
-            const float progress = local / chirp.seconds;
-            const float hz = chirp.fromHz + (chirp.toHz - chirp.fromHz) * progress;
-            const float envelope = std::sin(3.14159265f * progress);
-            value += std::sin(kTwoPi * hz * local) * envelope * envelope * (0.8f + 0.2f * std::sin(kTwoPi * 38.0f * local));
-        }
-        return value;
+        return low * (0.25f + 0.75f * wave);
     });
 }
 
@@ -105,8 +151,10 @@ std::vector<int16_t> toSamples(const std::vector<float>& loop, float peak) {
 
 float& AmbientMix::operator[](AmbientLayer layer) {
     switch (layer) {
+        case AmbientLayer::Rush: return rush;
+        case AmbientLayer::Climb: return climb;
+        case AmbientLayer::Dive: return dive;
         case AmbientLayer::Sea: return sea;
-        case AmbientLayer::Birds: return birds;
         default: return wind;
     }
 }
@@ -116,25 +164,28 @@ float AmbientMix::operator[](AmbientLayer layer) const { return const_cast<Ambie
 AmbientMix ambientMixFor(const AmbientListener& listener) {
     AmbientMix mix;
     if (!listener.playing) {
-        mix.wind = 0.15f;
-        mix.sea = 0.25f;
-        mix.birds = 0.35f;
+        mix.wind = 0.25f;
+        mix.sea = 0.2f;
         return mix;
     }
     const float radius = glm::length(glm::vec2(listener.position.x, listener.position.z));
     const float altitude = std::max(0.0f, listener.position.y - std::max(listener.groundHeight, 0.0f));
-    const float low = 1.0f - smooth(60.0f, 260.0f, altitude);
-    mix.wind = 0.12f + 0.88f * std::clamp((listener.speed - 12.0f) / 45.0f, 0.0f, 1.0f);
-    mix.sea = smooth(kSeaFrom, kSeaFull, radius) * (0.35f + 0.65f * low);
-    mix.birds = 0.8f * (1.0f - smooth(30.0f, 160.0f, altitude)) * (1.0f - smooth(kBirdsInland, kBirdsCoast, radius));
+    const float fast = smooth(18.0f, 70.0f, listener.speed);
+    mix.wind = 0.45f + 0.30f * smooth(80.0f, 400.0f, altitude) + 0.25f * fast;   // Mais aberto no alto e mais forte rapido.
+    mix.rush = 0.6f * fast;
+    mix.climb = smooth(1.0f, 9.0f, listener.verticalSpeed) * 0.9f;
+    mix.dive = smooth(4.0f, 28.0f, -listener.verticalSpeed) * (0.4f + 0.6f * fast);
+    mix.sea = smooth(kSeaFrom, kSeaFull, radius) * (0.35f + 0.65f * (1.0f - smooth(60.0f, 260.0f, altitude)));
     return mix;
 }
 
 std::vector<int16_t> synthesizeAmbientLoop(AmbientLayer layer, int sampleRate) {
     switch (layer) {
         case AmbientLayer::Wind: return toSamples(wind(sampleRate), kWindPeak);
+        case AmbientLayer::Rush: return toSamples(rush(sampleRate), kRushPeak);
+        case AmbientLayer::Climb: return toSamples(climb(sampleRate), kClimbPeak);
+        case AmbientLayer::Dive: return toSamples(dive(sampleRate), kDivePeak);
         case AmbientLayer::Sea: return toSamples(sea(sampleRate), kSeaPeak);
-        case AmbientLayer::Birds: return toSamples(birds(sampleRate), kBirdsPeak);
         case AmbientLayer::Count: break;
     }
     return {};

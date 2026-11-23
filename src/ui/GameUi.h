@@ -27,6 +27,7 @@ public:
 
     // Som de ambiente: o Game informa a cada quadro o que o passaro deve ouvir.
     void setAmbience(const AmbientMix& mix) { sound_.setAmbience(mix); }
+    void playSound(UiSound sound, float volume) { sound_.play(sound, volume); }   // Batidas de asa e cantos.
 
     void attachPoseSource(PoseSource* source) { poseSource_ = source; }
     // O Game recria a sessao ao entrar ou sair de uma sala; a interface passa a mostrar a nova.
