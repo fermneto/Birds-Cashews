@@ -10,7 +10,7 @@ constexpr float kLoopSeconds = 8.0f;
 constexpr float kSeamSeconds = 0.75f;   // Trecho do fim que se funde com o comeco.
 
 // Pico de cada camada no loop gerado, antes do volume do AmbientMix.
-constexpr float kWindPeak = 0.42f, kRushPeak = 0.30f, kClimbPeak = 0.20f, kDivePeak = 0.26f, kSeaPeak = 0.30f;
+constexpr float kWindPeak = 0.36f, kRushPeak = 0.14f, kClimbPeak = 0.20f, kDivePeak = 0.26f, kSeaPeak = 0.30f;
 
 // Distancias da ilha: a costa fica por volta de 820 m do centro.
 constexpr float kSeaFrom = 620.0f, kSeaFull = 900.0f;
@@ -59,26 +59,37 @@ private:
     float b0_ = 0, a1_ = 0, a2_ = 0, x1_ = 0, x2_ = 0, y1_ = 0, y2_ = 0;
 };
 
-// Vento de fundo: ruido grave e encorpado, que respira devagar.
+// Vento de fundo: sopro arejado, sem ronco grave. As rajadas sobem e descem devagar, e o tom do sopro
+// acompanha a rajada, como vento passando pelas folhas. Todas as ondas repetem em periodos inteiros do loop.
 std::vector<float> wind(int sampleRate) {
     std::mt19937 random(0xB1D5u);
     std::uniform_real_distribution<float> white(-1.0f, 1.0f);
-    float low = 0, lower = 0;
+    Resonator band(500.0f, 1.1f, sampleRate);
+    float soft = 0;
     const float length = kLoopSeconds * sampleRate;
     return seamless(sampleRate, [&](int i) {
-        low += (white(random) - low) * 0.05f;
-        lower += (low - lower) * 0.1f;
         const float phase = static_cast<float>(i) / length;
-        return lower * (0.85f + 0.15f * std::sin(kTwoPi * 2.0f * phase));
+        const float gust = std::clamp(0.45f + 0.30f * std::sin(kTwoPi * phase + 0.4f) + 0.15f * std::sin(kTwoPi * 3.0f * phase + 1.7f)
+                                          + 0.10f * std::sin(kTwoPi * 5.0f * phase + 2.9f), 0.0f, 1.0f);
+        if (i % 32 == 0) band.tune(380.0f + 420.0f * gust, 1.1f, sampleRate);
+        soft += (band(white(random)) - soft) * 0.25f;   // Tira o chiado mais agudo.
+        return soft * (0.25f + 0.75f * gust * gust);
     });
 }
 
-// Zunido do ar em alta velocidade: ruido mais claro, sem rajadas, para crescer liso com a velocidade.
+// Chiado leve do ar em alta velocidade: so as frequencias altas do ruido, sem faixa fixa de motor.
 std::vector<float> rush(int sampleRate) {
     std::mt19937 random(0x2A5Bu);
     std::uniform_real_distribution<float> white(-1.0f, 1.0f);
-    Resonator band(700.0f, 0.6f, sampleRate);
-    return seamless(sampleRate, [&](int) { return band(white(random)); });
+    float low = 0, smooth = 0;
+    const float length = kLoopSeconds * sampleRate;
+    return seamless(sampleRate, [&](int i) {
+        const float noise = white(random);
+        low += (noise - low) * 0.08f;
+        smooth += ((noise - low) - smooth) * 0.35f;   // Agudo, mas sem aspereza.
+        const float phase = static_cast<float>(i) / length;
+        return smooth * (0.8f + 0.2f * std::sin(kTwoPi * 2.0f * phase + 0.9f));
+    });
 }
 
 // Tom de Shepard: oitavas que sobem (ou descem) sem fim, com volume em sino pela altura.
@@ -167,8 +178,8 @@ AmbientMix ambientMixFor(const AmbientListener& listener) {
     const float radius = glm::length(glm::vec2(listener.position.x, listener.position.z));
     const float altitude = std::max(0.0f, listener.position.y - std::max(listener.groundHeight, 0.0f));
     const float fast = smooth(18.0f, 70.0f, listener.speed);
-    mix.wind = 0.45f + 0.35f * smooth(80.0f, 400.0f, altitude);   // Mais aberto la no alto.
-    mix.rush = fast;
+    mix.wind = 0.45f + 0.30f * smooth(80.0f, 400.0f, altitude) + 0.25f * fast;   // Mais aberto no alto e mais forte rapido.
+    mix.rush = 0.6f * fast;
     mix.climb = smooth(1.0f, 9.0f, listener.verticalSpeed) * 0.9f;
     mix.dive = smooth(4.0f, 28.0f, -listener.verticalSpeed) * (0.4f + 0.6f * fast);
     mix.sea = smooth(kSeaFrom, kSeaFull, radius) * (0.35f + 0.65f * (1.0f - smooth(60.0f, 260.0f, altitude)));

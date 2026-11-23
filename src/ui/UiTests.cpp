@@ -614,7 +614,8 @@ void testAmbience(TestRun& t) {
     t.check("ambiente: o vento de fundo esta sempre presente no voo", level.wind >= 0.45f);
     AmbientListener fast = cruise;
     fast.speed = 70;
-    t.check("ambiente: o zunido cresce com a velocidade", ambientMixFor(fast).rush > level.rush + 0.6f);
+    t.check("ambiente: o vento e o chiado crescem com a velocidade, o chiado sem dominar",
+            ambientMixFor(fast).rush > level.rush + 0.5f && ambientMixFor(fast).rush <= 0.6f && ambientMixFor(fast).wind > level.wind);
     AmbientListener rising = cruise;
     rising.verticalSpeed = 8;
     AmbientListener diving = fast;
