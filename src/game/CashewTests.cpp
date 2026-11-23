@@ -4,6 +4,7 @@
 #include "game/CashewCollector.h"
 #include "game/CashewModel.h"
 #include "gfx/Camera3D.h"
+#include "shared/CashewSpill.h"
 #include "shared/LocalAuthority.h"
 #include <algorithm>
 #include <array>
@@ -427,6 +428,136 @@ void testFlightCollects(TestRun& run, const World& world) {
     run.check("o voo passa dentro do raio de coleta", closest <= collector.stats().collectRadius);
     run.check("o bico abre durante a aproximacao", beakPeak > 0.5f);
 }
+
+GameEvent dropOf(PlayerId target, int value, glm::vec3 position, PlayerId actor = kNoPlayer) {
+    GameEvent event;
+    event.type = GameEventType::CashewDropped;
+    event.actor = actor;
+    event.target = target;
+    event.value = static_cast<uint8_t>(value);
+    event.position = position;
+    return event;
+}
+
+void testSpillPool(TestRun& run) {
+    CashewSpill pool;
+    const std::vector<GameEvent> three = pool.spill(dropOf(kMe, 3, glm::vec3(10, 50, 10)));
+    std::set<CashewId> ids;
+    bool loose = true, around = true;
+    for (const GameEvent& e : three) {
+        ids.insert(e.cashew);
+        loose = loose && e.type == GameEventType::CashewSpilled && isLooseCashew(e.cashew) && e.target == kMe;
+        around = around && glm::length(glm::vec2(e.position.x - 10, e.position.z - 10)) < 6.0f && e.position.y < 50;
+    }
+    run.check("caju solto: um evento por caju derrubado, com ids proprios", three.size() == 3 && ids.size() == 3 && loose);
+    run.check("caju solto: os cajus saem em volta e abaixo do passaro", around);
+    run.check("caju solto: so o primeiro pedido leva", pool.take(three[0].cashew) && !pool.take(three[0].cashew));
+    run.check("caju solto: id fixo nunca e solto", !pool.take(5) && pool.activeCount() == 2);
+    run.check("caju solto: quem entra recebe os que estao no chao", pool.activeSpills().size() == 2);
+    pool.advance(kLooseCashewSeconds + 3.0f);
+    run.check("caju solto: a vaga e liberada depois que o caju some", pool.activeCount() == 0 && !pool.take(three[1].cashew));
+
+    CashewSpill full;
+    for (int i = 0; i < kLooseCashewSlots; i++) full.spill(dropOf(kMe, 1, glm::vec3(0)));
+    const std::vector<GameEvent> extra = full.spill(dropOf(kMe, 1, glm::vec3(0)));
+    run.check("caju solto: sem vaga, reaproveita a do mais antigo",
+              extra.size() == 1 && extra[0].cashew == kLooseCashewBase && full.activeCount() == kLooseCashewSlots);
+}
+
+void testLooseCashewField(TestRun& run, const World& world) {
+    CashewField field(world, kSeed);
+    const CashewTree& tree = world.trees().front();
+    const glm::vec3 from = tree.base() + glm::vec3(tree.reach() + 40.0f, 80.0f, 0);   // Ao lado da copa, sobre o chao.
+    const CashewId id = kLooseCashewBase + 3;
+    run.check("caju solto: comeca inativo", !field.isActive(id) && field.contains(id) && field.activeLoose().empty());
+    field.spill(id, from);
+    run.check("caju solto: aparece onde saiu", field.isActive(id) && glm::length(field.positionOf(id) - from) < 1e-3f);
+    field.advance(0.5f);
+    const glm::vec3 falling = field.positionOf(id);
+    field.advance(6.0f);
+    const glm::vec3 rest = field.positionOf(id);
+    glm::vec3 probe = rest - glm::vec3(0, 3.0f, 0);
+    run.check("caju solto: cai ate o chao", falling.y < from.y && rest.y < falling.y && world.resolve(probe, 3.0f).hit());
+    glm::vec3 clear = rest;
+    run.check("caju solto: fica apoiado sem afundar", !world.resolve(clear, 2.0f).hit());
+    Camera3D camera;
+    camera.position = rest + glm::vec3(0, 0, 60);   // Olhando para -z, com o caju a frente.
+    const std::vector<glm::mat4> drawn = visibleCashews(field, camera.viewProjection(), camera.position, 0.0f, kCashewDrawDistance);
+    const bool shown = std::any_of(drawn.begin(), drawn.end(), [&](const glm::mat4& m) { return glm::length(glm::vec3(m[3]) - rest) < 1e-3f; });
+    run.check("caju solto: aparece na busca e no desenho", field.nearest(rest, 5.0f) == std::optional<CashewId>(id) && shown);
+    run.check("caju solto: nao volta depois de coletado",
+              field.markCollected(id) && !field.isActive(id) && !field.forceRespawn(id) && field.dueForRespawn().size() == 0);
+
+    field.spill(id, from);
+    field.advance(kLooseCashewSeconds + 0.1f);
+    run.check("caju solto: some sozinho depois do tempo", !field.isActive(id));
+    field.spill(id, from);
+    const size_t fixedCount = field.size();
+    run.check("caju solto: nao conta entre os cajus fixos", fixedCount == CashewField(world, kSeed).size());
+}
+
+void testStolenCargo(TestRun& run) {
+    CashewField field({CashewSpot{glm::vec3(0)}, CashewSpot{glm::vec3(1, 0, 0)}});
+    HeldAuthority authority;
+    CashewCollector cargo(field, authority, kMe);
+    cargo.handle({GameEventType::CashewCollected, kMe, kNoPlayer, 0, 1});
+    GameEvent robbed{GameEventType::NestRobbed, kMe, kRival, kNoCashew, 1};
+    cargo.handle(robbed);
+    cargo.handle(robbed);
+    run.check("roubo: cada caju roubado entra na carga marcado", cargo.carried() == 3 && cargo.stolen() == 2);
+    cargo.handle(robbed);
+    run.check("roubo: carga cheia nao recebe mais", cargo.carried() == 3 && cargo.stolen() == 2);
+    GameEvent other = robbed;
+    other.actor = kRival;
+    other.target = kMe;
+    cargo.handle(other);
+    run.check("roubo: o roubo de outro jogador nao mexe na carga", cargo.carried() == 3);
+
+    cargo.handle(dropOf(kMe, 1, glm::vec3(0)));
+    run.check("roubo: na queda o roubado sai primeiro", cargo.carried() == 2 && cargo.stolen() == 1);
+    int stolen = -1;
+    run.check("roubo: na entrega o roubado sai por ultimo", cargo.unload(1, &stolen) == 1 && stolen == 0 && cargo.stolen() == 1);
+    run.check("roubo: a entrega informa os roubados", cargo.unload(5, &stolen) == 1 && stolen == 1 && cargo.stolen() == 0);
+
+    GameEvent own{GameEventType::CashewSpilled, kMe, kMe, kLooseCashewBase + 1, 1, glm::vec3(-100, 0, 0)};
+    cargo.handle(own);
+    cargo.update(kFrame, glm::vec3(-100, 0, 0));
+    const bool waits = authority.requests.empty();
+    for (int i = 0; i < 130; i++) cargo.update(kFrame, glm::vec3(-100, 0, 0));
+    run.check("caju solto: quem derrubou espera 2 s para pegar de volta",
+              waits && authority.count(GameEventType::CashewCollected) == 1);
+    authority.requests.clear();
+
+    GameEvent spilled{GameEventType::CashewSpilled, kNoPlayer, kRival, kLooseCashewBase, 1, glm::vec3(100, 0, 0)};
+    cargo.handle(spilled);
+    run.check("caju solto: o evento poe o caju no campo", field.isActive(kLooseCashewBase));
+    cargo.update(kFrame, glm::vec3(100, 0, 0));
+    authority.confirmAll();
+    for (const GameEvent& event : authority.pollEvents()) cargo.handle(event);
+    run.check("caju solto: qualquer um coleta como caju comum",
+              cargo.carried() == 1 && cargo.stolen() == 0 && !field.isActive(kLooseCashewBase));
+}
+
+void testLocalAuthoritySpill(TestRun& run) {
+    LocalAuthority authority;
+    authority.request(dropOf(kMe, 2, glm::vec3(0, 50, 0)));
+    run.check("autoridade local: sem carga nada cai", authority.pollEvents().empty());
+    authority.request({GameEventType::CashewCollected, kMe, kNoPlayer, 0, 1});
+    authority.request({GameEventType::CashewCollected, kMe, kNoPlayer, 1, 1});
+    authority.pollEvents();
+    authority.request(dropOf(kMe, 5, glm::vec3(0, 50, 0)));
+    const std::vector<GameEvent> events = authority.pollEvents();
+    const long spilled = std::count_if(events.begin(), events.end(), [](const GameEvent& e) { return e.type == GameEventType::CashewSpilled; });
+    run.check("autoridade local: derruba so o que o jogador carrega",
+              !events.empty() && events[0].type == GameEventType::CashewDropped && events[0].value == 2 && spilled == 2);
+    const CashewId loose = events[1].cashew;
+    authority.request({GameEventType::CashewCollected, kNoPlayer, kNoPlayer, loose, 1});
+    authority.request({GameEventType::CashewCollected, kMe, kNoPlayer, loose, 1});
+    const std::vector<GameEvent> taken = authority.pollEvents();
+    run.check("autoridade local: o caju solto vai para um so", taken.size() == 1 && taken[0].actor == kNoPlayer);
+    authority.request({GameEventType::CashewSpilled, kMe, kMe, kLooseCashewBase + 9, 1});
+    run.check("autoridade local: ninguem cria caju solto por pedido", authority.pollEvents().empty());
+}
 }
 
 int runCashewSelfTest() {
@@ -445,5 +576,9 @@ int runCashewSelfTest() {
     testBeak(run);
     testVisibility(run);
     testFlightCollects(run, world);
+    testSpillPool(run);
+    testLooseCashewField(run, world);
+    testStolenCargo(run);
+    testLocalAuthoritySpill(run);
     return run.failures;
 }

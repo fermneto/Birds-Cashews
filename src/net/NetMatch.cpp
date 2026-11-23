@@ -43,6 +43,7 @@ bool NetMatch::host(const std::string& roomName) {
     HostConfig config;
     config.worldSeed = worldSeed_;
     config.cashewCount = cashewCount_;
+    config.nestPerch = nestPerch_;
     host_ = std::make_shared<HostAuthority>(udp_, config);
     mode_ = MatchMode::Host;
     changed_ = true;

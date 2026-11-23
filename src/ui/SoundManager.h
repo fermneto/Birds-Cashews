@@ -5,7 +5,8 @@
 #include <cstdint>
 #include <vector>
 
-enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denied, Record, NestMove, Landed, TakeOff, Count };
+enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denied, Record, NestMove, Landed, TakeOff,
+                     Spill, Steal, Alarm, Knock, Count };
 
 UiSound soundFor(GameplayFeedback feedback);
 

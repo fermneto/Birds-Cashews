@@ -73,18 +73,29 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
 | Agilidade | 2 | 5 | 9 | 14 | 20 | +12% de agilidade |
 | Capacidade | 4 | 8 | 13 | 19 | 26 | +1 caju de carga |
 | Alcance | 2 | 4 | 8 | 13 | 18 | +2,5 m de coleta |
-| Defesa | 3 | 6 | 10 | 15 | 22 | Sem efeito até a N5 |
-| Alarme | 3 | 6 | 10 | 15 | 22 | Sem efeito até a N5 |
-| Cofre | 4 | 8 | 13 | 19 | 26 | Sem efeito até a N5 |
+| Defesa | 3 | 6 | 10 | 15 | 22 | +1,5 s no tempo de roubo, que começa em 4 s |
+| Alarme | 3 | 6 | 10 | 15 | 22 | Avisa o roubo e aponta o ladrão por 5 s, +3 s por nível |
+| Cofre | 4 | 8 | 13 | 19 | 26 | Guarda 5 moedas por nível longe dos ladrões |
 | Tamanho | 3 | 7 | 12 | 18 | 25 | Ninho 18% maior e +20% de moedas na entrega |
 
 ### 3.3 Roubo e colisões
 
-- Ficar sobre um ninho rival por alguns segundos rouba um caju.
-- Colidir em mergulho com quem carrega cajus derruba a carga, e os cajus caem no mundo.
-- Bater em árvore reduz a velocidade e derruba um caju. Não existe morte.
+- **Roubo:** o pássaro pousa no ninho de um rival como pousa no próprio, mas sem menu. Uma barra enche e, a cada volta
+  completa, leva 1 caju para a carga. A volta dura 4 s, mais 1,5 s por nível de Defesa do dono. O roubo continua até a
+  carga encher, o ninho esvaziar ou o ladrão bater os braços para fugir.
+- **O que sai do ninho:** o ninho guarda moedas. Cada caju roubado tira 1 moeda da vítima, menos as protegidas pelo
+  Cofre (5 por nível). Com Alarme, a vítima ouve uma sirene e a bússola aponta o ladrão por 5 s, mais 3 s por nível.
+- **Mergulho:** quem está em mergulho e encosta em outro jogador com carga derruba toda a carga dele.
+- **Árvore:** bater com força (a partir de 6 m/s contra a superfície) reduz a velocidade e derruba um caju. Não existe
+  morte.
+- **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho ou pela árvore caem até o chão ou uma copa e ficam
+  30 s no mundo. Qualquer um pega, como caju comum. Quem derrubou espera 2 s para pegar o próprio caju de volta.
 - **Cajus roubados valem moeda, mas não somam no record.** Isso impede dois jogadores de inflarem o total trocando cajus.
-- Um ninho só existe no mundo enquanto o dono está conectado, então ninguém é roubado offline.
+- Um ninho só existe no mundo enquanto o dono está conectado, então ninguém é roubado offline. Se o dono sai, quem
+  estava roubando decola.
+- **Quem decide:** o host confirma cada roubo (o ladrão precisa estar no poleiro, o ninho precisa ter moedas fora do
+  Cofre e o intervalo mínimo é de 3 s), detecta os mergulhos e escolhe o id de cada caju caído. O cliente só derruba a
+  própria carga, na batida em árvore. O perfil é local, então cada computador desconta a moeda do próprio dono.
 
 ### 3.4 Pontuação e record
 
@@ -116,7 +127,7 @@ Cada pássaro nasce de uma semente de 32 bits, que alimenta um genoma determiní
 | Territorial | 1 médio | Ronda a própria árvore e persegue quem entra perto dela, a alguns metros |
 | Migratório | 5 médios | Bando em V que atravessa a ilha de ponta a ponta |
 
-Só o caçador mexe na carga dos jogadores. Quem está pousado no ninho não é atacado. Por enquanto, a carga derrubada some do mundo. Os cajus caindo chegam com a N5. Todo NPC desvia de copas, troncos, chão e mar e nunca fica dentro deles.
+Só o caçador mexe na carga dos jogadores. Quem está pousado no ninho não é atacado. A carga derrubada cai no mundo (seção 3.3). Todo NPC desvia de copas, troncos, chão e mar e nunca fica dentro deles.
 
 Pela rede trafega só a semente, e cada computador reconstrói o mesmo pássaro. O snapshot leva também um byte de comportamento por NPC (papel e pouso), para o cliente animar cada um. As asas têm estado próprio por pássaro: o planeio flexiona e intercala rajadas de batidas, o mergulho recolhe as asas para trás e o pouso as dobra rente ao corpo.
 
@@ -177,7 +188,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 
 | # | Requisito | Como será atendido | Situação |
 |---|---|---|---|
-| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Em produção, depois da N5 |
+| 1 | Diagrama UML de classes | `docs/uml_classes.png`, gerado a partir da arquitetura final | Em produção |
 | 2 | Bastante métodos | Classes pequenas por módulo | Atendido |
 | 3 | Rodar até sair, com menu | Menu principal: hospedar, entrar, calibrar, perfil, sair | Atendido |
 | 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Atendido |
@@ -198,7 +209,7 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
 | **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Salas de até 6 jogadores, testadas entre dois computadores | Roubo (N5, em andamento) e teste completo no hotspot |
+| **M3** Multiplayer | Salas de até 6 jogadores, roubo e mergulho, testados em loopback | Teste completo no hotspot |
 | **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
 | **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
 | **M6** Fechamento | README, créditos e uso de IA escritos | Teste integrado, UML e apresentação |
@@ -225,7 +236,7 @@ celular.
 1. Validar o jogo integrado com janela visível, webcam e som.
 2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
    [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Concluir a N5, em andamento na branch `neto/n5-roubo`.
-4. Produzir o diagrama UML depois da N5. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já
+3. Validar a N5 (roubo, mergulho e cajus caindo) com dois computadores.
+4. Produzir o diagrama UML. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já
    estão escritos.
 5. Fazer o teste integrado e ensaiar a apresentação.

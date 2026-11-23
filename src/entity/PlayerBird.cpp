@@ -42,7 +42,15 @@ void PlayerBird::step(const World& world, float dt) {
         return;
     }
     const float impact = flight_.applyContact(contact);
-    if (contact.surface == Surface::Solid) animation_.shake = std::max(animation_.shake, std::min(impact / 30.0f, 1.0f));
+    if (contact.surface != Surface::Solid) return;
+    animation_.shake = std::max(animation_.shake, std::min(impact / 30.0f, 1.0f));
+    solidImpact_ = std::max(solidImpact_, impact);
+}
+
+float PlayerBird::takeSolidImpact() {
+    const float impact = solidImpact_;
+    solidImpact_ = 0;
+    return impact;
 }
 
 // Usa a velocidade total, entao a queda do mergulho tambem abre o campo de visao.

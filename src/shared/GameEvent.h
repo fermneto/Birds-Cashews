@@ -2,7 +2,12 @@
 #include "shared/GameTypes.h"
 
 enum class GameEventType { CashewCollected, CashewDelivered, CashewDropped, CashewRespawned,
-                           NestRobbed, UpgradeBought, PlayerJoined, PlayerLeft };
+                           NestRobbed, UpgradeBought, PlayerJoined, PlayerLeft, CashewSpilled };
+constexpr GameEventType kLastGameEventType = GameEventType::CashewSpilled;
+
+// NestRobbed: actor e o ladrao e target o dono do ninho; vale 1 caju.
+// CashewDropped: target perdeu value cajus, e actor e quem bateu nele (kNoPlayer para NPC, ele mesmo para arvore).
+// CashewSpilled: so a autoridade cria. Um caju solto (isLooseCashew) comeca a cair de position.
 
 // Fato do jogo. O cliente pede com GameAuthority::request e so aplica o que voltar em pollEvents.
 struct GameEvent {

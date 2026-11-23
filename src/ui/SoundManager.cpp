@@ -63,6 +63,16 @@ std::vector<Tone> tonesFor(UiSound sound) {
         case UiSound::NestMove: return {{0, 0.06f, 500, 560, 0.5f, Wave::Sine}};
         case UiSound::Landed: return {{0, 0.16f, 330, 180, 0.7f, Wave::Sine}, {0.08f, 0.14f, 660, 880, 0.3f, Wave::Triangle}};
         case UiSound::TakeOff: return {{0, 0.32f, 220, 760, 0.6f, Wave::Triangle}};
+        // Cajus caindo: tres quedas curtas, cada vez mais graves.
+        case UiSound::Spill: return {{0, 0.1f, 880, 440, 0.6f, Wave::Triangle}, {0.1f, 0.1f, 740, 370, 0.6f, Wave::Triangle},
+                                     {0.2f, 0.14f, 620, 260, 0.6f, Wave::Triangle}};
+        // Roubo: duas notas rapidas e travessas.
+        case UiSound::Steal: return {{0, 0.07f, 988, 988, 0.5f, Wave::Square}, {0.09f, 0.1f, 784, 1175, 0.5f, Wave::Square}};
+        // Alarme: sirene que sobe e desce duas vezes.
+        case UiSound::Alarm: return {{0, 0.18f, 700, 1100, 0.55f, Wave::Square}, {0.18f, 0.18f, 1100, 700, 0.55f, Wave::Square},
+                                     {0.36f, 0.18f, 700, 1100, 0.55f, Wave::Square}};
+        // Mergulho certeiro: pancada grave seguida de um brilho.
+        case UiSound::Knock: return {{0, 0.12f, 150, 90, 0.75f, Wave::Square}, {0.1f, 0.16f, 1200, 1600, 0.35f, Wave::Sine}};
         case UiSound::Count: break;
     }
     return {};
@@ -79,7 +89,10 @@ UiSound soundFor(GameplayFeedback feedback) {
         case GameplayFeedback::MenuMove: return UiSound::NestMove;
         case GameplayFeedback::NestLanded: return UiSound::Landed;
         case GameplayFeedback::TakeOff: return UiSound::TakeOff;
-        case GameplayFeedback::CargoLost: return UiSound::Denied;
+        case GameplayFeedback::CargoLost: return UiSound::Spill;
+        case GameplayFeedback::CashewStolen: return UiSound::Steal;
+        case GameplayFeedback::NestAlarm: return UiSound::Alarm;
+        case GameplayFeedback::RivalKnocked: return UiSound::Knock;
     }
     return UiSound::Move;
 }

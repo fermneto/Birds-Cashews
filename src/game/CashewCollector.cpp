@@ -21,8 +21,19 @@ CashewCollector::CashewCollector(CashewField& field, GameAuthority& authority, P
 
 void CashewCollector::handle(const GameEvent& event) {
     if (event.type == GameEventType::CashewCollected) applyCollected(event);
-    if (event.type == GameEventType::CashewDropped && event.target == localPlayer_)
+    // Quem derruba a carga perde primeiro o que roubou.
+    if (event.type == GameEventType::CashewDropped && event.target == localPlayer_) {
         carried_ = std::max(0, carried_ - event.value);
+        stolen_ = std::min(std::max(0, stolen_ - event.value), carried_);
+    }
+    if (event.type == GameEventType::NestRobbed && event.actor == localPlayer_ && carried_ < stats_.capacity) {
+        carried_++;
+        stolen_++;
+    }
+    if (event.type == GameEventType::CashewSpilled) {
+        pendingCollect_.erase(event.cashew);
+        field_.spill(event.cashew, event.position, event.target);
+    }
     if (event.type == GameEventType::CashewRespawned) {
         pendingRespawn_.erase(event.cashew);
         // Pedido por outro jogador, o host da sala: o relogio dele pode estar alguns quadros a frente do nosso.
@@ -50,17 +61,18 @@ void CashewCollector::update(float dt, glm::vec3 position) {
 // Pedidos em andamento reservam espaco, para a carga nunca passar do limite.
 void CashewCollector::requestNearby(glm::vec3 position) {
     if (!collecting_) return;
-    int free = stats_.capacity - carried_ - static_cast<int>(pendingCollect_.size());
+    const int free = freeSpace();
     if (free <= 0) return;
     const float radius = stats_.collectRadius * stats_.collectRadius;
     std::vector<std::pair<float, CashewId>> inRange;
-    for (size_t i = 0; i < field_.size(); i++) {
-        const CashewId id = static_cast<CashewId>(i);
-        if (!field_.isActive(id) || pendingCollect_.count(id)) continue;
+    const auto consider = [&](CashewId id) {
+        if (!field_.collectableBy(id, localPlayer_) || pendingCollect_.count(id)) return;
         const glm::vec3 delta = field_.positionOf(id) - position;
         const float distance = glm::dot(delta, delta);
         if (distance <= radius) inRange.emplace_back(distance, id);
-    }
+    };
+    for (size_t i = 0; i < field_.size(); i++) consider(static_cast<CashewId>(i));
+    for (CashewId id : field_.activeLoose()) consider(id);
     std::sort(inRange.begin(), inRange.end());
     for (size_t i = 0; i < inRange.size() && static_cast<int>(i) < free; i++) {
         pendingCollect_[inRange[i].second] = kRequestTimeout;
@@ -68,11 +80,17 @@ void CashewCollector::requestNearby(glm::vec3 position) {
     }
 }
 
-int CashewCollector::unload(int amount) {
+int CashewCollector::unload(int amount, int* stolen) {
     const int removed = std::clamp(amount, 0, carried_);
+    const int ownLeft = carried_ - stolen_;
+    const int stolenOut = std::max(0, removed - ownLeft);
     carried_ -= removed;
+    stolen_ -= stolenOut;
+    if (stolen) *stolen = stolenOut;
     return removed;
 }
+
+int CashewCollector::freeSpace() const { return stats_.capacity - carried_ - static_cast<int>(pendingCollect_.size()); }
 
 void CashewCollector::requestRespawns() {
     for (CashewId id : field_.dueForRespawn()) {

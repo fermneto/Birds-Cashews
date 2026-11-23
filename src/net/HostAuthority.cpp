@@ -14,7 +14,9 @@ GameEvent eventOf(GameEventType type, PlayerId actor) {
 }
 }
 
-HostAuthority::HostAuthority(UdpSession& udp, HostConfig config) : udp_(udp), config_(config) {}
+HostAuthority::HostAuthority(UdpSession& udp, HostConfig config) : udp_(udp), config_(std::move(config)) {
+    lastRobAt_.fill(-1.0e9);
+}
 
 // ---- GameAuthority ----
 
@@ -64,13 +66,19 @@ std::string HostAuthority::playerName(PlayerId id) const {
 bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
     if (remote) {
         if (event.type == GameEventType::CashewRespawned || event.type == GameEventType::PlayerJoined ||
-            event.type == GameEventType::PlayerLeft) return false;
+            event.type == GameEventType::PlayerLeft || event.type == GameEventType::CashewSpilled) return false;
+        // Um cliente so derruba a propria carga (batida em arvore); mergulhos e cacadores sao decididos aqui.
+        if (event.type == GameEventType::CashewDropped && event.target != sender) return false;
         event.actor = sender;
     }
     switch (event.type) {
         case GameEventType::CashewCollected:
             // So o primeiro pedido leva o caju; os seguintes chegam com ele ja coletado.
-            if (event.cashew >= config_.cashewCount || !collected_.insert(event.cashew).second) return false;
+            if (isLooseCashew(event.cashew)) {
+                if (!spill_.take(event.cashew)) return false;
+            } else if (event.cashew >= config_.cashewCount || !collected_.insert(event.cashew).second) {
+                return false;
+            }
             if (event.actor < kMaxPlayers && carried_[event.actor] < 255) carried_[event.actor]++;
             return true;
         case GameEventType::CashewRespawned:
@@ -86,8 +94,62 @@ bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
             event.value = std::min(event.value, carried_[event.target]);
             carried_[event.target] = static_cast<uint8_t>(carried_[event.target] - event.value);
             return event.value > 0;
+        case GameEventType::NestRobbed:
+            if (!validateRobbery(event)) return false;
+            lastRobAt_[event.actor] = now_;
+            event.value = 1;
+            if (carried_[event.actor] < 255) carried_[event.actor]++;
+            return true;
+        case GameEventType::CashewSpilled:
+            return false;   // So nasce em confirm, a partir de um CashewDropped.
         default:
             return true;
+    }
+}
+
+// O ladrao esta pousado no ninho de outro jogador conectado, que ainda tem moedas fora do Cofre.
+bool HostAuthority::validateRobbery(const GameEvent& event) {
+    if (event.actor >= kMaxPlayers || event.target >= kMaxPlayers || event.actor == event.target) return false;
+    PlayerPublicState thief, owner;
+    if (!stateOf(event.actor, thief) || !stateOf(event.target, owner) || owner.nestStock == 0) return false;
+    if (now_ - lastRobAt_[event.actor] < kMinRobInterval) return false;
+    if (config_.nestPerch) {
+        const auto perch = config_.nestPerch(event.target);
+        if (!perch || glm::length(thief.position - *perch) > kRobRange) return false;
+    }
+    return true;
+}
+
+bool HostAuthority::stateOf(PlayerId id, PlayerPublicState& state) const {
+    if (id == kHostPlayer) {
+        state = local_;
+        return hasLocal_;
+    }
+    if (id >= kMaxPlayers || !remotes_[id].joined || !remotes_[id].hasState) return false;
+    state = current(id);
+    return true;
+}
+
+// Quem mergulha e encosta em outro jogador com carga derruba tudo o que ele leva.
+// Pousado no ninho o jogador publica carga zero e fica imune.
+void HostAuthority::checkDiveHits() {
+    std::vector<PlayerPublicState> birds;
+    for (PlayerId id = 0; id < kMaxPlayers; id++) {
+        PlayerPublicState state;
+        if (stateOf(id, state)) birds.push_back(state);
+    }
+    for (const PlayerPublicState& diver : birds) {
+        if (diver.mode != FlightMode::Dive) continue;
+        for (const PlayerPublicState& prey : birds) {
+            if (prey.id == diver.id || prey.carried == 0 || carried_[prey.id] == 0 || now_ < knockableAt_[prey.id]) continue;
+            if (glm::length(prey.position - diver.position) > kDiveHitRange) continue;
+            knockableAt_[prey.id] = now_ + kKnockImmunity;
+            GameEvent hit = eventOf(GameEventType::CashewDropped, diver.id);
+            hit.target = prey.id;
+            hit.value = carried_[prey.id];
+            hit.position = prey.position;
+            confirm(hit, false, kHostPlayer);
+        }
     }
 }
 
@@ -95,6 +157,11 @@ void HostAuthority::confirm(GameEvent event, bool remote, PlayerId sender) {
     if (!validate(event, remote, sender)) return;
     pending_.push_back(event);
     outgoing_.push_back(event);
+    if (event.type != GameEventType::CashewDropped) return;
+    for (const GameEvent& spilled : spill_.spill(event)) {
+        pending_.push_back(spilled);
+        outgoing_.push_back(spilled);
+    }
 }
 
 void HostAuthority::flushConfirmed() {
@@ -117,6 +184,8 @@ void HostAuthority::update(float seconds) {
     for (PlayerId id : remotePlayers())
         if (std::find(connected.begin(), connected.end(), id) == connected.end()) dropPlayer(id);
 
+    spill_.advance(seconds);
+    checkDiveHits();
     flushConfirmed();
     snapshotTimer_ += std::max(0.0f, seconds);
     if (snapshotTimer_ >= kStateInterval) {
@@ -163,6 +232,7 @@ void HostAuthority::welcome(PeerId peer, const HelloMessage& hello) {
         event.value = 1;
         sync.push_back(event);
     }
+    for (const GameEvent& loose : spill_.activeSpills()) sync.push_back(loose);
     for (const auto& batch : encodeEventBatches(MessageType::EventConfirmed, sync)) udp_.sendReliable(peer, batch);
 
     Remote& remote = remotes_[peer];
@@ -179,6 +249,7 @@ void HostAuthority::welcome(PeerId peer, const HelloMessage& hello) {
 void HostAuthority::dropPlayer(PlayerId id) {
     remotes_[id] = Remote{};
     carried_[id] = 0;
+    lastRobAt_[id] = -1.0e9;
     std::cout << "Rede: jogador " << static_cast<int>(id) << " saiu\n";
     confirm(eventOf(GameEventType::PlayerLeft, id), false, kHostPlayer);
 }

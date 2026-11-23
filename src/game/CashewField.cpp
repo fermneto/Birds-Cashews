@@ -61,7 +61,7 @@ bool hasEscapeRoute(const World& world, const CashewTree& tree, glm::vec3 start)
 }
 }
 
-CashewField::CashewField(const World& world, uint32_t seed) {
+CashewField::CashewField(const World& world, uint32_t seed) : world_(&world) {
     for (size_t i = 0; i < world.trees().size(); i++)
         growOnTree(world, i, (static_cast<uint64_t>(seed) << 20) ^ (i * 0x9E3779u + 0xCA5Eu));
     states_.resize(spots_.size());
@@ -105,24 +105,95 @@ std::optional<CashewId> CashewField::nearest(glm::vec3 position, float radius) c
     if (radius < 0) return std::nullopt;
     std::optional<CashewId> best;
     float bestDistance = radius * radius;
-    for (size_t i = 0; i < spots_.size(); i++) {
-        if (!states_[i].active) continue;
-        const glm::vec3 delta = spots_[i].position - position;
+    const auto consider = [&](CashewId id) {
+        const glm::vec3 delta = positionOf(id) - position;
         const float distance = glm::dot(delta, delta);
         if (distance <= bestDistance) {
             bestDistance = distance;
-            best = static_cast<CashewId>(i);
+            best = id;
         }
-    }
+    };
+    for (size_t i = 0; i < spots_.size(); i++)
+        if (states_[i].active) consider(static_cast<CashewId>(i));
+    for (CashewId id : activeLoose()) consider(id);
     return best;
 }
 
-glm::vec3 CashewField::positionOf(CashewId id) const { return contains(id) ? spots_[id].position : glm::vec3(0); }
+const LooseCashew* CashewField::loose(CashewId id) const {
+    return isLooseCashew(id) ? &loose_[id - kLooseCashewBase] : nullptr;
+}
 
-void CashewField::advance(float dt) { clock_ += dt; }
+bool CashewField::isActive(CashewId id) const {
+    if (const LooseCashew* fallen = loose(id)) return fallen->active;
+    return id < spots_.size() && states_[id].active;
+}
+
+// Queda livre ate o ponto de pouso, calculado uma vez na hora em que o caju sai.
+glm::vec3 CashewField::positionOf(CashewId id) const {
+    if (const LooseCashew* fallen = loose(id)) {
+        const float t = static_cast<float>(clock_ - fallen->spilledAt);
+        const float drop = fallen->from.y - fallen->rest.y;
+        if (drop <= 0.0f) return fallen->rest;
+        const float progress = std::min(1.0f, 0.5f * kFallSpeed * t * t / drop);
+        return glm::mix(fallen->from, fallen->rest, progress);
+    }
+    return id < spots_.size() ? spots_[id].position : glm::vec3(0);
+}
+
+float CashewField::yawOf(CashewId id) const {
+    if (const LooseCashew* fallen = loose(id)) return fallen->yaw;
+    return id < spots_.size() ? spots_[id].yaw : 0.0f;
+}
+
+std::vector<CashewId> CashewField::activeLoose() const {
+    std::vector<CashewId> ids;
+    for (int i = 0; i < kLooseCashewSlots; i++)
+        if (loose_[i].active) ids.push_back(static_cast<CashewId>(kLooseCashewBase + i));
+    return ids;
+}
+
+void CashewField::advance(float dt) {
+    clock_ += dt;
+    for (LooseCashew& fallen : loose_)
+        if (fallen.active && clock_ - fallen.spilledAt >= kLooseCashewSeconds) fallen.active = false;
+}
+
+// Desce de metro em metro ate encostar em chao, copa ou mar. A castanha fica apoiada, sem afundar.
+glm::vec3 CashewField::restingPoint(glm::vec3 from) const {
+    if (!world_) return from;
+    constexpr float kStep = 1.0f, kLowest = -20.0f, kNutBelowCenter = kFruitBottom - kFruitRadius;
+    for (glm::vec3 point = from; point.y > kLowest; point.y -= kStep) {
+        glm::vec3 resolved = point;
+        if (world_->resolve(resolved, kFruitRadius).hit()) return resolved + glm::vec3(0, kNutBelowCenter, 0);
+    }
+    return glm::vec3(from.x, kLowest, from.z);
+}
+
+// Um caju novo na mesma vaga substitui o antigo: a autoridade so reusa vagas de cajus que ja sumiram.
+bool CashewField::collectableBy(CashewId id, PlayerId player) const {
+    if (!isActive(id)) return false;
+    const LooseCashew* fallen = loose(id);
+    return !fallen || fallen->droppedBy != player || clock_ - fallen->spilledAt >= kRegrabSeconds;
+}
+
+bool CashewField::spill(CashewId id, glm::vec3 from, PlayerId droppedBy) {
+    if (!isLooseCashew(id)) return false;
+    LooseCashew& fallen = loose_[id - kLooseCashewBase];
+    fallen.active = true;
+    fallen.from = from;
+    fallen.rest = restingPoint(from);
+    fallen.yaw = static_cast<float>(id % 16) * 0.39f;
+    fallen.spilledAt = clock_;
+    fallen.droppedBy = droppedBy;
+    return true;
+}
 
 bool CashewField::markCollected(CashewId id) {
     if (!isActive(id)) return false;
+    if (isLooseCashew(id)) {
+        loose_[id - kLooseCashewBase].active = false;   // Caju derrubado nao volta.
+        return true;
+    }
     states_[id].active = false;
     states_[id].respawnAt = clock_ + spots_[id].respawnDelay;
     return true;
@@ -130,14 +201,14 @@ bool CashewField::markCollected(CashewId id) {
 
 // Um aviso atrasado de uma coleta anterior nao pode trazer o caju de volta antes da hora.
 bool CashewField::markRespawned(CashewId id) {
-    if (!contains(id) || states_[id].active || clock_ < states_[id].respawnAt) return false;
+    if (id >= spots_.size() || states_[id].active || clock_ < states_[id].respawnAt) return false;
     states_[id].active = true;
     return true;
 }
 
 // Em rede o relogio do host vale: o caju volta mesmo que o tempo local ainda nao tenha vencido.
 bool CashewField::forceRespawn(CashewId id) {
-    if (!contains(id) || states_[id].active) return false;
+    if (id >= spots_.size() || states_[id].active) return false;
     states_[id].active = true;
     return true;
 }

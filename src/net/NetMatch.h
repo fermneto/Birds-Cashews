@@ -35,6 +35,7 @@ public:
     // Nome e passaro enviados no Hello. O Game atualiza a todo quadro.
     void setLocalIdentity(const std::string& name, uint32_t birdSeed);
     void setCashewCount(size_t count) { cashewCount_ = count; }
+    void setNestPerch(std::function<std::optional<glm::vec3>(PlayerId)> perch) { nestPerch_ = std::move(perch); }
 
     void update(float seconds);
     bool consumeChange();            // Verdadeiro uma vez depois de entrar, sair ou perder a sala.
@@ -56,6 +57,7 @@ private:
     UdpSession udp_;
     uint32_t worldSeed_;
     size_t cashewCount_ = kNoCashew;
+    std::function<std::optional<glm::vec3>(PlayerId)> nestPerch_;
     std::string name_;
     uint32_t birdSeed_ = 0;
     MatchMode mode_ = MatchMode::Solo;

@@ -35,6 +35,7 @@ public:
     GameAuthority& authority() { return *authority_; }
 
     bool perched() const { return perched_; }
+    bool robbing() const { return perched_ && perchRival_ != kNoPlayer; }   // Pousado no ninho de um rival.
     const NestSite& nest() const { return nest_; }
     int nestSizeLevel() const;
     int nestRevision() const { return nestRevision_; }    // Muda quando o visual do ninho precisa ser refeito.
@@ -44,10 +45,18 @@ public:
 
 private:
     void handleEvent(const GameEvent& event);
+    void handleRobbery(const GameEvent& event);
+    void handleCargoDrop(const GameEvent& event, int carriedBefore);
+    void sufferRobbery(const GameEvent& event);
+    void checkTreeHit();
+    void robTick(float dt);
+    const PlayerPublicState* findPlayer(PlayerId id) const;
+    void refreshRobbery();
+    void refreshAlarm();
     void confirmDelivery(const GameEvent& event);
     void requestDelivery();
     void watchForLanding();
-    void land();
+    void land(const NestSite& site, PlayerId owner);
     void holdPerch(float dt);
     void takeOff();
     void handleMenuPress(ArmSide side);
@@ -71,9 +80,19 @@ private:
     NestMenu menu_;
     GameplayView view_;
     std::vector<GameplayFeedback> feedback_;
+    std::vector<PlayerPublicState> players_;   // Lista replicada do quadro atual.
 
     bool perched_ = false, landingArmed_ = true, deliveryPending_ = false;
-    float settle_ = 0, recordNotice_ = 0, cargoLostNotice_ = 0, menuHold_ = 0;
+    float settle_ = 0, recordNotice_ = 0, cargoLostNotice_ = 0, knockedNotice_ = 0, menuHold_ = 0;
+    CargoLossCause lossCause_ = CargoLossCause::Hunter;
+    float treeCooldown_ = 0;
+    NestSite perchSite_;                  // Ninho onde o passaro esta ou esteve pousado por ultimo.
+    PlayerId perchRival_ = kNoPlayer;     // Dono do ninho rival; kNoPlayer no proprio ninho.
+    float robTimer_ = 0, robWait_ = 0;
+    bool robPending_ = false;
+    int stolenThisVisit_ = 0;
+    float alarm_ = 0;
+    PlayerId thief_ = kNoPlayer;
     ArmSide menuArm_ = ArmSide::None;
     FlightMode flightMode_ = FlightMode::Glide;   // Replicado para os outros desenharem as asas.
     glm::vec3 landingFrom_{0};

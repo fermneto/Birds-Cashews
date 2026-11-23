@@ -7,13 +7,11 @@ mesmo mundo pela rede local e conversam por voz de proximidade.
 A pose do jogador vem do modelo YOLOv8n-pose, executado pelo módulo DNN do OpenCV na CPU. O mundo é desenhado com OpenGL,
 e a janela, o som e o microfone usam SDL2.
 
-Projeto da disciplina Linguagem de Programação I, semestre 2026.2. Entrega em 07/12/2026.
-
 ## Situação
 
 O jogo está em desenvolvimento. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer e voz já estão na
-`main`. O roubo de ninho, a colisão em mergulho e os cajus caindo no mundo (tarefa N5) ainda estão em implementação. A
-situação de cada tarefa está em [`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
+`main`, assim como o roubo de ninhos, a colisão em mergulho e os cajus caindo no mundo. Falta validar tudo junto com
+dois computadores. A situação de cada tarefa está em [`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
 
 ## Dependências
 
@@ -66,7 +64,8 @@ executável. Se a webcam não abrir, a calibração oferece continuar pelo tecla
 | `--voz-teste arquivo SAIDA.wav` | Gera um WAV de demonstração da voz, sem microfone |
 | `--help` | Lista as opções |
 
-Os modos de teste gravam em uma pasta temporária e não alteram `saves/`.
+O `--selftest` grava em pastas temporárias e não altera `saves/`. O `--render-test` cria em `saves/` perfis de exemplo,
+como "Jogador" e "Ninho maximo".
 
 ## Como jogar
 
@@ -81,6 +80,14 @@ Os modos de teste gravam em uma pasta temporária e não alteram `saves/`.
 
 O record é o maior total de cajus entregues entre os perfis daquele computador. Um aviso aparece quando você o ultrapassa.
 As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
+
+### Roubo e colisões
+
+- Pouse no ninho de um rival para roubar. Uma barra enche e, a cada volta, um caju vai para a sua carga. Bata os braços
+  para fugir. Cajus roubados viram moeda, mas não somam no seu total nem no record.
+- Defesa deixa o roubo mais lento, o Cofre guarda parte das moedas e o Alarme mostra na bússola quem está roubando.
+- Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
+- Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
 
 ### Com o corpo
 
@@ -139,7 +146,7 @@ Para testar na mesma máquina, abra `./birds` e hospede. Em outro terminal, abra
 ```
 
 Os testes cobrem gestos, voo, cajus, ninho, perfis e record, interface, NPCs, pássaros procedurais, rede e voz. Eles não
-abrem janela nem usam a webcam. Em 23/11/2026, a `main` passava em todas as 842 verificações. O programa termina com
+abrem janela nem usam a webcam. Em 23/11/2026, a `main` passava em todas as 911 verificações. O programa termina com
 código 0 quando tudo passa.
 
 ## Estrutura

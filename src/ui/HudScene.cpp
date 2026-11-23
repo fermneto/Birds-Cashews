@@ -32,9 +32,21 @@ void drawCoins(UiKit& kit, const GameplayView& view, float opacity) {
     kit.text.draw(kit.canvas, std::to_string(view.coins), {kUiMargin + 30, 131}, uiStyle(19, theme::kGold), opacity);
 }
 
+// Com o Alarme, um losango vermelho mostra para que lado o ladrao esta.
+void drawThief(UiKit& kit, const GameplayView& view) {
+    if (!view.alarmNow) return;
+    const int center = kUiWidth / 2;
+    const float limited = std::clamp(view.thiefBearing / (kHalfTurn * 0.5f), -1.0f, 1.0f);
+    const int x = center + static_cast<int>(limited * (kCompassHalf - 14));
+    kit.canvas.fill({x - 9, kCompassY - 11, 18, 18}, theme::kRed, 1.0f, 4);
+    kit.canvas.fill({x - 5, kCompassY - 7, 10, 10}, theme::kWhite, 0.9f, 3);
+    const std::string distance = "ladrão " + std::to_string(static_cast<int>(std::lround(std::max(view.thiefDistance, 0.0f)))) + " m";
+    kit.text.draw(kit.canvas, distance, {x, kCompassY - 18}, uiStyle(15, theme::kRed, TextAlign::Center));
+}
+
 // Barra de rumo: o ninho desliza sobre ela e, se ficar para tras, encosta na ponta indicando o lado.
 void drawCompass(UiKit& kit, const GameplayView& view) {
-    if (view.perchedOnNest) return;
+    if (view.perchedOnNest || view.robbery.active) return;
     const float opacity = view.carried > 0 ? 1.0f : 0.62f;
     const int center = kUiWidth / 2;
     kit.canvas.gradient({center - kCompassHalf, kCompassY, kCompassHalf, 2}, theme::kWhite, 0.0f, 0.75f * opacity, true);
@@ -53,6 +65,42 @@ void drawCompass(UiKit& kit, const GameplayView& view) {
     }
     const std::string distance = std::to_string(static_cast<int>(std::lround(std::max(view.nestDistance, 0.0f)))) + " m";
     kit.text.draw(kit.canvas, distance, {center, kCompassY + 36}, uiStyle(17, theme::kWhite, TextAlign::Center), opacity);
+}
+
+std::string robStatus(const RobView& rob) {
+    switch (rob.blocked) {
+        case RobBlock::EmptyNest: return "Nada para levar: o ninho está vazio ou no Cofre";
+        case RobBlock::CargoFull: return "Carga cheia: leve tudo para o seu ninho";
+        case RobBlock::Waiting: return "Pegando o caju...";
+        case RobBlock::None: break;
+    }
+    return "Fique pousado para levar um caju";
+}
+
+// Pousado no ninho de um rival: barra de progresso ate o proximo caju roubado.
+void drawRobbery(UiKit& kit, const GameplayView& view) {
+    const RobView& rob = view.robbery;
+    if (!rob.active) return;
+    const cv::Rect panel((kUiWidth - 460) / 2, 520, 460, 132);
+    kit.canvas.fill(panel, theme::kInk, 0.82f, 22);
+    kit.text.draw(kit.canvas, "Ninho rival", {panel.x + 24, panel.y + 36}, uiStyle(24, theme::kGold));
+    const std::string count = std::to_string(rob.stolenNow) + " roubado" + (rob.stolenNow == 1 ? "" : "s");
+    kit.text.draw(kit.canvas, count, {panel.x + panel.width - 24, panel.y + 36}, uiStyle(16, theme::kMuted, TextAlign::Right));
+    const cv::Rect bar(panel.x + 24, panel.y + 54, panel.width - 48, 12);
+    kit.canvas.fill(bar, theme::kWhite, 0.18f, 6);
+    const int filled = static_cast<int>(std::lround(bar.width * std::clamp(rob.progress, 0.0f, 1.0f)));
+    if (filled > 0) kit.canvas.fill({bar.x, bar.y, filled, bar.height}, rob.blocked == RobBlock::None || rob.blocked == RobBlock::Waiting ? theme::kGold : theme::kMuted, 1.0f, 6);
+    kit.text.draw(kit.canvas, robStatus(rob), {panel.x + 24, panel.y + 92}, uiStyle(16));
+    kit.text.draw(kit.canvas, "Bata as asas (Espaço) para fugir", {panel.x + 24, panel.y + 116}, uiStyle(14, theme::kMuted));
+}
+
+std::string cargoLostText(CargoLossCause cause) {
+    switch (cause) {
+        case CargoLossCause::Player: return "Um rival mergulhou em você e derrubou a carga!";
+        case CargoLossCause::Tree: return "Você bateu na árvore e derrubou um caju!";
+        case CargoLossCause::Hunter: break;
+    }
+    return "Um caçador derrubou a sua carga!";
 }
 
 void drawWarning(UiKit& kit, const std::string& text) {
@@ -183,9 +231,13 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     drawScore(kit, view);
     drawCoins(kit, view, view.menu.page != NestMenuPage::Closed ? 0.0f : scene.coinsOpacity);
     drawCompass(kit, view);
+    drawThief(kit, view);
+    drawRobbery(kit, view);
     if (scene.showPreview) drawPreviewFrame(kit);
     if (scene.bodyLost) drawWarning(kit, "Corpo fora do quadro: o pássaro plana nivelado");
     else if (view.nearBoundary) drawWarning(kit, "Volte para a ilha");
-    else if (view.cargoLostNow) drawWarning(kit, "Um caçador derrubou a sua carga!");
+    else if (view.cargoLostNow) drawWarning(kit, cargoLostText(view.cargoLossCause));
+    else if (view.alarmNow) drawWarning(kit, "Alarme: estão roubando o seu ninho!");
+    else if (view.knockedRivalNow) drawWarning(kit, "Mergulho certeiro: a carga do rival caiu!");
     drawBanner(kit, scene);
 }
