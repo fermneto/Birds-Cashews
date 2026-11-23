@@ -10,7 +10,7 @@ constexpr float kLoopSeconds = 8.0f;
 constexpr float kSeamSeconds = 0.75f;   // Trecho do fim que se funde com o comeco.
 
 // Pico de cada camada no loop gerado, antes do volume do AmbientMix.
-constexpr float kWindPeak = 0.36f, kRushPeak = 0.14f, kClimbPeak = 0.20f, kDivePeak = 0.26f, kSeaPeak = 0.30f;
+constexpr float kWindPeak = 0.36f, kRushPeak = 0.14f, kClimbPeak = 0.24f, kDivePeak = 0.26f, kSeaPeak = 0.30f;
 
 // Distancias da ilha: a costa fica por volta de 820 m do centro.
 constexpr float kSeaFrom = 620.0f, kSeaFull = 900.0f;
@@ -92,27 +92,20 @@ std::vector<float> rush(int sampleRate) {
     });
 }
 
-// Tom de Shepard: oitavas que sobem (ou descem) sem fim, com volume em sino pela altura.
-// Cada parcial sobe uma oitava por loop, entao a ilusao de subida nunca acaba.
-std::vector<float> shepard(int sampleRate, float direction, float baseHz, float breath, uint32_t seed) {
-    constexpr int kPartials = 5;
-    std::array<float, kPartials> phases{};
-    std::mt19937 random(seed);
+// Subida: sopro grave e quente, sem nota definida. Em cada uma das quatro ondas do loop a faixa do ruido
+// sobe de leve, dando a sensacao de ganhar altura sem nenhum tom agudo.
+std::vector<float> climb(int sampleRate) {
+    std::mt19937 random(0xC11Bu);
     std::uniform_real_distribution<float> white(-1.0f, 1.0f);
-    Resonator air(1400.0f, 0.8f, sampleRate);
+    Resonator band(260.0f, 0.9f, sampleRate);
+    float soft = 0;
     const float length = kLoopSeconds * sampleRate;
     return seamless(sampleRate, [&](int i) {
-        const float progress = std::fmod(static_cast<float>(i) / length, 1.0f);
-        float value = 0;
-        for (int p = 0; p < kPartials; p++) {
-            const float octave = std::fmod(p + (direction > 0 ? progress : 1.0f - progress), static_cast<float>(kPartials));
-            const float hz = baseHz * std::exp2(octave);
-            const float bell = std::sin(3.14159265f * octave / kPartials);
-            phases[p] += hz / static_cast<float>(sampleRate);
-            phases[p] -= std::floor(phases[p]);
-            value += std::sin(kTwoPi * phases[p]) * bell * bell;
-        }
-        return value * 0.25f + air(white(random)) * breath;
+        const float swell = std::fmod(4.0f * static_cast<float>(i) / length, 1.0f);   // Quatro ondas por loop.
+        const float rise = std::sin(3.14159265f * swell);
+        if (i % 32 == 0) band.tune(220.0f + 220.0f * swell, 0.9f, sampleRate);
+        soft += (band(white(random)) - soft) * 0.2f;
+        return soft * (0.35f + 0.65f * rise);
     });
 }
 
@@ -190,7 +183,7 @@ std::vector<int16_t> synthesizeAmbientLoop(AmbientLayer layer, int sampleRate) {
     switch (layer) {
         case AmbientLayer::Wind: return toSamples(wind(sampleRate), kWindPeak);
         case AmbientLayer::Rush: return toSamples(rush(sampleRate), kRushPeak);
-        case AmbientLayer::Climb: return toSamples(shepard(sampleRate, 1.0f, 110.0f, 0.6f, 0xC11Bu), kClimbPeak);
+        case AmbientLayer::Climb: return toSamples(climb(sampleRate), kClimbPeak);
         case AmbientLayer::Dive: return toSamples(dive(sampleRate), kDivePeak);
         case AmbientLayer::Sea: return toSamples(sea(sampleRate), kSeaPeak);
         case AmbientLayer::Count: break;

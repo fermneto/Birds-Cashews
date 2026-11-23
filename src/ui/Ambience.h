@@ -12,7 +12,7 @@ constexpr int kAmbientLayers = static_cast<int>(AmbientLayer::Count);
 struct AmbientMix {
     float wind = 0;    // Vento de fundo, sempre presente.
     float rush = 0;    // Zunido do ar passando, cresce com a velocidade.
-    float climb = 0;   // Tom que sobe sem parar enquanto o passaro ganha altura.
+    float climb = 0;   // Sopro grave enquanto o passaro ganha altura, sem nota aguda.
     float dive = 0;    // Assobio do vento no mergulho.
     float sea = 0;     // Ondas, perto da costa.
     float& operator[](AmbientLayer layer);
