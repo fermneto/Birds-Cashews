@@ -50,6 +50,8 @@ public:
     // Uma vez por quadro, inclusive nos menus: le a rede, detecta saidas e envia snapshots.
     void update(float seconds);
     void setNpcs(std::vector<NpcPublicState> npcs) { npcs_ = std::move(npcs); }
+    // Mundo salvo de outra partida: esses cajus comecam colhidos, inclusive para quem entrar depois.
+    void restoreCollected(const std::vector<CashewId>& cashews);
 
     std::vector<PlayerId> remotePlayers() const;   // Clientes que ja se apresentaram.
     std::string playerName(PlayerId id) const override;   // O 0 e o proprio host.

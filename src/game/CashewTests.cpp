@@ -538,6 +538,29 @@ void testStolenCargo(TestRun& run) {
               cargo.carried() == 1 && cargo.stolen() == 0 && !field.isActive(kLooseCashewBase));
 }
 
+void testWorldRestore(TestRun& run) {
+    std::vector<CashewSpot> spots(4);
+    for (auto& spot : spots) spot.respawnDelay = 40.0f;
+    CashewField field(spots);
+    field.markCollected(1);
+    field.advance(15.0f);
+    field.markCollected(3);
+    field.spill(kLooseCashewBase, glm::vec3(0));
+    const std::vector<UnavailableCashew> saved = field.unavailable();
+    run.check("mundo salvo: guarda os cajus fixos que faltam e o tempo de cada um",
+              saved.size() == 2 && saved[0].id == 1 && std::abs(saved[0].secondsLeft - 25.0f) < 1e-3f && saved[1].id == 3 &&
+                  std::abs(saved[1].secondsLeft - 40.0f) < 1e-3f);
+
+    CashewField reopened(spots);
+    reopened.restoreUnavailable(saved);
+    reopened.restoreUnavailable({{kLooseCashewBase, 5.0f}, {200, 5.0f}});
+    run.check("mundo salvo: ao reabrir os mesmos cajus continuam colhidos",
+              !reopened.isActive(1) && !reopened.isActive(3) && reopened.isActive(0) && reopened.activeLoose().empty());
+    reopened.advance(26.0f);
+    run.check("mundo salvo: cada caju volta no tempo que faltava",
+              reopened.dueForRespawn() == std::vector<CashewId>{1} && reopened.markRespawned(1) && !reopened.markRespawned(3));
+}
+
 void testLocalAuthoritySpill(TestRun& run) {
     LocalAuthority authority;
     authority.request(dropOf(kMe, 2, glm::vec3(0, 50, 0)));
@@ -580,5 +603,6 @@ int runCashewSelfTest() {
     testLooseCashewField(run, world);
     testStolenCargo(run);
     testLocalAuthoritySpill(run);
+    testWorldRestore(run);
     return run.failures;
 }

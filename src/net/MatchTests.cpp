@@ -868,6 +868,25 @@ void testRobberyNeedsPerch(TestRun& t) {
             farRefused && countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
 }
 
+void testRestoredWorld(TestRun& t) {
+    Room room;
+    room.host.authority->restoreCollected({4, 7, 5000});
+    Client& guest = room.join({kWorld, "Ana", 1});
+    room.pump(20);
+    const auto synced = [&](CashewId id) {
+        return std::any_of(guest.log.begin(), guest.log.end(), [&](const GameEvent& e) {
+            return e.type == GameEventType::CashewCollected && e.cashew == id;
+        });
+    };
+    t.check("mundo salvo: quem entra recebe os cajus ja colhidos", ready(guest) && synced(4) && synced(7) && !synced(5000));
+    const PlayerId me = guest.authority ? guest.authority->localPlayer() : kNoPlayer;
+    if (guest.authority) guest.authority->request(eventOf(GameEventType::CashewCollected, me, 4));
+    room.host.authority->request(eventOf(GameEventType::CashewRespawned, 0, 7));
+    room.pump(20);
+    t.check("mundo salvo: caju colhido antes nao e colhido de novo, e volta quando o host decide",
+            countOf(room.host.log, GameEventType::CashewCollected, me) == 0 && countOf(room.host.log, GameEventType::CashewRespawned, 0) == 1);
+}
+
 void testRosterProtocol(TestRun& t) {
     const Bytes bytes = encodeRoster({{0, "Ana"}, {4, "Bruno Ávila"}});
     const auto back = decodeRoster(bytes);
@@ -1140,6 +1159,7 @@ int runMatchSelfTest() {
     testRobberyNeedsPerch(test);
     testDiveKnock(test);
     testRosterProtocol(test);
+    testRestoredWorld(test);
     testNamesOverNetwork(test);
     return test.failures;
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "save/WorldStore.h"
 #include "shared/CashewQuery.h"
 #include "shared/GameTypes.h"
 #include <array>
@@ -50,6 +51,9 @@ public:
     bool markRespawned(CashewId id);   // So aceita depois de vencido o tempo do caju.
     bool forceRespawn(CashewId id);    // Para quando outro computador ja decidiu que o caju voltou.
     std::vector<CashewId> dueForRespawn() const;
+    // Estado salvo do mundo: os cajus fixos que ainda nao voltaram e quanto falta para cada um.
+    std::vector<UnavailableCashew> unavailable() const;
+    void restoreUnavailable(const std::vector<UnavailableCashew>& cashews);   // Ids invalidos sao ignorados.
     bool spill(CashewId id, glm::vec3 from, PlayerId droppedBy = kNoPlayer);   // Comeca a queda de um caju derrubado.
     bool collectableBy(CashewId id, PlayerId player) const;   // Ativo e, se acabou de cair deste jogador, ja liberado.
 

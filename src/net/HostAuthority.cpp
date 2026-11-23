@@ -49,6 +49,11 @@ void HostAuthority::publishLocalPlayer(const PlayerPublicState& state) {
     hasLocal_ = true;
 }
 
+void HostAuthority::restoreCollected(const std::vector<CashewId>& cashews) {
+    for (CashewId id : cashews)
+        if (id < config_.cashewCount) collected_.insert(id);
+}
+
 std::vector<PlayerId> HostAuthority::remotePlayers() const {
     std::vector<PlayerId> ids;
     for (PlayerId id = 1; id < kMaxPlayers; id++)
