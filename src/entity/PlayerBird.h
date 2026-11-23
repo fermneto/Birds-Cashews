@@ -31,6 +31,7 @@ public:
     const BirdAnimation& animation() const { return animation_; }
     bool nearBoundary() const { return nearBoundary_; }
     float takeSolidImpact();   // Maior impacto em copa ou tronco desde a ultima chamada, em m/s.
+    float takeFlap();          // Forca (0 a 1) da batida de asa mais forte desde a ultima chamada; 0 sem batida.
 
 private:
     void enforceBoundary(float dt);
@@ -44,4 +45,5 @@ private:
     float flapTimer_ = 0;
     bool nearBoundary_ = false;
     float solidImpact_ = 0;
+    float flapSound_ = 0, lastStroke_ = 0;
 };

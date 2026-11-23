@@ -8,7 +8,10 @@
 #include <vector>
 
 enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denied, Record, NestMove, Landed, TakeOff,
-                     Spill, Steal, Alarm, Knock, Count };
+                     Spill, Steal, Alarm, Knock,
+                     Flap,                                              // Sopro de uma batida de asa.
+                     ChirpTweet, ChirpTrill, ChirpWhistle, ChirpCaw,     // Cantos dos NPCs, do menor ao maior.
+                     Count };
 
 UiSound soundFor(GameplayFeedback feedback);
 
@@ -24,7 +27,7 @@ public:
     SoundManager& operator=(const SoundManager&) = delete;
 
     bool hasDevice() const { return device_ != 0; }
-    void play(UiSound sound);
+    void play(UiSound sound, float volume = 1.0f);
     void play(GameplayFeedback feedback) { play(soundFor(feedback)); }
     // Volume desejado de cada camada do ambiente. A mistura chega nele aos poucos, sem estalos.
     void setAmbience(const AmbientMix& mix);
@@ -37,6 +40,7 @@ private:
     struct Voice {
         const std::vector<int16_t>* samples = nullptr;
         size_t position = 0;
+        float gain = 1;
     };
     static constexpr int kVoices = 8;
 

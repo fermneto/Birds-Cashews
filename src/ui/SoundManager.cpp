@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <random>
 
 namespace {
 constexpr int kSampleRate = 44100;
@@ -74,9 +75,40 @@ std::vector<Tone> tonesFor(UiSound sound) {
                                      {0.36f, 0.18f, 700, 1100, 0.55f, Wave::Square}};
         // Mergulho certeiro: pancada grave seguida de um brilho.
         case UiSound::Knock: return {{0, 0.12f, 150, 90, 0.75f, Wave::Square}, {0.1f, 0.16f, 1200, 1600, 0.35f, Wave::Sine}};
+        // Piado curto que sobe, de passaro pequeno.
+        case UiSound::ChirpTweet: return {{0, 0.06f, 3200, 4200, 0.35f, Wave::Sine}, {0.09f, 0.05f, 3600, 4400, 0.3f, Wave::Sine}};
+        // Trinado: notas rapidas alternadas.
+        case UiSound::ChirpTrill: {
+            std::vector<Tone> trill;
+            for (int i = 0; i < 7; i++) trill.push_back({i * 0.045f, 0.035f, i % 2 ? 2900.0f : 3400.0f, i % 2 ? 3000.0f : 3500.0f, 0.3f, Wave::Sine});
+            return trill;
+        }
+        // Assobio de duas notas, de passaro medio: "fiu-fiu".
+        case UiSound::ChirpWhistle: return {{0, 0.16f, 1500, 2300, 0.35f, Wave::Sine}, {0.24f, 0.2f, 1700, 1250, 0.35f, Wave::Sine}};
+        // Grasnado grave e aspero, de passaro grande.
+        case UiSound::ChirpCaw: return {{0, 0.22f, 520, 430, 0.3f, Wave::Square}, {0, 0.22f, 780, 640, 0.15f, Wave::Triangle},
+                                        {0.3f, 0.18f, 500, 420, 0.25f, Wave::Square}};
+        case UiSound::Flap:
         case UiSound::Count: break;
     }
     return {};
+}
+
+// Batida de asa: sopro de ruido grave que cresce rapido e se desfaz, sem nota definida.
+std::vector<float> flapWhoosh() {
+    constexpr float kSeconds = 0.32f;
+    std::mt19937 random(0xF1A9u);
+    std::uniform_real_distribution<float> white(-1.0f, 1.0f);
+    std::vector<float> mix(static_cast<size_t>(kSeconds * kSampleRate));
+    float low = 0, lower = 0;
+    for (size_t i = 0; i < mix.size(); i++) {
+        const float t = static_cast<float>(i) / kSampleRate;
+        low += (white(random) - low) * (0.10f + 0.12f * (1.0f - t / kSeconds));   // Fica mais grave no fim.
+        lower += (low - lower) * 0.3f;
+        const float swell = std::min(t / 0.07f, 1.0f) * std::exp(-7.0f * std::max(0.0f, t - 0.07f));
+        mix[i] = lower * swell * 5.0f;
+    }
+    return mix;
 }
 }
 
@@ -101,7 +133,7 @@ UiSound soundFor(GameplayFeedback feedback) {
 int SoundManager::sampleRate() { return kSampleRate; }
 
 std::vector<int16_t> SoundManager::synthesize(UiSound sound) {
-    std::vector<float> mix;
+    std::vector<float> mix = sound == UiSound::Flap ? flapWhoosh() : std::vector<float>{};
     for (const Tone& tone : tonesFor(sound)) addTone(mix, tone);
     std::vector<int16_t> samples(mix.size());
     std::transform(mix.begin(), mix.end(), samples.begin(), [](float value) {
@@ -144,8 +176,8 @@ SoundManager::~SoundManager() {
     if (subsystemOpen_) SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
-void SoundManager::play(UiSound sound) {
-    if (device_ == 0) return;
+void SoundManager::play(UiSound sound, float volume) {
+    if (device_ == 0 || volume <= 0.0f) return;
     const std::vector<int16_t>& samples = bank_[static_cast<size_t>(sound)];
     SDL_LockAudioDevice(device_);
     // Com todas as vozes ocupadas, substitui a que esta mais perto do fim.
@@ -156,6 +188,7 @@ void SoundManager::play(UiSound sound) {
     }
     chosen->samples = &samples;
     chosen->position = 0;
+    chosen->gain = std::min(volume, 1.0f);
     SDL_UnlockAudioDevice(device_);
 }
 
@@ -201,7 +234,7 @@ void SoundManager::mix(int16_t* output, int count) {
         if (!voice.samples) continue;
         const size_t left = voice.samples->size() - voice.position;
         const int amount = static_cast<int>(std::min<size_t>(left, static_cast<size_t>(samples)));
-        for (int i = 0; i < amount; i++) mixBuffer_[i] += (*voice.samples)[voice.position + i];
+        for (int i = 0; i < amount; i++) mixBuffer_[i] += static_cast<int>((*voice.samples)[voice.position + i] * voice.gain);
         voice.position += amount;
         if (voice.position >= voice.samples->size()) voice = Voice{};
     }

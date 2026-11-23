@@ -13,9 +13,17 @@ constexpr float kBeakOpenRate = 12.0f, kBeakCloseRate = 5.0f;
 
 void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, yaw, FlightModel::kCruiseSpeed); }
 
+// Com o corpo, cada descida dos punhos que passa do limite conta uma batida; no teclado, cada Espaco.
 void PlayerBird::applyControls(const FlightControls& controls) {
     controls_ = controls;
-    if (controls.bodyControlled) return;
+    if (controls.bodyControlled) {
+        constexpr float kStrokeStart = 0.3f;
+        if (controls.stroke > kStrokeStart && lastStroke_ <= kStrokeStart) flapSound_ = std::max(flapSound_, std::min(controls.stroke, 1.0f));
+        lastStroke_ = controls.stroke;
+        return;
+    }
+    lastStroke_ = 0;
+    if (controls.flaps > 0) flapSound_ = std::max(flapSound_, std::clamp(controls.flapStrength, 0.3f, 1.0f));
     for (uint32_t i = 0; i < controls.flaps; i++) {
         flight_.flap(controls.flapStrength);
         flapTimer_ = kFlapDuration;
@@ -45,6 +53,12 @@ void PlayerBird::step(const World& world, float dt) {
     if (contact.surface != Surface::Solid) return;
     animation_.shake = std::max(animation_.shake, std::min(impact / 30.0f, 1.0f));
     solidImpact_ = std::max(solidImpact_, impact);
+}
+
+float PlayerBird::takeFlap() {
+    const float flap = flapSound_;
+    flapSound_ = 0;
+    return flap;
 }
 
 float PlayerBird::takeSolidImpact() {
