@@ -184,7 +184,7 @@ NpcPublicState readNpc(Reader& in) {
 
 std::optional<MessageHeader> peekHeader(const Bytes& bytes) {
     if (bytes.size() < 2 || bytes[1] < static_cast<uint8_t>(MessageType::Hello) ||
-        bytes[1] > static_cast<uint8_t>(MessageType::Voice)) return std::nullopt;
+        bytes[1] > static_cast<uint8_t>(MessageType::Roster)) return std::nullopt;
     return MessageHeader{bytes[0], static_cast<MessageType>(bytes[1])};
 }
 
@@ -346,6 +346,38 @@ std::optional<VoiceFrame> decodeVoice(const Bytes& bytes) {
     return frame;
 }
 
+Bytes encodeRoster(const RosterMessage& roster) {
+    Writer out(MessageType::Roster);
+    const size_t count = std::min(roster.size(), static_cast<size_t>(kMaxPlayers));
+    out.u8(static_cast<uint8_t>(count));
+    for (size_t i = 0; i < count; i++) {
+        const std::string name = roster[i].name.substr(0, kMaxNameLength);
+        out.u8(roster[i].player);
+        out.u8(static_cast<uint8_t>(name.size()));
+        out.raw(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+    }
+    return out.take();
+}
+
+std::optional<RosterMessage> decodeRoster(const Bytes& bytes) {
+    if (!expect(bytes, MessageType::Roster)) return std::nullopt;
+    Reader in(bytes, 2);
+    const uint8_t count = in.u8();
+    if (count > kMaxPlayers) return std::nullopt;
+    RosterMessage roster;
+    for (uint8_t i = 0; i < count; i++) {
+        RosterEntry entry;
+        entry.player = in.u8();
+        const uint8_t length = in.u8();
+        if (entry.player >= kMaxPlayers || length > kMaxNameLength) return std::nullopt;
+        entry.name = in.text(length);
+        roster.push_back(std::move(entry));
+    }
+    if (!in.atEnd()) return std::nullopt;
+    return roster;
+}
+
+static_assert(2 + 1 + kMaxPlayers * (2 + kMaxNameLength) <= kMaxPayload, "A lista de nomes cabe em uma mensagem");
 static_assert(2 + 4 + 1 + kMaxPlayers * kPlayerSize + 1 + kMaxNpcs * kNpcSize <= kMaxPayload,
               "O snapshot cheio precisa caber em um datagrama");
 static_assert(2 + 1 + kMaxEventsPerMessage * kEventSize <= kMaxPayload);

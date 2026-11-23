@@ -16,7 +16,8 @@ namespace net {
 // versao" falha se o formato mudar sem a versao mudar.
 // Versao 2: o NPC ganhou o byte de comportamento (papel e pouso).
 // Versao 3: o jogador publica a Defesa e as moedas roubaveis do ninho, e existe o evento CashewSpilled.
-inline constexpr uint8_t kProtocolVersion = 3;
+// Versao 4: o host envia a lista de nomes dos jogadores (Roster).
+inline constexpr uint8_t kProtocolVersion = 4;
 inline constexpr size_t kMaxNameLength = 32;
 inline constexpr size_t kMaxNpcs = 24;
 inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.
@@ -31,6 +32,7 @@ enum class MessageType : uint8_t {
     PlayerState,         // Cliente -> host, nao confiavel: estado do proprio passaro.
     Snapshot,            // Host -> clientes, nao confiavel: todos os jogadores e os NPCs.
     Voice,               // Ida e volta pelo host, nao confiavel: um quadro de voz.
+    Roster,              // Host -> clientes, confiavel: o nome de cada jogador na sala.
 };
 
 enum class RefuseReason : uint8_t { Full = 1, Version, WorldSeed };
@@ -63,6 +65,13 @@ struct StateMessage {
     PlayerPublicState state;
 };
 
+// Nome de cada jogador na sala, para aparecer acima do passaro dele.
+struct RosterEntry {
+    PlayerId player = kNoPlayer;
+    std::string name;
+};
+using RosterMessage = std::vector<RosterEntry>;
+
 struct SnapshotMessage {
     float time = 0;   // Relogio do host, em segundos.
     std::vector<PlayerPublicState> players;
@@ -83,6 +92,7 @@ std::vector<uint8_t> encodeEvents(MessageType type, const std::vector<GameEvent>
 std::vector<uint8_t> encodeState(const StateMessage& message);
 std::vector<uint8_t> encodeSnapshot(const SnapshotMessage& message);
 std::vector<uint8_t> encodeVoice(const VoiceFrame& frame);
+std::vector<uint8_t> encodeRoster(const RosterMessage& roster);   // Ate kMaxPlayers nomes, cortados em kMaxNameLength.
 
 // Cada decodificador confere versao, tipo, tamanho exato e faixas validas, e falha em qualquer desvio.
 // Hello, Welcome e Refuse aceitam qualquer versao, para que quem recebe possa comparar.
@@ -93,6 +103,7 @@ std::optional<std::vector<GameEvent>> decodeEvents(MessageType type, const std::
 std::optional<StateMessage> decodeState(const std::vector<uint8_t>& bytes);
 std::optional<SnapshotMessage> decodeSnapshot(const std::vector<uint8_t>& bytes);
 std::optional<VoiceFrame> decodeVoice(const std::vector<uint8_t>& bytes);
+std::optional<RosterMessage> decodeRoster(const std::vector<uint8_t>& bytes);
 
 // Divide uma lista longa em mensagens que cabem no limite do UdpSession.
 std::vector<std::vector<uint8_t>> encodeEventBatches(MessageType type, const std::vector<GameEvent>& events);

@@ -1,6 +1,7 @@
 #include "core/Game.h"
 #include "core/BirdShots.h"
 #include "game/CashewModel.h"
+#include "game/NameTags.h"
 #include "game/NestModel.h"
 #include "shared/BirdFactory.h"
 #include "input/BodyInput.h"
@@ -9,6 +10,7 @@
 #include "ui/CalibratedBodyInput.h"
 #include "ui/FakeNetSession.h"
 #include "ui/UiShowcase.h"
+#include "ui/UiAssets.h"
 #include "vision/Clock.h"
 #include "vision/VisionOverlay.h"
 #include <opencv2/imgcodecs.hpp>
@@ -37,6 +39,7 @@ public:
         list.push_back(rival_);
         return list;
     }
+    std::string playerName(PlayerId id) const override { return id == rival_.id ? "Rival de teste" : ""; }
 
 private:
     PlayerPublicState rival_;
@@ -287,11 +290,39 @@ void Game::prepareBirds() {
     renderer_.setBirdInstances(std::move(birds));
 }
 
+// Nome em uma pilula escura e translucida, legivel sobre o ceu e sobre as copas.
+const cv::Mat& Game::nameLabel(const std::string& name) {
+    const auto found = labelImages_.find(name);
+    if (found != labelImages_.end()) return found->second;
+    if (!labelText_) labelText_ = std::make_unique<TextPainter>((assetsDirectory() / "font.ttf").string());
+    constexpr int kSize = 18, kPadX = 12, kHeight = 30;
+    const int width = std::min(labelText_->width(name, kSize), 260) + 2 * kPadX;
+    Canvas canvas(width, kHeight);
+    canvas.fill({0, 0, width, kHeight}, cv::Scalar(26, 32, 18), 0.62f, kHeight / 2);
+    TextStyle style;
+    style.size = kSize;
+    style.align = TextAlign::Center;
+    style.outline = false;
+    labelText_->drawFit(canvas, name, {width / 2, 21}, width - 2 * kPadX, style);
+    return labelImages_.emplace(name, canvas.pixels().clone()).first->second;
+}
+
+// O nome de cada jogador proximo aparece acima do passaro dele. Sozinho a lista so tem o proprio jogador.
+void Game::prepareNameTags(const Camera3D& camera) {
+    std::vector<WorldLabel> labels;
+    GameAuthority& authority = session_->authority();
+    const auto tags = visibleNameTags(camera.position, authority.players(), session_->localPlayer(),
+                                      [&](PlayerId id) { return authority.playerName(id); });
+    for (const NameTag& tag : tags) labels.push_back({tag.name, nameLabel(tag.name), tag.anchor, tag.opacity});
+    renderer_.setLabels(std::move(labels));
+}
+
 void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
     prepareBirds();
+    prepareNameTags(camera);
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -301,6 +332,7 @@ cv::Mat Game::captureFrame(float time) {
     prepareCashews(camera);
     prepareNest(camera);
     prepareBirds();
+    prepareNameTags(camera);
     return renderer_.capture(camera, player_.animation(), time);
 }
 
@@ -541,6 +573,12 @@ void Game::captureRivalNestShots(const std::string& outputDir) {
     const glm::vec3 heading(std::sin(nest->site.yaw), 0, -std::cos(nest->site.yaw));
     aimAt(nest->site.perch + heading * 150.0f + glm::vec3(0, 40, 0), nest->site.perch);
     cv::imwrite(outputDir + "/17_ninho_rival_perto.png", captureFrame(3.0f));
+
+    // O nome do rival aparece acima dele so quando esta perto.
+    aimAt(rival.position + glm::vec3(0, 6, 60), rival.position + glm::vec3(0, 5, 0));
+    cv::imwrite(outputDir + "/18_nome_do_jogador.png", captureFrame(3.0f));
+    aimAt(rival.position + glm::vec3(0, 6, 200), rival.position);
+    cv::imwrite(outputDir + "/19_nome_longe_some.png", captureFrame(3.0f));
 }
 
 // Simula um mergulho real para conferir o campo de visao em alta velocidade.

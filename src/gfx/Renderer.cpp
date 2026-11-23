@@ -173,6 +173,25 @@ uniform sampler2D uImage;
 out vec4 color;
 void main() { color = texture(uImage, vUv); })";
 
+// Etiqueta presa ao mundo: o retangulo ja vem em coordenadas da tela, com a profundidade do ponto ancorado,
+// para as copas e o relevo esconderem o nome de quem esta atras deles.
+const char* const kLabelVertex = R"(#version 330 core
+uniform vec4 uRect;
+uniform float uDepth;
+out vec2 vUv;
+void main() {
+    vec2 corner = vec2(gl_VertexID & 1, (gl_VertexID >> 1) & 1);
+    vUv = vec2(corner.x, 1.0 - corner.y);
+    gl_Position = vec4(uRect.xy + corner * uRect.zw, uDepth, 1.0);
+})";
+
+const char* const kLabelFragment = R"(#version 330 core
+in vec2 vUv;
+uniform sampler2D uImage;
+uniform float uOpacity;
+out vec4 color;
+void main() { color = texture(uImage, vUv) * uOpacity; })";
+
 void configureTexture(GLuint texture) {
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -193,6 +212,7 @@ Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, g
     : worldShader_(kWorldVertex, kWorldFragment), skyShader_(kSkyVertex, kSkyFragment),
       waterShader_(kWorldVertex, kWaterFragment), previewShader_(kPreviewVertex, kPreviewFragment),
       overlayShader_(kPreviewVertex, kOverlayFragment), windShader_(kWindVertex, kWindFragment),
+      labelShader_(kLabelVertex, kLabelFragment),
       worldMesh_(worldMesh.vertices()), cloudMesh_(cloudMesh.vertices()), waterMesh_(waterQuad()),
       spawnPoint_(spawnPoint) {
     for (const auto& bird : kIslandBirds) cacheBird(bird.seed);
@@ -208,6 +228,7 @@ Renderer::~Renderer() {
     glDeleteVertexArrays(1, &emptyVao_);
     glDeleteTextures(1, &previewTexture_);
     glDeleteTextures(1, &overlayTexture_);
+    for (auto& [key, label] : labelTextures_) glDeleteTextures(1, &label.texture);
     if (targetFbo_) {
         glDeleteFramebuffers(1, &targetFbo_);
         glDeleteTextures(1, &targetColor_);
@@ -487,6 +508,60 @@ void Renderer::drawOverlay() {
     glDisable(GL_BLEND);
 }
 
+// Texturas de nomes que sairam da tela sao apagadas, para a memoria nao crescer com quem entra e sai.
+void Renderer::setLabels(std::vector<WorldLabel> labels) {
+    for (auto it = labelTextures_.begin(); it != labelTextures_.end();) {
+        const bool used = std::any_of(labels.begin(), labels.end(), [&](const WorldLabel& l) { return l.key == it->first; });
+        if (used) {
+            ++it;
+            continue;
+        }
+        glDeleteTextures(1, &it->second.texture);
+        it = labelTextures_.erase(it);
+    }
+    for (const WorldLabel& label : labels) {
+        if (labelTextures_.count(label.key) || label.image.empty()) continue;
+        CV_Assert(label.image.type() == CV_8UC4 && label.image.isContinuous());
+        LabelTexture texture{0, label.image.cols, label.image.rows};
+        glGenTextures(1, &texture.texture);
+        configureTexture(texture.texture);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture.width, texture.height, 0, GL_BGRA, GL_UNSIGNED_BYTE, label.image.data);
+        labelTextures_[label.key] = texture;
+    }
+    labels_ = std::move(labels);
+}
+
+void Renderer::drawLabels(const Camera3D& camera) {
+    if (labels_.empty()) return;
+    const glm::mat4 viewProjection = camera.viewProjection();
+    const float scale = std::min(width_ / kLogicalWidth, height_ / kLogicalHeight);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    labelShader_.use();
+    labelShader_.set("uImage", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(emptyVao_);
+    for (const WorldLabel& label : labels_) {
+        const auto found = labelTextures_.find(label.key);
+        const glm::vec4 clip = viewProjection * glm::vec4(label.anchor, 1.0f);
+        if (found == labelTextures_.end() || clip.w <= 0.01f || label.opacity <= 0.0f) continue;
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        if (ndc.z > 1.0f) continue;
+        const float w = 2.0f * found->second.width * scale / width_, h = 2.0f * found->second.height * scale / height_;
+        labelShader_.set("uRect", glm::vec4(ndc.x - w * 0.5f, ndc.y, w, h));
+        labelShader_.set("uDepth", ndc.z);
+        labelShader_.set("uOpacity", label.opacity);
+        glBindTexture(GL_TEXTURE_2D, found->second.texture);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+}
+
 void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, float time) {
     glViewport(0, 0, width_, height_);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -498,6 +573,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawRivalNests();
     drawWater(camera, time);
     drawWind(animation);
+    drawLabels(camera);
     if (viewModelVisible_) drawViewModel(camera, animation);
     drawPreview();
     drawOverlay();

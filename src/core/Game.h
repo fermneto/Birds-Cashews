@@ -9,9 +9,11 @@
 #include "voice/VoiceChat.h"
 #include "ui/DemoGameplaySource.h"
 #include "ui/GameUi.h"
+#include "ui/TextPainter.h"
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 struct GameOptions {
     bool keyboard = false;
@@ -49,6 +51,8 @@ private:
     void syncMatch(float frameSeconds);
     void rebuildSession();
     void prepareBirds();
+    void prepareNameTags(const Camera3D& camera);
+    const cv::Mat& nameLabel(const std::string& name);
     void refreshPreview();
     Camera3D buildCamera() const;
     void prepareCashews(const Camera3D& camera);
@@ -80,6 +84,8 @@ private:
     VoiceLink* voiceLink_ = nullptr;
     PoseSource* poseSource_ = nullptr;
     cv::Mat previewBase_;
+    std::unique_ptr<TextPainter> labelText_;                  // Criado no primeiro nome mostrado.
+    std::unordered_map<std::string, cv::Mat> labelImages_;    // Uma imagem por nome, feita uma vez.
     float accumulator_ = 0, time_ = 0, telemetryTimer_ = 0;
     int width_ = 1280, height_ = 720;
     int shownNestRevision_ = -1, shownRivalRevision_ = -1;
