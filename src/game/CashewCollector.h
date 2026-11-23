@@ -13,9 +13,13 @@ public:
     void update(float dt, glm::vec3 position);
     float beakTarget(glm::vec3 position) const;   // 1 com caju coletavel ao alcance do bico, senao 0.
     void setCollecting(bool collecting) { collecting_ = collecting; }   // Pousado no ninho, o passaro nao coleta.
-    int unload(int amount);   // Tira cajus da carga e retorna quantos sairam de fato.
+    // Tira cajus da carga e retorna quantos sairam de fato. Os roubados saem por ultimo, e stolen
+    // recebe quantos deles sairam.
+    int unload(int amount, int* stolen = nullptr);
 
     int carried() const { return carried_; }
+    int stolen() const { return stolen_; }   // Parte da carga que veio de ninhos rivais.
+    int freeSpace() const;                    // Espaco livre, descontando os pedidos em andamento.
     CargoStats& stats() { return stats_; }
     const CargoStats& stats() const { return stats_; }
 
@@ -31,7 +35,7 @@ private:
     GameAuthority& authority_;
     PlayerId localPlayer_;
     CargoStats stats_;
-    int carried_ = 0;
+    int carried_ = 0, stolen_ = 0;
     bool collecting_ = true;
     PendingRequests pendingCollect_, pendingRespawn_;
 };

@@ -15,7 +15,8 @@ namespace net {
 // sao recusadas com uma mensagem clara, em vez de conectar pela metade. O teste "formato fixo da
 // versao" falha se o formato mudar sem a versao mudar.
 // Versao 2: o NPC ganhou o byte de comportamento (papel e pouso).
-inline constexpr uint8_t kProtocolVersion = 2;
+// Versao 3: o jogador publica a Defesa e as moedas roubaveis do ninho, e existe o evento CashewSpilled.
+inline constexpr uint8_t kProtocolVersion = 3;
 inline constexpr size_t kMaxNameLength = 32;
 inline constexpr size_t kMaxNpcs = 24;
 inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.

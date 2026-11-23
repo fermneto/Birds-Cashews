@@ -15,6 +15,9 @@ constexpr float kTakeoffFlap = 1.4f;        // Forca da batida que tira o passar
 constexpr float kPerchPitch = -0.42f;       // Pousado, o passaro olha para dentro do ninho.
 constexpr float kRecordNoticeSeconds = 6.0f;
 constexpr float kCargoLostNoticeSeconds = 3.0f;
+constexpr float kTreeHitImpact = 6.0f;      // m/s contra a copa ou o tronco para soltar um caju.
+constexpr float kTreeHitCooldown = 1.5f;    // Uma batida longa raspando na copa so derruba um caju.
+constexpr float kRobAnswerSeconds = 3.0f;   // Sem resposta da autoridade, tenta de novo.
 constexpr float kFullTurn = 6.2831853f;
 
 std::unique_ptr<GameAuthority> orLocal(std::unique_ptr<GameAuthority> authority) {
@@ -36,7 +39,7 @@ GameplaySession::GameplaySession(const World& world, uint32_t seed, CashewField&
     : world_(world), bird_(bird), localPlayer_(localPlayer), authority_(orLocal(std::move(authority))),
       collector_(cashews, *authority_, localPlayer), nest_(chooseNestSite(world, seed, localPlayer)),
       rivals_(world, seed),
-      store_(saveDir), records_(saveDir) {
+      store_(saveDir), records_(saveDir), perchSite_(nest_) {
     refreshView();
 }
 
@@ -84,21 +87,41 @@ void GameplaySession::applyControls(const FlightControls& controls) {
     bird_.applyControls(FlightControls{});
     if (settle_ >= kLandingSeconds) {
         if (controls.flaps > 0) takeOff();
-        else handleMenuPress(controls.menuPressed);
+        else if (perchRival_ == kNoPlayer) handleMenuPress(controls.menuPressed);
     }
     refreshView();
 }
 
 void GameplaySession::stepBird(float dt) {
-    if (!perched_) bird_.step(world_, dt);
+    if (perched_) return;
+    bird_.step(world_, dt);
+    checkTreeHit();
+}
+
+// Bater com forca numa copa ou tronco solta um caju, que cai no mundo. A fisica ja reduziu a velocidade.
+void GameplaySession::checkTreeHit() {
+    const float impact = bird_.takeSolidImpact();
+    if (impact < kTreeHitImpact || treeCooldown_ > 0 || collector_.carried() <= 0) return;
+    treeCooldown_ = kTreeHitCooldown;
+    GameEvent event;
+    event.type = GameEventType::CashewDropped;
+    event.actor = localPlayer_;
+    event.target = localPlayer_;
+    event.value = 1;
+    event.position = bird_.flight().position();
+    authority_->request(event);
 }
 
 // Todo evento confirmado passa por aqui, porque pollEvents entrega cada um uma unica vez.
 void GameplaySession::update(float frameSeconds) {
+    players_ = authority_->players();
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
-    rivals_.update(authority_->players(), localPlayer_);
+    rivals_.update(players_, localPlayer_);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
     cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);
+    knockedNotice_ = std::max(0.0f, knockedNotice_ - frameSeconds);
+    treeCooldown_ = std::max(0.0f, treeCooldown_ - frameSeconds);
+    alarm_ = std::max(0.0f, alarm_ - frameSeconds);
     if (perched_) holdPerch(frameSeconds);
     else watchForLanding();
 
@@ -112,12 +135,54 @@ void GameplaySession::update(float frameSeconds) {
 void GameplaySession::handleEvent(const GameEvent& event) {
     const int carriedBefore = collector_.carried();
     collector_.handle(event);
-    if (collector_.carried() > carriedBefore) feedback_.push_back(GameplayFeedback::CashewCollected);
-    if (event.type == GameEventType::CashewDropped && collector_.carried() < carriedBefore) {
+    if (event.type == GameEventType::CashewCollected && collector_.carried() > carriedBefore)
+        feedback_.push_back(GameplayFeedback::CashewCollected);
+    if (event.type == GameEventType::CashewDropped) handleCargoDrop(event, carriedBefore);
+    if (event.type == GameEventType::NestRobbed) {
+        if (event.actor == localPlayer_ && collector_.carried() > carriedBefore) {
+            stolenThisVisit_++;
+            feedback_.push_back(GameplayFeedback::CashewStolen);
+        }
+        handleRobbery(event);
+    }
+    if (event.type == GameEventType::CashewDelivered && event.actor == localPlayer_) confirmDelivery(event);
+}
+
+// A carga cai por tres motivos: cacador (NPC), mergulho de outro jogador ou batida em arvore.
+void GameplaySession::handleCargoDrop(const GameEvent& event, int carriedBefore) {
+    if (event.target == localPlayer_ && collector_.carried() < carriedBefore) {
+        lossCause_ = event.actor == kNoPlayer      ? CargoLossCause::Hunter
+                     : event.actor == localPlayer_ ? CargoLossCause::Tree
+                                                   : CargoLossCause::Player;
         feedback_.push_back(GameplayFeedback::CargoLost);
         cargoLostNotice_ = kCargoLostNoticeSeconds;
     }
-    if (event.type == GameEventType::CashewDelivered && event.actor == localPlayer_) confirmDelivery(event);
+    if (event.actor == localPlayer_ && event.target != localPlayer_ && event.target < kMaxPlayers) {
+        feedback_.push_back(GameplayFeedback::RivalKnocked);
+        knockedNotice_ = kCargoLostNoticeSeconds;
+    }
+}
+
+void GameplaySession::handleRobbery(const GameEvent& event) {
+    if (event.actor == localPlayer_) robPending_ = false;
+    if (event.target == localPlayer_ && event.actor != localPlayer_) sufferRobbery(event);
+}
+
+// O perfil e local: cada computador tira a moeda do proprio dono. O Cofre guarda parte do saldo.
+void GameplaySession::sufferRobbery(const GameEvent& event) {
+    if (!profile_) return;
+    if (robbableCoins(profile_->coins(), profile_->level(NestUpgrade::Vault)) > 0 && profile_->spendCoins(1)) saveNow();
+    const float seconds = alarmSeconds(profile_->level(NestUpgrade::Alarm));
+    if (seconds <= 0) return;
+    alarm_ = seconds;
+    thief_ = event.actor;
+    feedback_.push_back(GameplayFeedback::NestAlarm);
+}
+
+const PlayerPublicState* GameplaySession::findPlayer(PlayerId id) const {
+    for (const PlayerPublicState& player : players_)
+        if (player.id == id) return &player;
+    return nullptr;
 }
 
 // No ninho o jogador aparece sem carga, porque os cacadores nao atacam quem esta pousado.
@@ -133,7 +198,12 @@ void GameplaySession::publishLocalPlayer() {
     state.mode = perched_ ? FlightMode::Glide : flightMode_;
     state.carried = perched_ ? 0 : static_cast<uint8_t>(std::min(collector_.carried(), 255));
     state.nestLevel = static_cast<uint8_t>(nestSizeLevel());
-    if (profile_) state.birdSeed = profile_->birdSeed();
+    if (profile_) {
+        state.birdSeed = profile_->birdSeed();
+        state.nestDefense = static_cast<uint8_t>(profile_->level(NestUpgrade::Defense));
+        const int stock = robbableCoins(profile_->coins(), profile_->level(NestUpgrade::Vault));
+        state.nestStock = static_cast<uint8_t>(std::min(stock, 255));
+    }
     authority_->publishLocalPlayer(state);
 }
 
@@ -153,11 +223,13 @@ void GameplaySession::requestDelivery() {
 void GameplaySession::confirmDelivery(const GameEvent& event) {
     if (!deliveryPending_) return;
     deliveryPending_ = false;
-    const int delivered = collector_.unload(event.value);
+    int stolen = 0;
+    const int delivered = collector_.unload(event.value, &stolen);
     if (delivered <= 0 || !profile_) return;
 
+    // Roubados e bonus viram moeda, mas so os cajus colhidos somam na pontuacao.
     const int bonus = sizeCoinBonus(delivered, profile_->level(NestUpgrade::Size));
-    profile_->deliverCashews(delivered + bonus, bonus);
+    profile_->deliverCashews(delivered + bonus, bonus + stolen);
     feedback_.push_back(GameplayFeedback::CashewDelivered);
 
     // O primeiro total de um computador sem record nao ultrapassa ninguem.
@@ -169,26 +241,35 @@ void GameplaySession::confirmDelivery(const GameEvent& event) {
     saveNow();
 }
 
-// Depois de decolar, o pouso so volta a valer quando o passaro se afasta do ninho.
+// Depois de decolar, o pouso so volta a valer quando o passaro se afasta do ninho de onde saiu.
+// Pousa no proprio ninho e tambem nos ninhos dos rivais, onde rouba.
 void GameplaySession::watchForLanding() {
-    const float distance = glm::length(nest_.perch - bird_.flight().position());
+    const glm::vec3 position = bird_.flight().position();
     if (!landingArmed_) {
-        landingArmed_ = distance > kRearmRadius;
+        landingArmed_ = glm::length(perchSite_.perch - position) > kRearmRadius;
         return;
     }
-    if (profile_ && distance <= kLandingRadius) land();
+    if (!profile_) return;
+    if (glm::length(nest_.perch - position) <= kLandingRadius) return land(nest_, kNoPlayer);
+    for (const RivalNest& rival : rivals_.nests())
+        if (glm::length(rival.site.perch - position) <= kLandingRadius) return land(rival.site, rival.owner);
 }
 
-void GameplaySession::land() {
+void GameplaySession::land(const NestSite& site, PlayerId owner) {
     FlightModel& flight = bird_.flight();
     perched_ = true;
+    perchSite_ = site;
+    perchRival_ = owner;
+    robTimer_ = robWait_ = 0;
+    robPending_ = false;
+    stolenThisVisit_ = 0;
     settle_ = 0;
     landingFrom_ = flight.position();
     landingYaw_ = flight.yaw();
     landingPitch_ = flight.pitch();
     landingRoll_ = flight.roll();
     bird_.applyControls(FlightControls{});
-    menu_.open();
+    if (owner == kNoPlayer) menu_.open();
     feedback_.push_back(GameplayFeedback::NestLanded);
 }
 
@@ -197,10 +278,42 @@ void GameplaySession::holdPerch(float dt) {
     settle_ = std::min(settle_ + dt, kLandingSeconds);
     const float t = glm::smoothstep(0.0f, kLandingSeconds, settle_);
     FlightModel& flight = bird_.flight();
-    flight.place(glm::mix(landingFrom_, nest_.perch, t),
-                 landingYaw_ + std::remainder(nest_.yaw - landingYaw_, kFullTurn) * t, 0.0f);
+    flight.place(glm::mix(landingFrom_, perchSite_.perch, t),
+                 landingYaw_ + std::remainder(perchSite_.yaw - landingYaw_, kFullTurn) * t, 0.0f);
     flight.setAttitude(glm::mix(landingPitch_, kPerchPitch, t), landingRoll_ * (1.0f - t));
-    requestDelivery();
+    if (perchRival_ == kNoPlayer) requestDelivery();
+    else robTick(dt);
+}
+
+// Cada volta completa da barra pede 1 caju a autoridade. A Defesa do dono deixa a volta mais longa.
+void GameplaySession::robTick(float dt) {
+    if (!rivals_.find(perchRival_)) {
+        takeOff();   // O dono saiu da sala e o ninho sumiu.
+        return;
+    }
+    if (settle_ < kLandingSeconds) return;
+    if (robPending_) {
+        robWait_ += dt;
+        if (robWait_ >= kRobAnswerSeconds) robPending_ = false;
+        return;
+    }
+    const PlayerPublicState* owner = findPlayer(perchRival_);
+    if (!owner || owner->nestStock == 0 || collector_.freeSpace() <= 0) {
+        robTimer_ = 0;
+        return;
+    }
+    robTimer_ += dt;
+    if (robTimer_ < robSeconds(owner->nestDefense)) return;
+    robTimer_ = 0;
+    robWait_ = 0;
+    robPending_ = true;
+    GameEvent event;
+    event.type = GameEventType::NestRobbed;
+    event.actor = localPlayer_;
+    event.target = perchRival_;
+    event.value = 1;
+    event.position = perchSite_.perch;
+    authority_->request(event);
 }
 
 // A batida de saida usa o mesmo caminho das batidas normais, com a forca da decolagem.
@@ -208,7 +321,7 @@ void GameplaySession::takeOff() {
     releasePerch();
     landingArmed_ = false;
     FlightModel& flight = bird_.flight();
-    flight.place(nest_.perch, nest_.yaw, FlightModel::kCruiseSpeed * flight.stats().speed * kTakeoffSpeedFactor);
+    flight.place(perchSite_.perch, perchSite_.yaw, FlightModel::kCruiseSpeed * flight.stats().speed * kTakeoffSpeedFactor);
     FlightControls launch;
     launch.mode = FlightMode::Flap;
     launch.flaps = 1;
@@ -219,6 +332,8 @@ void GameplaySession::takeOff() {
 
 void GameplaySession::releasePerch() {
     perched_ = false;
+    perchRival_ = kNoPlayer;
+    robPending_ = false;
     menu_.close();
     menuArm_ = ArmSide::None;
     menuHold_ = 0;
@@ -263,7 +378,7 @@ void GameplaySession::announcePurchase(int code) {
     authority_->request(event);
 }
 
-// Defesa, Alarme e Cofre so guardam o nivel: quem os usa e o roubo de ninho.
+// Defesa, Alarme e Cofre valem no roubo: publishLocalPlayer e sufferRobbery leem os niveis direto do perfil.
 void GameplaySession::applyUpgrades() {
     FlightStats& flight = bird_.flight().stats();
     flight.speed = speedMultiplier(profile_->level(BirdUpgrade::Speed));
@@ -288,8 +403,12 @@ void GameplaySession::refreshView() {
     view_.recordHolder = records_.holder();
     view_.recordBeatenNow = recordNotice_ > 0;
     view_.cargoLostNow = cargoLostNotice_ > 0;
+    view_.cargoLossCause = lossCause_;
+    view_.knockedRivalNow = knockedNotice_ > 0;
     view_.nearBoundary = bird_.nearBoundary();
-    view_.perchedOnNest = perched_;
+    view_.perchedOnNest = perched_ && perchRival_ == kNoPlayer;
+    refreshRobbery();
+    refreshAlarm();
     view_.nestDistance = glm::length(toNest);
     view_.nestBearing = std::remainder(std::atan2(toNest.x, -toNest.z) - flight.yaw(), kFullTurn);
     if (!profile_) return;
@@ -300,4 +419,29 @@ void GameplaySession::refreshView() {
     view_.menu = describeNestMenu(menu_, *profile_);
     view_.menu.raisedArm = menuArm_;
     view_.menu.holdProgress = menuHold_;
+}
+
+void GameplaySession::refreshRobbery() {
+    RobView& rob = view_.robbery;
+    rob = RobView{};
+    if (!robbing()) return;
+    rob.active = true;
+    rob.stolenNow = stolenThisVisit_;
+    const PlayerPublicState* owner = findPlayer(perchRival_);
+    if (robPending_) rob.blocked = RobBlock::Waiting;
+    else if (collector_.freeSpace() <= 0) rob.blocked = RobBlock::CargoFull;
+    else if (!owner || owner->nestStock == 0) rob.blocked = RobBlock::EmptyNest;
+    if (owner && rob.blocked == RobBlock::None) rob.progress = std::min(1.0f, robTimer_ / robSeconds(owner->nestDefense));
+    if (rob.blocked == RobBlock::Waiting) rob.progress = 1.0f;
+}
+
+// A bussola aponta o ladrao enquanto o Alarme durar e ele estiver na sala.
+void GameplaySession::refreshAlarm() {
+    const PlayerPublicState* thief = alarm_ > 0 ? findPlayer(thief_) : nullptr;
+    view_.alarmNow = thief != nullptr;
+    if (!thief) return;
+    const FlightModel& flight = bird_.flight();
+    const glm::vec3 toThief = thief->position - flight.position();
+    view_.thiefDistance = glm::length(toThief);
+    view_.thiefBearing = std::remainder(std::atan2(toThief.x, -toThief.z) - flight.yaw(), kFullTurn);
 }

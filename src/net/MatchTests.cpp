@@ -47,7 +47,8 @@ uint16_t freePort() {
 }
 
 struct Host {
-    explicit Host(uint16_t port, size_t cashews = 100) : udp(port), authority(std::make_shared<HostAuthority>(udp, HostConfig{kWorld, cashews})) {
+    explicit Host(uint16_t port, size_t cashews = 100, std::function<std::optional<glm::vec3>(PlayerId)> perch = {})
+        : udp(port), authority(std::make_shared<HostAuthority>(udp, HostConfig{kWorld, cashews, kProtocolVersion, std::move(perch)})) {
         ok = udp.host("Sala de teste");
     }
     std::vector<GameEvent> drain() {
@@ -76,7 +77,8 @@ struct Client {
 };
 
 struct Room {
-    explicit Room(size_t cashews = 100) : port(freePort()), host(port, cashews) {}
+    explicit Room(size_t cashews = 100, std::function<std::optional<glm::vec3>(PlayerId)> perch = {})
+        : port(freePort()), host(port, cashews, std::move(perch)) {}
 
     // Um quadro para todos: o tempo do jogo anda dt, e a rede de verdade leva uma fracao de milissegundo.
     void step(float dt = kDt) {
@@ -779,6 +781,144 @@ void testRivalNestsOverNetwork(TestRun& t) {
     for (int i = 0; i < 300 && host.session().rivalNests().find(1); i++) frame(false);
     t.check("ninhos em rede: o ninho do cliente some quando ele sai", host.session().rivalNests().nests().empty());
 }
+
+GameEvent robOf(PlayerId owner) {
+    GameEvent event = eventOf(GameEventType::NestRobbed, kNoPlayer);
+    event.target = owner;
+    return event;
+}
+
+void testRobberyOverNetwork(TestRun& t) {
+    Room room;
+    Client& thief = room.join({kWorld, "Ladra", 5});
+    if (!ready(thief)) {
+        t.check("roubo em rede: cliente entra", false);
+        return;
+    }
+    const PlayerId me = thief.authority->localPlayer();
+    PlayerPublicState owner = stateAt(0, glm::vec3(0, 100, 0));
+    owner.nestStock = 3;
+    owner.nestDefense = 1;
+    room.host.authority->publishLocalPlayer(owner);
+    thief.authority->publishLocalPlayer(stateAt(me, glm::vec3(5, 100, 0)));
+    room.pump(20);
+
+    thief.authority->request(robOf(0));
+    const bool robbed = room.pumpUntil([&] { return countOf(thief.log, GameEventType::NestRobbed, me) == 1; }, 200);
+    const auto& confirmed = room.host.log.back();
+    t.check("roubo em rede: o host confirma e todos recebem",
+            robbed && countOf(room.host.log, GameEventType::NestRobbed, me) == 1 && confirmed.target == 0 && confirmed.value == 1);
+    t.check("roubo em rede: o host passa a contar o caju roubado na carga", [&] {
+        thief.authority->request(eventOf(GameEventType::CashewDelivered, me, kNoCashew, 9));
+        room.pump(20);
+        return !thief.log.empty() && thief.log.back().type == GameEventType::CashewDelivered && thief.log.back().value == 1;
+    }());
+
+    thief.authority->request(robOf(0));
+    room.pump(30);
+    t.check("roubo em rede: roubar rapido demais e recusado", countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
+    room.pump(static_cast<int>(kMinRobInterval / kDt));
+    thief.authority->request(robOf(me));
+    room.pump(20);
+    t.check("roubo em rede: ninguem rouba o proprio ninho", countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
+    owner.nestStock = 0;
+    room.host.authority->publishLocalPlayer(owner);
+    thief.authority->request(robOf(0));
+    room.pump(20);
+    t.check("roubo em rede: ninho vazio ou no Cofre nao e roubado", countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
+    owner.nestStock = 3;
+    room.host.authority->publishLocalPlayer(owner);
+    thief.authority->request(robOf(0));
+    room.pump(20);
+    t.check("roubo em rede: com moedas e tempo, rouba de novo", countOf(room.host.log, GameEventType::NestRobbed, me) == 2);
+
+    // Pedidos que so o host pode fazer.
+    GameEvent knock = eventOf(GameEventType::CashewDropped, me);
+    knock.target = 0;
+    thief.authority->request(knock);
+    thief.authority->request(eventOf(GameEventType::CashewSpilled, me, kLooseCashewBase, 1));
+    room.pump(20);
+    t.check("roubo em rede: cliente nao derruba a carga dos outros nem cria cajus soltos",
+            countOf(room.host.log, GameEventType::CashewDropped, me) == 0 &&
+                countOf(room.host.log, GameEventType::CashewSpilled, me) == 0);
+}
+
+void testRobberyNeedsPerch(TestRun& t) {
+    const glm::vec3 perch(500, 80, 500);
+    Room room(100, [&](PlayerId) { return std::optional<glm::vec3>(perch); });
+    Client& thief = room.join({kWorld, "Ladra", 5});
+    if (!ready(thief)) {
+        t.check("roubo em rede: cliente entra no teste do poleiro", false);
+        return;
+    }
+    const PlayerId me = thief.authority->localPlayer();
+    PlayerPublicState owner = stateAt(0, glm::vec3(0, 100, 0));
+    owner.nestStock = 3;
+    room.host.authority->publishLocalPlayer(owner);
+    thief.authority->publishLocalPlayer(stateAt(me, perch + glm::vec3(200, 0, 0)));
+    room.pump(20);
+    thief.authority->request(robOf(0));
+    room.pump(20);
+    const bool farRefused = countOf(room.host.log, GameEventType::NestRobbed, me) == 0;
+    thief.authority->publishLocalPlayer(stateAt(me, perch));
+    room.pump(20);
+    thief.authority->request(robOf(0));
+    room.pump(20);
+    t.check("roubo em rede: so rouba quem esta pousado no ninho",
+            farRefused && countOf(room.host.log, GameEventType::NestRobbed, me) == 1);
+}
+
+void testDiveKnock(TestRun& t) {
+    Room room;
+    Client& prey = room.join({kWorld, "Presa", 7});
+    if (!ready(prey)) {
+        t.check("mergulho: cliente entra", false);
+        return;
+    }
+    const PlayerId me = prey.authority->localPlayer();
+    prey.authority->request(eventOf(GameEventType::CashewCollected, me, 10));
+    prey.authority->request(eventOf(GameEventType::CashewCollected, me, 11));
+    const glm::vec3 where(0, 120, 0);
+    PlayerPublicState hunter = stateAt(0, where + glm::vec3(30, 0, 0));
+    hunter.mode = FlightMode::Dive;
+    room.host.authority->publishLocalPlayer(hunter);
+    prey.authority->publishLocalPlayer(stateAt(me, where));   // Carrega 2 cajus.
+    room.pump(40);
+    t.check("mergulho: longe nao derruba ninguem", countOf(room.host.log, GameEventType::CashewDropped, 0) == 0);
+
+    hunter.mode = FlightMode::Glide;
+    hunter.position = where + glm::vec3(2, 0, 0);
+    room.host.authority->publishLocalPlayer(hunter);
+    room.pump(20);
+    t.check("mergulho: encostar sem mergulhar nao derruba", countOf(room.host.log, GameEventType::CashewDropped, 0) == 0);
+
+    hunter.mode = FlightMode::Dive;
+    room.host.authority->publishLocalPlayer(hunter);
+    room.pumpUntil([&] { return countOf(prey.log, GameEventType::CashewSpilled, 0) == 2; }, 200);
+    const auto drop = std::find_if(prey.log.begin(), prey.log.end(), [](const GameEvent& e) { return e.type == GameEventType::CashewDropped; });
+    t.check("mergulho: derruba toda a carga de quem leva cajus",
+            drop != prey.log.end() && drop->actor == 0 && drop->target == me && drop->value == 2);
+    t.check("mergulho: os cajus caem no mundo para todos",
+            countOf(prey.log, GameEventType::CashewSpilled, 0) == 2 && countOf(room.host.log, GameEventType::CashewSpilled, 0) == 2);
+    room.pump(60);
+    t.check("mergulho: a carga cai uma unica vez", countOf(room.host.log, GameEventType::CashewDropped, 0) == 1);
+
+    Client& late = room.join({kWorld, "Atrasado", 8});
+    room.pump(20);
+    t.check("caju solto: quem entra depois ve os cajus no chao",
+            ready(late) && std::count_if(late.log.begin(), late.log.end(), [](const GameEvent& e) {
+                return e.type == GameEventType::CashewSpilled;
+            }) == 2);
+
+    const CashewId loose = drop != prey.log.end() ? std::next(drop)->cashew : kNoCashew;
+    late.authority->request(eventOf(GameEventType::CashewCollected, late.authority->localPlayer(), loose));
+    prey.authority->request(eventOf(GameEventType::CashewCollected, me, loose));
+    room.pump(30);
+    const auto takers = std::count_if(room.host.log.begin(), room.host.log.end(), [&](const GameEvent& e) {
+        return e.type == GameEventType::CashewCollected && e.cashew == loose;
+    });
+    t.check("caju solto: o host entrega cada caju a um so jogador", isLooseCashew(loose) && takers == 1);
+}
 } // namespace
 
 // Codifica uma amostra fixa de cada mensagem e resume os bytes. Se o formato mudar, o resumo muda.
@@ -795,6 +935,8 @@ uint32_t wireFingerprint() {
     player.speaking = true;
     player.birdSeed = 123456789u;
     player.nestLevel = 2;
+    player.nestDefense = 4;
+    player.nestStock = 17;
     NpcPublicState npc;
     npc.seed = 987654321u;
     npc.position = {10.0f, 20.0f, 30.0f};
@@ -819,11 +961,11 @@ uint32_t wireFingerprint() {
 }
 
 void testWireFormatLocked(TestRun& t) {
-    constexpr uint32_t kVersion2Fingerprint = 1173541394u;
+    constexpr uint32_t kVersion3Fingerprint = 124672947u;
     const uint32_t fingerprint = wireFingerprint();
-    if (fingerprint != kVersion2Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
-    t.check("protocolo: formato fixo da versao 2 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
-            kProtocolVersion == 2 && fingerprint == kVersion2Fingerprint);
+    if (fingerprint != kVersion3Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
+    t.check("protocolo: formato fixo da versao 3 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
+            kProtocolVersion == 3 && fingerprint == kVersion3Fingerprint);
 }
 
 // Um host de outra versao que conecta, mas manda um estado que o cliente nao consegue ler.
@@ -942,5 +1084,8 @@ int runMatchSelfTest() {
     testVoiceOverNetwork(test);
     testSimulatedMatch(test);
     testRivalNestsOverNetwork(test);
+    testRobberyOverNetwork(test);
+    testRobberyNeedsPerch(test);
+    testDiveKnock(test);
     return test.failures;
 }

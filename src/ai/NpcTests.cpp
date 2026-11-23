@@ -126,8 +126,10 @@ void testOriginalRoles(TestRun& test, const World& world) {
                        CashewSpot{world.spawnPoint() + glm::vec3(8, 0, 0)}});
     LocalAuthority authority;
     CashewCollector cargo(field, authority, playerId);
-    cargo.handle({GameEventType::CashewCollected, playerId, kNoPlayer, 1, 1});
-    cargo.handle({GameEventType::CashewCollected, playerId, kNoPlayer, 2, 1});
+    // A coleta passa pela autoridade, que so deixa derrubar o que confirmou.
+    authority.request({GameEventType::CashewCollected, playerId, kNoPlayer, 1, 1});
+    authority.request({GameEventType::CashewCollected, playerId, kNoPlayer, 2, 1});
+    for (const auto& event : authority.pollEvents()) cargo.handle(event);
     PlayerPublicState prey = playerAt(playerId, hunter->position, glm::vec3(0), 1);
 
     ecosystem.advance(0.04f, {prey}, field, authority);

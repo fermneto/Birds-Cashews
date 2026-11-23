@@ -403,7 +403,11 @@ std::string GameUi::frameKey() const {
     key << '|' << v.carried << ',' << v.capacity << ',' << v.coins << ',' << v.totalDelivered << ',' << v.record << ','
         << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << v.nearBoundary << ',' << quantized(coinsOpacity(), 20.0f) << ',' << std::lround(v.nestDistance) << ','
         << quantized(v.nestBearing, 60.0f) << ',' << quantized(banner_.opacity(), 30.0f) << ','
-        << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected());
+        << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected()) << ','
+        << static_cast<int>(v.cargoLossCause) << ',' << v.knockedRivalNow << ',' << v.alarmNow << ','
+        << quantized(v.thiefBearing, 60.0f) << ',' << std::lround(v.thiefDistance);
+    const RobView& rob = v.robbery;
+    key << '|' << rob.active << ',' << quantized(rob.progress, 60.0f) << ',' << static_cast<int>(rob.blocked) << ',' << rob.stolenNow;
     const NestMenuView& menu = v.menu;
     key << '|' << static_cast<int>(menu.page) << ',' << menu.selected << ',' << menu.leftLabel << ',' << menu.rightLabel << ','
         << static_cast<int>(menu.raisedArm) << ',' << quantized(menu.holdProgress, 24.0f);

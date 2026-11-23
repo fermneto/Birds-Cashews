@@ -66,12 +66,14 @@ std::vector<glm::mat4> visibleCashews(const CashewField& field, const glm::mat4&
         return true;
     };
     std::vector<glm::mat4> visible;
-    for (size_t i = 0; i < field.size(); i++) {
-        const CashewSpot& spot = field.spots()[i];
-        const float distance = glm::length(spot.position - camera);
-        if (!field.isActive(static_cast<CashewId>(i)) || distance < minDistance || distance >= maxDistance) continue;
-        if (!inFrustum(spot.position)) continue;
-        visible.push_back(glm::rotate(glm::translate(glm::mat4(1.0f), spot.position), spot.yaw, glm::vec3(0, 1, 0)));
-    }
+    const auto add = [&](CashewId id) {
+        const glm::vec3 position = field.positionOf(id);
+        const float distance = glm::length(position - camera);
+        if (distance < minDistance || distance >= maxDistance || !inFrustum(position)) return;
+        visible.push_back(glm::rotate(glm::translate(glm::mat4(1.0f), position), field.yawOf(id), glm::vec3(0, 1, 0)));
+    };
+    for (size_t i = 0; i < field.size(); i++)
+        if (field.isActive(static_cast<CashewId>(i))) add(static_cast<CashewId>(i));
+    for (CashewId id : field.activeLoose()) add(id);   // Derrubados: sem talo, caindo ou no chao.
     return visible;
 }

@@ -58,6 +58,14 @@ Game::Game(const GameOptions& options)
       session_(std::make_unique<GameplaySession>(world_, options.seed, cashews_, player_, saveDirFor(options), kLocalPlayer)),
       npcs_(world_, options.seed) {
     match_.setCashewCount(cashews_.size());
+    // O host confere se o ladrao esta mesmo no ninho roubado. chooseNestSite e caro: cada lugar e calculado uma vez.
+    auto perches = std::make_shared<std::array<std::optional<glm::vec3>, kMaxPlayers>>();
+    match_.setNestPerch([this, perches](PlayerId owner) -> std::optional<glm::vec3> {
+        if (owner >= kMaxPlayers) return std::nullopt;
+        auto& perch = (*perches)[owner];
+        if (!perch) perch = chooseNestSite(world_, options_.seed, owner).perch;
+        return perch;
+    });
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
     renderer_.setRivalBeaconMesh(buildRivalBeaconMesh());

@@ -720,6 +720,174 @@ void testHunterDrop(TestRun& run, const World& world) {
     run.check("cacador: quem esta no ninho nao vira alvo", authority.players()[0].carried == 0);
 }
 
+// Jogo local com um rival conectado, cujo estado o teste controla.
+class RivalAuthority final : public LocalAuthority {
+public:
+    explicit RivalAuthority(PlayerId id) { rival.id = id; rival.position = glm::vec3(0, 300, 0); }
+    std::vector<PlayerPublicState> players() const override {
+        std::vector<PlayerPublicState> list = LocalAuthority::players();
+        if (present) list.push_back(rival);
+        return list;
+    }
+    PlayerPublicState rival;
+    bool present = true;
+};
+
+constexpr PlayerId kRivalId = 1;
+
+struct RobRig {
+    RobRig(const World& world, const fs::path& dir, int stock, int defense = 0, const std::vector<glm::vec3>& cashews = {}) {
+        auto owned = std::make_unique<RivalAuthority>(kRivalId);
+        authority = owned.get();
+        authority->rival.nestStock = static_cast<uint8_t>(stock);
+        authority->rival.nestDefense = static_cast<uint8_t>(defense);
+        rig = std::make_unique<Rig>(world, dir, cashews, std::move(owned));
+        rivalSite = chooseNestSite(world, kSeed, kRivalId);
+        rig->ticks(1);   // A lista de jogadores chega e o ninho rival aparece.
+    }
+    void landOnRival() {
+        rig->bird.spawn(rivalSite.perch + glm::vec3(0, 6, 0), 0.0f);
+        rig->ticks(45);
+        rig->session.drainFeedback();
+    }
+    int seconds(float s) { return static_cast<int>(std::lround(s / kFrame)); }
+
+    RivalAuthority* authority = nullptr;
+    std::unique_ptr<Rig> rig;
+    NestSite rivalSite;
+};
+
+void testRobbery(TestRun& run, const World& world) {
+    TempDir dir;
+    RobRig rob(world, dir.path(), 5);
+    Rig& rig = *rob.rig;
+    run.check("roubo: o ninho do rival existe", rig.session.rivalNests().find(kRivalId) != nullptr);
+    rob.landOnRival();
+    const GameplayView& view = rig.session.view();
+    run.check("roubo: pousa no ninho rival sem abrir o menu",
+              rig.session.robbing() && !view.perchedOnNest && view.menu.page == NestMenuPage::Closed && view.robbery.active);
+    run.check("roubo: fica no poleiro do rival", glm::length(rig.bird.flight().position() - rob.rivalSite.perch) < 0.001f);
+
+    rig.ticks(rob.seconds(robSeconds(0)) - 60);
+    run.check("roubo: a barra enche aos poucos", rig.session.collector().carried() == 0 && view.robbery.progress > 0.6f &&
+                                                 view.robbery.progress < 1.0f);
+    rig.ticks(70);
+    run.check("roubo: depois de 4 s leva um caju marcado como roubado",
+              rig.session.collector().carried() == 1 && rig.session.collector().stolen() == 1 && view.robbery.stolenNow == 1);
+    run.check("roubo: avisa com som proprio", rig.countFeedback(GameplayFeedback::CashewStolen) == 1);
+    rig.ticks(rob.seconds(robSeconds(0)) * 2 + 20);
+    run.check("roubo: continua enquanto fica pousado e cabe na carga",
+              rig.session.collector().carried() == 3 && view.robbery.blocked == RobBlock::CargoFull);
+
+    rig.flap();
+    run.check("roubo: bater as asas foge do ninho rival", !rig.session.perched() && !rig.session.robbing());
+    rig.bird.spawn(rig.session.nest().perch + glm::vec3(0, 6, 0), 0.0f);
+    rig.ticks(45);
+    rig.ticks(2);
+    const Profile* profile = rig.session.profile();
+    run.check("roubo: roubados viram moeda e nao somam no record",
+              profile->coins() == 3 && profile->totalDelivered() == 0 && rig.session.view().record == 0);
+}
+
+void testRobberyLimits(TestRun& run, const World& world) {
+    {
+        TempDir dir;
+        RobRig rob(world, dir.path(), 5, 2);
+        rob.landOnRival();
+        rob.rig->ticks(rob.seconds(robSeconds(0)) + 30);
+        const bool slower = rob.rig->session.collector().carried() == 0;
+        rob.rig->ticks(rob.seconds(robSeconds(2) - robSeconds(0)));
+        run.check("defesa: cada nivel deixa o roubo mais lento", slower && rob.rig->session.collector().carried() == 1 &&
+                                                                    robSeconds(2) == 7.0f && robSeconds(9) == robSeconds(5));
+    }
+    {
+        TempDir dir;
+        RobRig rob(world, dir.path(), 0);
+        rob.landOnRival();
+        rob.rig->ticks(rob.seconds(10.0f));
+        run.check("cofre: ninho sem moedas fora do Cofre nao e roubado",
+                  rob.rig->session.collector().carried() == 0 && rob.rig->session.view().robbery.blocked == RobBlock::EmptyNest);
+    }
+    {
+        TempDir dir;
+        RobRig rob(world, dir.path(), 5);
+        rob.landOnRival();
+        rob.authority->present = false;
+        rob.rig->ticks(2);
+        run.check("roubo: se o dono sai da sala, o ladrao decola", !rob.rig->session.perched());
+    }
+}
+
+GameEvent robbedBy(PlayerId thief) {
+    GameEvent event;
+    event.type = GameEventType::NestRobbed;
+    event.actor = thief;
+    event.target = kMe;
+    event.value = 1;
+    return event;
+}
+
+void testVictim(TestRun& run, const World& world) {
+    {
+        TempDir dir;
+        seedProfile(dir.path(), 12, {}, {3, 0, 2, 0});
+        RobRig rob(world, dir.path(), 0);
+        Rig& rig = *rob.rig;
+        rig.session.publishLocalPlayer();
+        const PlayerPublicState& me = rob.authority->players().front();
+        run.check("cofre: publica as moedas que podem ser roubadas e a Defesa", me.nestStock == 2 && me.nestDefense == 3);
+        rob.authority->request(robbedBy(kRivalId));
+        rig.tick();
+        run.check("vitima: perde uma moeda por caju roubado e salva",
+                  rig.session.profile()->coins() == 11 && ProfileStore(dir.path()).load(kName)->coins() == 11);
+        run.check("alarme: sem Alarme a vitima nao e avisada",
+                  !rig.session.view().alarmNow && rig.countFeedback(GameplayFeedback::NestAlarm) == 0);
+        for (int i = 0; i < 3; i++) rob.authority->request(robbedBy(kRivalId));
+        rig.tick();
+        run.check("cofre: as moedas guardadas nao saem", rig.session.profile()->coins() == vaultProtection(2));
+    }
+    {
+        TempDir dir;
+        seedProfile(dir.path(), 5, {}, {0, 1, 0, 0});
+        RobRig rob(world, dir.path(), 0);
+        Rig& rig = *rob.rig;
+        rig.bird.flight().place(kFarAway, 0.0f, 0.0f);
+        rob.authority->rival.position = kFarAway + glm::vec3(100, 0, 0);   // A direita de quem olha para -z.
+        rob.authority->request(robbedBy(kRivalId));
+        rig.tick();
+        const GameplayView& view = rig.session.view();
+        run.check("alarme: avisa e aponta o ladrao", view.alarmNow && rig.countFeedback(GameplayFeedback::NestAlarm) == 1 &&
+                                                       view.thiefBearing > 1.4f && view.thiefBearing < 1.75f &&
+                                                       std::abs(view.thiefDistance - 100.0f) < 1.0f);
+        rig.ticks(static_cast<int>(alarmSeconds(1) / kFrame) + 5);
+        run.check("alarme: dura 5 s mais 3 s por nivel", !rig.session.view().alarmNow && alarmSeconds(1) == 8.0f && alarmSeconds(0) == 0.0f);
+    }
+}
+
+void testTreeHit(TestRun& run, const World& world) {
+    TempDir dir;
+    auto owned = std::make_unique<LocalAuthority>();
+    const glm::vec3 cashew = kFarAway + glm::vec3(0, 0, -2);
+    Rig rig(world, dir.path(), {cashew, cashew + glm::vec3(1, 0, 0)}, std::move(owned));
+    rig.bird.flight().place(kFarAway, 0.0f, 0.0f);
+    rig.ticks(3);
+    rig.session.drainFeedback();
+
+    const CashewTree& tree = world.trees().front();
+    rig.bird.flight().place(tree.base() + glm::vec3(0, 6, 30), 0.0f, 40.0f);   // Em linha reta contra o tronco.
+    bool hit = false;
+    for (int i = 0; i < 120 && !hit; i++) {
+        rig.tick();
+        hit = rig.session.view().cargoLostNow;
+    }
+    const GameplayView& view = rig.session.view();
+    run.check("arvore: bater com forca derruba um caju", hit && view.carried == 1 && view.cargoLossCause == CargoLossCause::Tree);
+    run.check("arvore: a batida reduz a velocidade", rig.bird.flight().speed() < 30.0f);
+    run.check("arvore: o caju cai no mundo", rig.field.activeLoose().size() == 1);
+    rig.ticks(20);
+    run.check("arvore: raspar na mesma batida nao derruba outro", rig.session.view().carried == 1);
+}
+
 int runNestSelfTest() {
     TestRun run;
     const World world(kSeed);
@@ -738,5 +906,9 @@ int runNestSelfTest() {
     testFullLoop(run, world);
     testBodyControls(run, world);
     testHunterDrop(run, world);
+    testRobbery(run, world);
+    testRobberyLimits(run, world);
+    testVictim(run, world);
+    testTreeHit(run, world);
     return run.failures;
 }

@@ -21,6 +21,7 @@ const char* eventName(GameEventType type) {
         case GameEventType::UpgradeBought: return "upgrade comprado";
         case GameEventType::PlayerJoined: return "jogador entrou";
         case GameEventType::PlayerLeft: return "jogador saiu";
+        case GameEventType::CashewSpilled: return "caju caiu no mundo";
     }
     return "?";
 }

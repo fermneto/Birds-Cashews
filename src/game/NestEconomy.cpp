@@ -28,6 +28,11 @@ constexpr int kBaseCapacity = 3, kCapacityPerLevel = 1;
 constexpr float kBaseCollectRadius = 9.0f, kCollectRadiusPerLevel = 2.5f;
 constexpr float kNestScalePerLevel = 0.18f;
 constexpr int kBonusPercentPerLevel = 20;
+constexpr float kBaseRobSeconds = 4.0f, kRobSecondsPerLevel = 1.5f;
+constexpr int kVaultCoinsPerLevel = 5;
+constexpr float kBaseAlarmSeconds = 5.0f, kAlarmSecondsPerLevel = 3.0f;
+
+int clampLevel(int level) { return std::clamp(level, 0, kMaxUpgradeLevel); }
 
 int priceAt(const PriceTable& table, int level) {
     return level >= 0 && level < kMaxUpgradeLevel ? table[static_cast<size_t>(level)] : 0;
@@ -53,4 +58,12 @@ float nestScale(int sizeLevel) { return 1.0f + kNestScalePerLevel * sizeLevel; }
 int sizeCoinBonus(int delivered, int sizeLevel) {
     if (delivered <= 0 || sizeLevel <= 0) return 0;
     return (delivered * sizeLevel * kBonusPercentPerLevel + 99) / 100;
+}
+
+float robSeconds(int defenseLevel) { return kBaseRobSeconds + kRobSecondsPerLevel * clampLevel(defenseLevel); }
+int vaultProtection(int vaultLevel) { return kVaultCoinsPerLevel * clampLevel(vaultLevel); }
+int robbableCoins(int coins, int vaultLevel) { return std::max(0, coins - vaultProtection(vaultLevel)); }
+
+float alarmSeconds(int alarmLevel) {
+    return alarmLevel <= 0 ? 0.0f : kBaseAlarmSeconds + kAlarmSecondsPerLevel * clampLevel(alarmLevel);
 }

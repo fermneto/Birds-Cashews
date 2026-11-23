@@ -30,6 +30,7 @@ public:
     const FlightModel& flight() const { return flight_; }
     const BirdAnimation& animation() const { return animation_; }
     bool nearBoundary() const { return nearBoundary_; }
+    float takeSolidImpact();   // Maior impacto em copa ou tronco desde a ultima chamada, em m/s.
 
 private:
     void enforceBoundary(float dt);
@@ -42,4 +43,5 @@ private:
     float beakTargets_[static_cast<int>(BeakSource::Count)] = {};
     float flapTimer_ = 0;
     bool nearBoundary_ = false;
+    float solidImpact_ = 0;
 };

@@ -11,7 +11,7 @@ constexpr float kMaxCoordinate = 100000.0f;   // Bem alem do mar: nada valido pa
 constexpr float kMaxSpeed = 1000.0f;
 constexpr float kMaxAngle = 1000.0f;
 constexpr size_t kEventSize = 18;
-constexpr size_t kPlayerSize = 45;
+constexpr size_t kPlayerSize = 47;
 constexpr size_t kNpcSize = 30;
 
 class Writer {
@@ -110,7 +110,7 @@ void writeEvent(Writer& out, const GameEvent& event) {
 GameEvent readEvent(Reader& in) {
     GameEvent event;
     const uint8_t type = in.u8();
-    if (type > static_cast<uint8_t>(GameEventType::PlayerLeft)) in.fail();
+    if (type > static_cast<uint8_t>(kLastGameEventType)) in.fail();
     event.type = static_cast<GameEventType>(type);
     event.actor = in.u8();
     event.target = in.u8();
@@ -132,6 +132,8 @@ void writePlayer(Writer& out, const PlayerPublicState& state) {
     out.u8(state.speaking ? 1 : 0);
     out.u32(state.birdSeed);
     out.u8(state.nestLevel);
+    out.u8(state.nestDefense);
+    out.u8(state.nestStock);
 }
 
 PlayerPublicState readPlayer(Reader& in) {
@@ -148,6 +150,8 @@ PlayerPublicState readPlayer(Reader& in) {
     state.speaking = in.flag();
     state.birdSeed = in.u32();
     state.nestLevel = in.u8();
+    state.nestDefense = in.u8();
+    state.nestStock = in.u8();
     return state;
 }
 

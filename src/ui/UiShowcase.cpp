@@ -102,6 +102,20 @@ void showHud(GameUi& ui, DemoGameplaySource& demo, ScriptedPoseSource& camera,
     demo.setView(DemoGameplaySource::nestInvestSample());
     shot("ui_16_ninho_investir");
 
+    GameplayView robbing = DemoGameplaySource::flightSample();
+    robbing.robbery.active = true;
+    robbing.robbery.progress = 0.62f;
+    robbing.robbery.stolenNow = 1;
+    demo.setView(robbing);
+    shot("ui_20_roubo_ninho_rival");
+
+    GameplayView alarm = DemoGameplaySource::flightSample();
+    alarm.alarmNow = true;
+    alarm.thiefBearing = -0.45f;
+    alarm.thiefDistance = 212.0f;
+    demo.setView(alarm);
+    shot("ui_21_alarme_ladrao");
+
     demo.setView(DemoGameplaySource::flightSample());
     sendKey(ui, SDLK_ESCAPE);
     shot("ui_17_pausa");

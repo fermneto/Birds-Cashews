@@ -578,7 +578,8 @@ void testSounds(TestRun& t) {
     }
     const GameplayFeedback all[] = {GameplayFeedback::CashewCollected, GameplayFeedback::CashewDelivered, GameplayFeedback::UpgradeBought,
                                     GameplayFeedback::UpgradeDenied, GameplayFeedback::RecordBeaten, GameplayFeedback::MenuMove,
-                                    GameplayFeedback::NestLanded, GameplayFeedback::TakeOff};
+                                    GameplayFeedback::NestLanded, GameplayFeedback::TakeOff, GameplayFeedback::CargoLost,
+                                    GameplayFeedback::CashewStolen, GameplayFeedback::NestAlarm, GameplayFeedback::RivalKnocked};
     std::vector<UiSound> mapped;
     for (const GameplayFeedback feedback : all) mapped.push_back(soundFor(feedback));
     std::sort(mapped.begin(), mapped.end());

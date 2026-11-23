@@ -21,3 +21,9 @@ float nestScale(int sizeLevel);
 
 // Moedas extras de uma entrega. Nao contam na pontuacao nem no record.
 int sizeCoinBonus(int delivered, int sizeLevel);
+
+// Roubo de ninho (PLANO 3.3).
+float robSeconds(int defenseLevel);            // Tempo pousado no ninho rival para levar 1 caju.
+int vaultProtection(int vaultLevel);           // Moedas que o Cofre guarda longe dos ladroes.
+int robbableCoins(int coins, int vaultLevel);  // O que sobra para roubar.
+float alarmSeconds(int alarmLevel);            // Quanto tempo a bussola aponta o ladrao. 0 sem Alarme.
