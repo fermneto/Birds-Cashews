@@ -105,6 +105,8 @@ std::string cargoLostText(CargoLossCause cause) {
     return "Um caçador derrubou a sua carga!";
 }
 
+bool silentCargoLoss(CargoLossCause cause) { return cause == CargoLossCause::Plane || cause == CargoLossCause::Whale; }
+
 void drawWarning(UiKit& kit, const std::string& text) {
     const int width = kit.text.width(text, 18) + 58;
     const cv::Rect pill((kUiWidth - width) / 2, 96, width, 40);
@@ -237,12 +239,9 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     drawRobbery(kit, view);
     if (scene.showPreview) drawPreviewFrame(kit);
     if (scene.bodyLost) drawWarning(kit, "Corpo fora do quadro: o pássaro plana nivelado");
-    else if (view.whaleNow) drawWarning(kit, "A baleia te abocanhou!");
-    else if (view.nearBoundary) drawWarning(kit, "Cuidado com a baleia: volte para a ilha");
-    else if (view.cargoLostNow) drawWarning(kit, cargoLostText(view.cargoLossCause));
+    // O aviao e a baleia nao tem aviso na tela: o jogador ve e ouve o evento no proprio mundo.
+    else if (view.cargoLostNow && !silentCargoLoss(view.cargoLossCause)) drawWarning(kit, cargoLostText(view.cargoLossCause));
     else if (view.alarmNow) drawWarning(kit, "Alarme: estão roubando o seu ninho!");
     else if (view.knockedRivalNow) drawWarning(kit, "Mergulho certeiro: a carga do rival caiu!");
-    else if (view.planeHitNow) drawWarning(kit, "Um avião acertou você!");
-    else if (view.planeIncoming) drawWarning(kit, "Um avião vem na sua direção: desça!");
     drawBanner(kit, scene);
 }

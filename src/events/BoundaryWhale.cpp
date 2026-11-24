@@ -184,13 +184,28 @@ bool BoundaryWhale::holdsLocal() const {
     return attack && !attack->spat;
 }
 
+bool BoundaryWhale::throwsLocal() const {
+    const WhaleAttack* attack = localAttack();
+    return attack && attack->spat && attack->age < kThrowEnd;
+}
+
 bool BoundaryWhale::busy() const { return localAttack() != nullptr; }
 
-// Cuspido da boca ja de frente para o centro da ilha, rapido e subindo: o jogador volta a voar no ar.
+// Cuspido da boca ja de frente para o centro da ilha, com forca e subindo. Durante o arremesso a velocidade
+// e mantida, e o jogador so volta a controlar o voo quando ele acaba.
 bool BoundaryWhale::stepBird(PlayerBird& bird) {
     WhaleAttack* attack = localAttack();
-    if (!attack || attack->spat) return false;
+    if (!attack) return false;
     FlightModel& flight = bird.flight();
+    if (attack->spat) {
+        if (attack->age < kThrowEnd) {
+            const glm::vec3 p = flight.position();
+            const glm::vec2 inward = glm::length(glm::vec2(p.x, p.z)) > 1.0f ? -glm::normalize(glm::vec2(p.x, p.z)) : glm::vec2(0, -1);
+            flight.setVelocity(glm::vec3(inward.x, 0, inward.y) * kSpitSpeed + glm::vec3(0, kSpitClimb, 0));
+            flight.setAttitude(0.2f, 0.0f);
+        }
+        return false;
+    }
     if (attack->age >= kSpitTime) {
         const HeldBird held = heldAt(attack->bite, attack->start, attack->startYaw, kSpitTime);
         flight.place(held.position, yawToCenter(attack->bite), kSpitSpeed);
@@ -235,7 +250,8 @@ void BoundaryWhale::advanceAttacks(float seconds, PlayerBird& bird) {
         cue(WhaleCueKind::Splash, 3.9f, 0.6f, 0.0f);
     }
     attacks_.erase(std::remove_if(attacks_.begin(), attacks_.end(), [&](const WhaleAttack& a) {
-                       return a.age >= kEndTime && (a.target != localPlayer_ || a.spat);
+                       if (a.target != localPlayer_) return a.age >= kEndTime;
+                       return a.spat && a.age >= std::max(kEndTime, kThrowEnd);
                    }),
                    attacks_.end());
 }

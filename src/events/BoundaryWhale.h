@@ -18,8 +18,10 @@ constexpr float kSinkStart = 3.35f;   // Depois do tranco da cuspida, mergulha.
 constexpr float kEndTime = kWhaleSequenceSeconds;   // Some debaixo da agua.
 constexpr float kCooldown = 8.0f;     // Segundos depois de cuspir sem outra mordida no mesmo passaro.
 constexpr float kRetrySeconds = 2.0f; // Sem resposta da autoridade, pede de novo.
-constexpr float kSpitSpeed = 70.0f;   // m/s para dentro do mapa.
-constexpr float kSpitClimb = 14.0f;   // m/s para cima na saida da boca.
+constexpr float kSpitSpeed = 115.0f;  // m/s para dentro do mapa.
+constexpr float kSpitClimb = 18.0f;   // m/s para cima na saida da boca.
+constexpr float kThrowSeconds = 2.5f; // Depois da cuspida, voa arremessado para o centro sem perder velocidade.
+constexpr float kThrowEnd = kSpitTime + kThrowSeconds;
 constexpr float kMaxLeap = 75.0f;     // A boca nunca sobe mais que isso acima do mar.
 constexpr float kScale = 1.4f;       // O modelo (gfx/WhaleView) tem 46 m; a baleia do jogo tem uns 65 m.
 constexpr float kJawOpen = 0.75f;     // Radianos com a boca toda aberta no salto.
@@ -71,13 +73,14 @@ public:
     // WhaleBite confirmado pela autoridade. Comeca a animacao de qualquer jogador; o local fica preso.
     void handle(const GameEvent& event, const FlightModel& localFlight);
     // A cada passo da fisica. Retorna true quando a baleia segura o passaro e a fisica normal nao deve rodar.
-    // Na hora de cuspir, arremessa o passaro e devolve o controle no mesmo passo.
+    // Na hora de cuspir, arremessa o passaro; durante o arremesso a fisica roda, mas a velocidade e mantida.
     bool stepBird(PlayerBird& bird);
     // Uma vez por quadro, depois dos eventos: avanca as animacoes, o aviso e pede a mordida quando preciso.
     void update(float seconds, PlayerBird& bird, const World& world, GameAuthority& authority, bool canTrigger);
 
     bool holdsLocal() const;            // O passaro local esta na boca da baleia.
-    bool busy() const;                  // Ha uma baleia atras do passaro local (ate ela sumir).
+    bool throwsLocal() const;           // O passaro local acabou de ser cuspido e ainda voa arremessado.
+    bool busy() const;                  // Ha uma baleia atras do passaro local (ate ela sumir e o arremesso acabar).
     float warning() const { return warning_; }   // 0 a 1: quao perto do limite, sobre o mar.
     float cooldown() const { return cooldown_; }
     bool waiting() const { return waitTimer_ > 0; }   // Pedido enviado, sem resposta ainda.

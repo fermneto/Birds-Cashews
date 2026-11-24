@@ -225,8 +225,43 @@ void Game::advance(float frameSeconds) {
     updateCashews(frameSeconds);
     updateNpcs(frameSeconds);
     player_.animate(frameSeconds);
+    updateChaseCamera(frameSeconds);
     time_ += frameSeconds;
     telemetryTimer_ += frameSeconds;
+}
+
+// Enquanto a baleia ataca, a camera sai do passaro: de lado, para ver o salto e a mordida, e atras dele
+// no arremesso. Depois volta suavemente para a primeira pessoa.
+void Game::updateChaseCamera(float frameSeconds) {
+    const BoundaryWhale& whale = session_->whale();
+    const FlightModel& flight = player_.flight();
+    const glm::vec3 bird = flight.position();
+    glm::vec3 forward = flight.heading();
+    forward.y = 0;
+    forward = glm::length(forward) > 0.01f ? glm::normalize(forward) : glm::vec3(0, 0, -1);
+    glm::vec3 eye(0), look = forward * 10.0f;
+    if (whale.holdsLocal()) {
+        const glm::vec2 flat(bird.x, bird.z);
+        const glm::vec2 in = glm::length(flat) > 1.0f ? -glm::normalize(flat) : glm::vec2(0, -1);
+        const glm::vec3 inward(in.x, 0, in.y), side(-in.y, 0, in.x);
+        eye = inward * 34.0f + side * 26.0f + glm::vec3(0, 10, 0);
+        look = -inward * 10.0f + glm::vec3(0, -3, 0);
+    } else if (whale.busy()) {
+        const glm::vec3 side(-forward.z, 0, forward.x);
+        eye = -forward * 30.0f + side * 9.0f + glm::vec3(0, 24, 0);
+        look = forward * 22.0f;
+    }
+    const bool wanted = whale.busy();
+    if (!wanted && !chaseOn_) return;
+    if (wanted && !chaseOn_) {   // Comeca dentro do passaro e se afasta.
+        chaseOn_ = true;
+        chaseEye_ = glm::vec3(0);
+        chaseLook_ = forward * 10.0f;
+    }
+    const float follow = 1.0f - std::exp(-(wanted ? 2.5f : 5.0f) * frameSeconds);
+    chaseEye_ += (eye - chaseEye_) * follow;
+    chaseLook_ += (look - chaseLook_) * follow;
+    if (!wanted && glm::length(chaseEye_) < 0.8f) chaseOn_ = false;
 }
 
 void Game::refreshPreview() {
@@ -324,6 +359,15 @@ Camera3D Game::buildCamera() const {
     const FlightModel& flight = player_.flight();
     const float shake = player_.animation().shake, kick = player_.animation().kick;
     Camera3D camera;
+    if (chaseOn_) {
+        camera.position = flight.position() + chaseEye_;
+        const glm::vec3 view = chaseLook_ - chaseEye_;
+        camera.yaw = std::atan2(view.x, -view.z);
+        camera.pitch = std::atan2(view.y, glm::length(glm::vec2(view.x, view.z))) + shake * 0.03f * std::sin(time_ * 47.0f);
+        camera.roll = shake * 0.03f * std::sin(time_ * 61.0f);
+        camera.aspect = static_cast<float>(width_) / static_cast<float>(std::max(height_, 1));
+        return camera;
+    }
     camera.position = flight.position() + glm::vec3(0, kick * 0.2f, 0);
     camera.yaw = flight.yaw();
     camera.pitch = flight.pitch() + kick * 0.05f + shake * 0.04f * std::sin(time_ * 47.0f);
@@ -380,6 +424,14 @@ void Game::prepareBirds() {
     } else {
         for (size_t i = 0; i < npcs_.birds().size(); i++) addNpc(npcPublicState(npcs_.birds()[i]), i);
     }
+    if (chaseOn_) {   // Em terceira pessoa o proprio passaro aparece na cena.
+        const FlightModel& flight = player_.flight();
+        const Profile* profile = session_->profile();
+        BirdInstance self{profile ? profile->birdSeed() : options_.seed, flight.position(), flight.yaw(),
+                          flight.pitch(), flight.roll(), kBirdScale, FlightMode::Glide};
+        self.key = 999u;
+        birds.push_back(self);
+    }
     if (match_.online()) {
         for (const PlayerPublicState& other : session_->authority().players())
             if (other.id != match_.localPlayer() && other.id != kNoPlayer) {
@@ -434,6 +486,7 @@ void Game::renderFrame() {
     prepareBirds();
     prepareNameTags(camera);
     showSkyPlanes(renderer_, session_->skyPlane().planes(), time_);
+    renderer_.setViewModelVisible(!chaseOn_);
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -630,10 +683,21 @@ void Game::captureWhaleShots(const std::string& outputDir) {
         start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
         cv::imwrite(outputDir + "/" + moment.name + ".png", captureFrame(3.0f));
     }
-    aimAt(bite, bite + glm::vec3(0, 0, -10));
-    start(session_->localPlayer(), 2.1f);
-    whale.stepBird(player_);
-    cv::imwrite(outputDir + "/baleia_5_na_boca.png", captureFrame(3.0f));
+    // O passaro local preso e depois arremessado, visto pela camera em terceira pessoa ja assentada.
+    const auto thirdPerson = [&](const char* name, float age) {
+        aimAt(bite, bite + glm::vec3(0, 0, -10));
+        start(session_->localPlayer(), age);
+        whale.stepBird(player_);
+        whale.stepBird(player_);
+        chaseOn_ = false;
+        for (int i = 0; i < 240; i++) updateChaseCamera(1.0f / 60.0f);
+        renderer_.setViewModelVisible(false);
+        cv::imwrite(outputDir + "/" + name + ".png", captureFrame(3.0f));
+        renderer_.setViewModelVisible(true);
+        chaseOn_ = false;
+    };
+    thirdPerson("baleia_5_na_boca", 2.1f);
+    thirdPerson("baleia_7_arremesso", 3.2f);
     whale = BoundaryWhale(session_->localPlayer());
     aimAt(glm::vec3(0, 45, 1105), glm::vec3(0, 0, 1180));
     for (int i = 0; i < 150; i++) whale.update(1.0f / 60.0f, player_, world_, session_->authority(), false);

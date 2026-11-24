@@ -113,13 +113,16 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 - Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
 - Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
 - Quem sobe até o teto (cerca de 410 m) chama um avião. Ele aparece ao longe, com o ronco do motor crescendo, e vem
-  direto em você. Desça antes que ele chegue: se acertar, você despenca, fica tonto por um instante e perde a carga.
+  direto em você. Não há aviso na tela: desça antes que ele chegue. Se acertar, você despenca mais de 100 m, fica tonto
+  por um instante e perde a carga.
 
 ### Limite do mapa
 
 A ilha é cercada de mar. Perto do limite aparecem a sombra de uma baleia gigante debaixo da água, bolhas, espirros e um
-ronco grave: é hora de voltar. Quem passa do limite é abocanhado pela baleia, que mastiga um pouco e cospe o pássaro de
-volta para o meio da ilha. Os cajus da carga caem no mar e se perdem. Todos na sala veem a baleia.
+ronco grave: é hora de voltar. Não há aviso na tela. Quem passa do limite é abocanhado pela baleia, que mastiga um pouco
+e cospe o pássaro com força para o meio da ilha. Durante o ataque a câmera sai para a terceira pessoa, para você ver a
+baleia e o arremesso, e volta para a primeira pessoa quando o voo é devolvido. Os cajus da carga caem no mar e se perdem.
+Todos na sala veem a baleia.
 
 ### Com o corpo
 

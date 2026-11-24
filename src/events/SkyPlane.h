@@ -28,8 +28,8 @@ constexpr float kPlaneCooldown = 25.0f;         // O dono espera isso depois de 
 constexpr float kPlaneRelaunchInterval = 20.0f; // A autoridade nao aceita dois avioes para o mesmo alvo nesse tempo.
 constexpr float kPlaneLaunchSlack = 40.0f;      // Folga de altura no host, que ve o cliente um pouco atrasado.
 constexpr float kPlaneStrikeWindow = kPlaneApproachLimit + 5.0f;
-constexpr float kPlaneStunSeconds = 1.8f;       // Tontura depois da batida: sem controle do voo.
-constexpr float kPlaneKnockDown = 55.0f;        // m/s para baixo logo depois da batida.
+constexpr float kPlaneStunSeconds = 2.6f;       // Tontura depois da batida: sem controle do voo.
+constexpr float kPlaneKnockDown = 95.0f;        // m/s para baixo logo depois da batida; cai cerca de 130 m tonto.
 constexpr float kPlaneKnockPush = 20.0f;        // m/s na direcao em que o aviao voava.
 
 // Autor do CashewDropped causado pelo aviao, para a interface dizer o motivo.

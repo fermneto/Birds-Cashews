@@ -230,7 +230,10 @@ void SkyPlaneEvent::tumble(PlayerBird& bird, float dt) {
     stun_ = std::max(0.0f, stun_ - dt);
     const float fade = stun_ / kPlaneStunSeconds;
     const float t = kPlaneStunSeconds - stun_;
-    bird.flight().setAttitude(-0.6f * fade, 0.9f * std::sin(t * 10.0f) * fade);
+    FlightModel& flight = bird.flight();
+    flight.setAttitude(-0.6f * fade, 0.9f * std::sin(t * 10.0f) * fade);
+    // O tranco nao some no planeio: o passaro continua despencando, cada vez menos, ate a tontura passar.
+    flight.setVerticalSpeed(std::min(flight.verticalSpeed(), -kPlaneKnockDown * fade));
 }
 
 FlightControls SkyPlaneEvent::stunControls() const {

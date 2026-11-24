@@ -61,6 +61,7 @@ private:
     const cv::Mat& nameLabel(const std::string& name);
     void refreshPreview();
     Camera3D buildCamera() const;
+    void updateChaseCamera(float frameSeconds);
     void prepareCashews(const Camera3D& camera);
     void prepareNest(const Camera3D& camera);
     void prepareWhales();
@@ -100,4 +101,7 @@ private:
     double worldElapsed_ = 0;         // Tempo de mundo das partidas anteriores, lido de mundo.txt.
     int width_ = 1280, height_ = 720;
     int shownNestRevision_ = -1, shownRivalRevision_ = -1;
+    // Camera em terceira pessoa enquanto a baleia ataca: posicao do olho e do ponto mirado relativas ao passaro.
+    bool chaseOn_ = false;
+    glm::vec3 chaseEye_{0}, chaseLook_{0};
 };

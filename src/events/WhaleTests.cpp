@@ -286,13 +286,15 @@ void testSpitEverywhere(TestRun& t, const World& world) {
             continue;
         }
         rig.tickUntil([&] { return !rig.session.whale().holdsLocal(); }, 400);
-        for (int f = 0; f < 300; f++) {
+        // Durante o arremesso o passaro voa sem comandos; depois dele o jogador ja controla o voo.
+        for (int f = 0; f < 400 && rig.session.whale().throwsLocal(); f++) {
             rig.tick();
             allFree = allFree && isFree(world, rig.bird.flight().position());
         }
-        allInside = allInside && radiusOf(rig.bird.flight().position()) < World::kBoundaryRadius - 50.0f;
+        allInside = allInside && radiusOf(rig.bird.flight().position()) < World::kBoundaryRadius - 200.0f;
     }
-    t.check("baleia: de qualquer lado e altura ela ataca, cospe para dentro e o passaro fica livre", allTriggered && allInside && allFree);
+    t.check("baleia: de qualquer lado e altura ela ataca, cospe com forca para o centro e o passaro fica livre",
+            allTriggered && allInside && allFree);
 }
 
 // ---- Rede: host autoritativo e clientes animando a mesma baleia ----

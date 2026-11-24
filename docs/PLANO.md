@@ -92,10 +92,11 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
 - **Árvore:** bater com força (a partir de 6 m/s contra a superfície) reduz a velocidade e derruba um caju. Não existe
   morte.
 - **Avião no teto:** o voo tem teto em 420 m. Quem passa de 410 m chama um avião, que aparece a 700 m, à frente do
-  pássaro e um pouco acima, com o ronco do motor crescendo e o aviso "Um avião vem na sua direção: desça!". Ele voa a
+  pássaro e um pouco acima, com o ronco do motor crescendo. Não há aviso na tela: o jogador vê e ouve o avião. Ele voa a
   95 m/s, o dobro do pássaro mais rápido, sempre apontando para o alvo, então sempre chega, depois de uns 6 a 8 s. Ele
   não desce abaixo de 360 m: quem mergulha antes vê o avião passar por cima e ir embora. Se acertar, o pássaro é jogado
-  para baixo (cai cerca de 40 m), a tela treme, fica tonto por 1,8 s sem controle do voo e toda a carga cai no mundo.
+  para baixo a 95 m/s e continua despencando durante a tontura (cai mais de 100 m), a tela treme, fica 2,6 s sem controle
+  do voo e toda a carga cai no mundo. A câmera continua em primeira pessoa.
   Depois de cada avião, o mesmo jogador espera 25 s para chamar outro.
 - **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho, pelo avião ou pela árvore caem até o chão ou uma copa e ficam
   30 s no mundo. Qualquer um pega, como caju comum. Quem derrubou espera 2 s para pegar o próprio caju de volta.
@@ -175,14 +176,17 @@ O mapa é um círculo de 1150 m de raio, todo cercado de mar. Não existe parede
 abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
 
 - **Aviso (de 1050 a 1150 m):** a sombra da baleia ronda por baixo da água, perto do pássaro, cada vez maior. Sobem bolhas,
-  ela espirra pelo espiráculo e um ronco grave fica mais alto. O HUD avisa "Cuidado com a baleia: volte para a ilha". Dá
-  tempo de virar.
+  ela espirra pelo espiráculo e um ronco grave fica mais alto. Não há aviso na tela, só esses sinais no mundo. Dá tempo
+  de virar.
+- **Câmera:** do salto até o fim do arremesso, a câmera sai para a terceira pessoa. Com o pássaro na boca, ela fica de
+  lado, entre a baleia e a ilha. No arremesso, segue atrás e acima do pássaro. Depois volta suavemente para a primeira pessoa.
 - **Mordida (1 s):** passou de 1150 m, a baleia salta do mar de boca aberta, vindo de fora do mapa, e fecha a boca no
   pássaro. Se ele estiver muito alto, é puxado para baixo até a boca, que salta no máximo 75 m acima do mar.
 - **Mastigada (2 s):** a baleia cai de volta com o pássaro preso entre as mandíbulas e mastiga com a cabeça fora da água. A
   câmera treme a cada mordida e os comandos não respondem.
-- **Cuspida:** a baleia cospe o pássaro para o centro da ilha a 70 m/s, subindo. O jogador volta a controlar o voo no ar.
-  Em 4 s ele está mais de 50 m para dentro do limite, sem encostar em nada.
+- **Cuspida:** a baleia cospe o pássaro com força para o centro da ilha, a 115 m/s e subindo. Ele voa arremessado por
+  2,5 s sem perder velocidade nem responder aos comandos, avança mais de 200 m para dentro do limite e só então o jogador
+  volta a controlar o voo, ainda rápido, chegando a uns 450 m da borda.
 - **Carga:** os cajus caem no mar com a mordida e se perdem. Diferente da carga derrubada por mergulho ou por árvore
   (seção 3.3), eles não ficam no mundo: o mar está fora do mapa e ninguém consegue alcançá-los. A perda também impede que a
   baleia vire um atalho gratuito, já que a cuspida leva o pássaro rápido até o meio da ilha.

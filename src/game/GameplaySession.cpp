@@ -79,7 +79,7 @@ std::vector<GameplayFeedback> GameplaySession::drainFeedback() {
 void GameplaySession::applyControls(const FlightControls& input) {
     const FlightControls controls = skyPlane_.stunned() ? skyPlane_.stunControls() : input;   // Tonto pelo aviao.
     flightMode_ = perched_ || controls.mode == FlightMode::Lost ? FlightMode::Glide : controls.mode;
-    if (whale_.holdsLocal()) {   // Preso na boca da baleia, os comandos so voltam depois da cuspida.
+    if (whale_.holdsLocal() || whale_.throwsLocal()) {   // Preso na boca ou arremessado: sem comandos ate o fim do arremesso.
         flightMode_ = FlightMode::Glide;
         bird_.applyControls(FlightControls{});
         return;
