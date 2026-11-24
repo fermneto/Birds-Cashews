@@ -110,40 +110,116 @@ bool isFree(const World& world, glm::vec3 point) {
 
 // ---- Animacao: so depende da posicao do evento e do tempo ----
 
+GameEvent biteOf(PlayerId id, glm::vec3 position) {
+    GameEvent event;
+    event.type = GameEventType::WhaleBite;
+    event.actor = event.target = id;
+    event.position = position;
+    return event;
+}
+
+
 void testTimeline(TestRun& t) {
     const glm::vec3 bite(0, 30, 1160);
-    const whale::Pose atBite = whale::poseAt(bite, whale::kBiteTime);
-    const whale::HeldBird held = whale::heldAt(bite, bite + glm::vec3(0, 0, 4), 0.0f, whale::kBiteTime);
+    const WhaleTimeline time = whaleTimeline(bite.y);
+    const whale::Pose atBite = whale::poseAt(bite, time.bite);
+    const whale::HeldBird held = whale::heldAt(bite, bite + glm::vec3(0, 0, 4), glm::vec3(0), 0.0f, time.bite);
+    t.check("baleia: num salto baixo o ritmo de sempre, uns 1 s ate a mordida e uns 3,5 s ate cuspir",
+            time.bite > 0.9f && time.bite < 1.2f && time.spit > 3.0f && time.spit < 4.0f && time.end > time.spit + 1.0f);
     t.check("baleia: na mordida a boca chega ao passaro",
             glm::length(atBite.holdPoint() - bite) < 6.0f && glm::length(held.position - atBite.holdPoint()) < 0.01f);
     t.check("baleia: salta de baixo da agua e some de novo no mar",
-            whale::poseAt(bite, 0).mouth.y < -10.0f && whale::poseAt(bite, whale::kEndTime).mouth.y < -20.0f &&
-                atBite.mouth.y > 20.0f);
+            whale::poseAt(bite, 0).mouth.y < -10.0f && whale::poseAt(bite, time.end).mouth.y < -20.0f && atBite.mouth.y > 20.0f);
     t.check("baleia: vem de fora do mapa e olha para a ilha",
             radiusOf(whale::poseAt(bite, 0).mouth) > radiusOf(bite) + 15.0f && atBite.forward.z < -0.2f);
     const auto jaw = [&](float age) { return whale::poseAt(bite, age).jaw; };
     float chewOpen = 0, chewClosed = 1;
-    for (float age = whale::kFallEnd; age < whale::kSpitTime; age += 0.01f) {
+    for (float age = time.fallEnd; age < time.spit; age += 0.01f) {
         chewOpen = std::max(chewOpen, jaw(age));
         chewClosed = std::min(chewClosed, jaw(age));
     }
     t.check("baleia: abre a boca no salto, fecha na mordida, mastiga e abre para cuspir",
-            jaw(0.9f) > 0.5f && jaw(1.2f) < 0.1f && chewOpen > 0.2f && chewClosed < 0.02f && jaw(3.2f) > 0.6f);
+            jaw(0.9f * time.bite) > 0.5f && jaw(time.bite + 0.2f) < 0.1f && chewOpen > 0.2f && chewClosed < 0.02f &&
+                jaw(time.spit + 0.2f) > 0.6f);
 
     // Sem saltos de um quadro para o outro, nem quando muda de fase.
     float worstMouth = 0, worstHeld = 0;
-    const glm::vec3 start = bite + glm::vec3(3, 10, -5);
-    for (float age = 0; age < whale::kEndTime; age += 1.0f / 240.0f) {
+    const glm::vec3 start = bite + glm::vec3(3, 10, -5), velocity(0, -2, 24);
+    for (float age = 0; age < time.end; age += 1.0f / 240.0f) {
         worstMouth = std::max(worstMouth, glm::length(whale::poseAt(bite, age + 1.0f / 240.0f).mouth - whale::poseAt(bite, age).mouth));
-        if (age + 1.0f / 240.0f < whale::kSpitTime)
-            worstHeld = std::max(worstHeld, glm::length(whale::heldAt(bite, start, 0, age + 1.0f / 240.0f).position -
-                                                        whale::heldAt(bite, start, 0, age).position));
+        if (age + 1.0f / 240.0f < time.spit)
+            worstHeld = std::max(worstHeld, glm::length(whale::heldAt(bite, start, velocity, 0, age + 1.0f / 240.0f).position -
+                                                        whale::heldAt(bite, start, velocity, 0, age).position));
     }
     t.check("baleia: a animacao e continua entre as fases", worstMouth < 1.5f && worstHeld < 1.5f);
-    const glm::vec3 high(0, 380, 1160);
-    t.check("baleia: passaro alto e puxado ate a boca, que nao salta acima do limite",
-            whale::poseAt(high, whale::kBiteTime).mouth.y <= whale::kMaxLeap + 0.01f &&
-                glm::length(whale::heldAt(high, high, 0, whale::kBiteTime).position - whale::poseAt(high, whale::kBiteTime).holdPoint()) < 0.01f);
+}
+
+// Do rente ao mar ate o teto do voo: a baleia salta em arco ate a altura do passaro, que nao e puxado, e cai
+// de volta na agua com ele. Saltos mais altos duram mais; tudo sai so da posicao do evento e do tempo.
+void testHighLeap(TestRun& t) {
+    bool reaches = true, apex = true, ballistic = true, gentle = true, smooth = true, dry = true, settles = true, longer = true;
+    float lastBite = 0, lastEnd = 0;
+    for (const float height : {14.0f, 30.0f, 75.0f, 150.0f, 250.0f, 350.0f, FlightModel::kCeiling, FlightModel::kCeiling + 12.0f}) {
+        const glm::vec3 bite = pointAt(1158.0f, 0.7f + height * 0.01f, height);
+        const WhaleTimeline time = whaleTimeline(height);
+        const glm::vec3 velocity = whale::outward(bite) * FlightModel::kCruiseSpeed + glm::vec3(0, -4, 0);
+        const whale::Pose top = whale::poseAt(bite, time.bite);
+        reaches = reaches && glm::length(top.holdPoint() - bite) < 6.0f && top.mouth.y > height;
+        // O apice e na mordida; na subida a boca freia sob a gravidade do salto (segunda diferenca constante).
+        constexpr float h = 0.05f;
+        for (float age = 0; age < time.brake; age += h) apex = apex && whale::poseAt(bite, age).mouth.y <= top.mouth.y + 0.01f;
+        for (float age = h; age + h < time.bite; age += h) {
+            const float curve =
+                (whale::poseAt(bite, age + h).mouth.y - 2 * whale::poseAt(bite, age).mouth.y + whale::poseAt(bite, age - h).mouth.y) / (h * h);
+            ballistic = ballistic && std::abs(curve + time.gravity) < 0.5f;
+        }
+        // Enquanto a baleia sobe o passaro so perde o embalo: cada quadro anda no maximo o que ja voava, mais um ajuste leve.
+        for (float age = 0; age + kFrame <= time.bite; age += kFrame) {
+            const float step = glm::length(whale::heldAt(bite, bite, velocity, 0, age + kFrame).position -
+                                           whale::heldAt(bite, bite, velocity, 0, age).position);
+            gentle = gentle && step <= (glm::length(velocity) + 20.0f) * kFrame;
+        }
+        for (float age = 0; age < time.spit; age += 1.0f / 240.0f) {
+            const glm::vec3 now = whale::heldAt(bite, bite, velocity, 0, age).position;
+            smooth = smooth && glm::length(whale::heldAt(bite, bite, velocity, 0, age + 1.0f / 240.0f).position - now) < 1.5f;
+            if (age >= time.bite) dry = dry && now.y > 1.0f;   // Preso na boca, nunca afunda.
+        }
+        settles = settles && std::abs(whale::poseAt(bite, time.fallEnd + 0.01f).mouth.y - 6.5f) < 1.0f && time.brake > time.bite &&
+                  time.fallEnd > time.brake && time.spit > time.fallEnd + 1.0f;
+        longer = longer && time.bite > lastBite && time.end > lastEnd;
+        lastBite = time.bite;
+        lastEnd = time.end;
+    }
+    const WhaleTimeline ceiling = whaleTimeline(FlightModel::kCeiling);
+    t.check("baleia: o salto alcanca o passaro em qualquer altura ate o teto do voo", reaches);
+    t.check("baleia: o apice do salto e na mordida, em arco balistico", apex && ballistic);
+    t.check("baleia: o passaro alto nao e puxado ate a boca, so perde o embalo", gentle);
+    t.check("baleia: preso, o passaro cai com a baleia sem saltos e nunca afunda", smooth && dry);
+    t.check("baleia: cai de volta e assenta na agua para mastigar", settles);
+    t.check("baleia: saltos mais altos duram mais, sem exagero",
+            longer && ceiling.bite > 3.0f && ceiling.bite < 4.5f && ceiling.spit < 10.0f &&
+                ceiling.impactSpeed > 3.0f * whaleTimeline(30).impactSpeed);
+}
+
+// Dois computadores com quadros de tamanhos diferentes desenham a mesma baleia no mesmo instante.
+void testDeterminism(TestRun& t, const World& world) {
+    TempDir dir;
+    Rig rig(world, dir.path());
+    const glm::vec3 bite = pointAt(1160.0f, 2.0f, 380.0f);
+    const PlayerId other = static_cast<PlayerId>(rig.session.localPlayer() + 1);
+    BoundaryWhale fast(rig.session.localPlayer()), slow(rig.session.localPlayer());
+    fast.handle(biteOf(other, bite), rig.bird.flight());
+    slow.handle(biteOf(other, bite), rig.bird.flight());
+    bool same = true;
+    for (int i = 0; i < 6; i++) {
+        for (int f = 0; f < 60; f++) fast.update(1.0f / 120.0f, rig.bird, world, rig.session.authority(), false);
+        for (int f = 0; f < 22; f++) slow.update(0.5f / 22.0f, rig.bird, world, rig.session.authority(), false);
+        const WhaleScene a = fast.scene(), b = slow.scene();
+        whale::HeldBird heldA, heldB;
+        same = same && a.whales.size() == 1 && b.whales.size() == 1 && fast.heldPose(other, heldA) && slow.heldPose(other, heldB) &&
+               glm::length(a.whales[0].model[3] - b.whales[0].model[3]) < 0.05f && glm::length(heldA.position - heldB.position) < 0.05f;
+    }
+    t.check("baleia: a mesma pose em todos os computadores, qualquer que seja o tamanho do quadro", same);
 }
 
 void testModel(TestRun& t) {
@@ -161,13 +237,6 @@ void testModel(TestRun& t) {
 
 // ---- Regra da autoridade ----
 
-GameEvent biteOf(PlayerId id, glm::vec3 position) {
-    GameEvent event;
-    event.type = GameEventType::WhaleBite;
-    event.actor = event.target = id;
-    event.position = position;
-    return event;
-}
 
 void testGate(TestRun& t) {
     WhaleGate gate;
@@ -219,16 +288,17 @@ void testSolo(TestRun& t, const World& world) {
                 rig.field.activeLoose().empty());
     t.check("baleia sozinho: todos veem a baleia saltando", whale.scene().whales.size() == 1);
 
-    rig.tickUntil([&] { return whale.attacks().front().age >= whale::kBiteTime; }, 200);
-    const whale::Pose bitten = whale::poseAt(whale.attacks().front().bite, whale::kBiteTime);
+    const WhaleTimeline time = whale.attacks().front().timeline;
+    rig.tickUntil([&] { return whale.attacks().front().age >= time.bite; }, 200);
+    const whale::Pose bitten = whale::poseAt(whale.attacks().front().bite, time.bite);
     t.check("baleia sozinho: na mordida o passaro esta entre as mandibulas",
             glm::length(rig.bird.flight().position() - bitten.holdPoint()) < 4.0f && rig.count(WhaleCueKind::Bite) == 1 &&
-                rig.count(WhaleCueKind::Splash) == 1);
-    rig.tickUntil([&] { return whale.attacks().front().age >= whale::kFallEnd + 0.05f; }, 200);
+                rig.count(WhaleCueKind::Splash) == 1 && rig.count(WhaleCueKind::Song) == 1);
+    rig.tickUntil([&] { return whale.attacks().front().age >= time.fallEnd + 0.05f; }, 200);
     rig.cues.clear();
     float shake = 0;
     bool stayed = true;
-    while (whale.holdsLocal() && whale.attacks().front().age < whale::kSpitTime - 0.05f) {
+    while (whale.holdsLocal() && whale.attacks().front().age < time.spit - 0.05f) {
         rig.tick(FlightControls{FlightMode::Flap, 0.0f, 3, 1.0f});   // Bater as asas nao solta da boca.
         shake = std::max(shake, rig.bird.animation().shake);
         const whale::Pose pose = whale::poseAt(whale.attacks().front().bite, whale.attacks().front().age);
@@ -280,12 +350,13 @@ void testSpitEverywhere(TestRun& t, const World& world) {
         TempDir dir;
         Rig rig(world, dir.path());
         const float angle = kPi * 2.0f * i / 8.0f + 0.2f;
-        rig.placeOut(pointAt(i % 2 ? 1300.0f : 1155.0f, angle, i % 3 == 0 ? 300.0f : 4.0f + 10.0f * i));
+        const float heights[] = {4.0f, 420.0f, 35.0f, 300.0f, 90.0f, 410.0f, 180.0f, 260.0f};
+        rig.placeOut(pointAt(i % 2 ? 1300.0f : 1155.0f, angle, heights[i]));
         if (!rig.tickUntil([&] { return rig.session.whale().holdsLocal(); }, 4)) {
             allTriggered = false;
             continue;
         }
-        rig.tickUntil([&] { return !rig.session.whale().holdsLocal(); }, 400);
+        rig.tickUntil([&] { return !rig.session.whale().holdsLocal(); }, 900);
         // Durante o arremesso o passaro voa sem comandos; depois dele o jogador ja controla o voo.
         for (int f = 0; f < 400 && rig.session.whale().throwsLocal(); f++) {
             rig.tick();
@@ -431,7 +502,7 @@ void testNetwork(TestRun& t, const World& world) {
 
     // Cada computador anima a mesma baleia: no mesmo tempo desde o evento, a mesma pose.
     const auto ageOf = [](const Peer& peer) { return peer.whale.attacks().empty() ? -1.0f : peer.whale.attacks().front().age; };
-    for (int i = 0; i < 300 && ageOf(crowd) < whale::kBiteTime + 0.5f; i++) {
+    for (int i = 0; i < 300 && ageOf(crowd) < whaleTimeline(seen.position.y).bite + 0.5f; i++) {
         frame(true);
         prey.publish();
     }
@@ -439,8 +510,8 @@ void testNetwork(TestRun& t, const World& world) {
     const whale::Pose there = whale::poseAt(seen.position, age), here = whale::poseAt(prey.whale.attacks().front().bite, age);
     whale::HeldBird drawn;
     const bool held = crowd.whale.heldPose(prey.id, drawn);
-    const whale::HeldBird own = whale::heldAt(prey.whale.attacks().front().bite, prey.whale.attacks().front().start,
-                                              prey.whale.attacks().front().startYaw, age);
+    const WhaleAttack& mine = prey.whale.attacks().front();
+    const whale::HeldBird own = whale::heldAt(mine.bite, mine.start, mine.velocity, mine.startYaw, age);
     t.check("baleia em rede: a plateia ve a mesma pose da baleia e o passaro preso na boca",
             glm::length(there.mouth - here.mouth) < 0.01f && held && glm::length(drawn.position - own.position) < 0.01f &&
                 std::abs(ageOf(prey) - age) < 0.2f);
@@ -475,6 +546,8 @@ int runWhaleSelfTest() {
     TestRun test;
     const World world(kSeed);
     testTimeline(test);
+    testHighLeap(test);
+    testDeterminism(test, world);
     testModel(test);
     testGate(test);
     testSolo(test, world);

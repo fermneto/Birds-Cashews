@@ -693,7 +693,9 @@ void testSounds(TestRun& t) {
         const auto [low, high] = std::minmax_element(samples.begin(), samples.end());
         const bool audible = !samples.empty() && *high > 1500 && *low < -1500;
         const bool notClipped = !samples.empty() && *high < 32767 && *low > -32767;
-        const bool shortEnough = samples.size() < static_cast<size_t>(SoundManager::sampleRate());
+        // Os sons da baleia sao longos de proposito (canto, splash com cauda de agua); os outros ficam abaixo de 1 s.
+        const bool whale = i >= static_cast<int>(UiSound::WhaleSpout) && i <= static_cast<int>(UiSound::WhaleSong);
+        const bool shortEnough = samples.size() < static_cast<size_t>(SoundManager::sampleRate() * (whale ? 4 : 1));
         t.check("som: efeito " + std::to_string(i) + " audivel, sem saturar e curto", audible && notClipped && shortEnough);
     }
     const GameplayFeedback all[] = {GameplayFeedback::CashewCollected, GameplayFeedback::CashewDelivered, GameplayFeedback::UpgradeBought,

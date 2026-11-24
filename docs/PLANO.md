@@ -176,15 +176,26 @@ O mapa é um círculo de 1150 m de raio, todo cercado de mar. Não existe parede
 abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
 
 - **Aviso (de 1050 a 1150 m):** a sombra da baleia ronda por baixo da água, perto do pássaro, cada vez maior. Sobem bolhas,
-  ela espirra pelo espiráculo e um ronco grave fica mais alto. Não há aviso na tela, só esses sinais no mundo. Dá tempo
-  de virar.
+  ela espirra pelo espiráculo (um sopro forte com garoa caindo) e um ronco grave e áspero fica mais alto. Não há aviso
+  na tela, só esses sinais no mundo. Dá tempo de virar.
 - **Câmera:** do salto até o fim do arremesso, a câmera sai para a terceira pessoa. Com o pássaro na boca, ela fica de
-  lado, entre a baleia e a ilha. No arremesso, segue atrás e acima do pássaro. Depois volta suavemente para a primeira pessoa.
-- **Mordida (1 s):** passou de 1150 m, a baleia salta do mar de boca aberta, vindo de fora do mapa, e fecha a boca no
-  pássaro. Se ele estiver muito alto, é puxado para baixo até a boca, que salta no máximo 75 m acima do mar.
-- **Mastigada (2 s):** a baleia cai de volta com o pássaro preso entre as mandíbulas e mastiga com a cabeça fora da água. A
-  câmera treme a cada mordida e os comandos não respondem.
-- **Cuspida:** a baleia cospe o pássaro com força para o centro da ilha, a 115 m/s e subindo. Ele voa arremessado por
+  lado, entre a baleia e a ilha. Num salto alto ela se afasta (até uns 3 vezes) e olha para baixo enquanto a baleia
+  sobe, para mostrar o arco, e volta a se aproximar quando a baleia chega e cai com o pássaro. No arremesso, segue atrás
+  e acima do pássaro. Depois volta suavemente para a primeira pessoa.
+- **Salto e mordida:** passou de 1150 m, a baleia salta do mar de boca aberta, vindo de fora do mapa, cantando um gemido
+  grave. O salto é balístico: sai de 20 m de fundo, sobe em arco freando e chega ao ápice exatamente na altura do
+  pássaro, onde fecha a boca, em qualquer altura até o teto de 420 m. O pássaro não é puxado: ele perde o embalo em
+  cerca de meio segundo e paira virado para a baleia, com um ajuste suave de poucos metros ao longo do salto para ficar
+  entre as mandíbulas. Saltos maiores levam mais tempo: cerca de 1 s até 75 m de altura e 3,7 s do teto (a gravidade do
+  salto cai de 100 para 65 m/s² nos saltos altos, para que se veja o arco).
+- **Queda e mastigada:** a baleia cai de volta com o pássaro na boca. O corpo bate na água e freia a cabeça até a altura de
+  mastigar; o splash (espuma, gotas e, nas quedas altas, uma coluna de água e um ronco por baixo) cresce com a velocidade
+  da pancada. Ela mastiga 1,4 s com a cabeça fora da água. A câmera treme na mordida, na pancada e a cada mastigada, e os
+  comandos não respondem. Do teto, a sequência até a cuspida leva uns 9 s; de baixo, uns 3,5 s.
+- **Cuspida:** depois de voltar para a água, a baleia cospe o pássaro com força para o centro da ilha, a 115 m/s e
+  subindo. Cuspir de volta no mar, e não no ar, mantém a mastigada visível, faz a cuspida sair sempre da mesma altura
+  (o arremesso chega sempre ao mesmo ponto, venha o pássaro de onde vier) e evita jogá-lo de volta perto do teto, onde
+  chamaria o avião. Ele voa arremessado por
   2,5 s sem perder velocidade nem responder aos comandos, avança mais de 200 m para dentro do limite e só então o jogador
   volta a controlar o voo, ainda rápido, chegando a uns 450 m da borda.
 - **Carga:** os cajus caem no mar com a mordida e se perdem. Diferente da carga derrubada por mergulho ou por árvore
@@ -197,7 +208,8 @@ abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
   `LocalAuthority` no jogo sozinho) confere se o pássaro está mesmo além do limite, se ainda não foi mordido nesta saída e
   quantos cajus ele levava, e envia o evento a todos. O evento leva o alvo e a posição da mordida. Cada computador anima a
   mesma baleia a partir do instante em que recebe o evento, sem mais nada pela rede: a pose depende só da posição e do
-  tempo. O dono controla o próprio pássaro durante a sequência, preso na boca e depois arremessado. Os outros desenham o
+  tempo, e a duração de cada fase sai da altura da mordida (`whaleTimeline`), que o host também usa para proteger o
+  pássaro durante a sequência. O dono controla o próprio pássaro durante a sequência, preso na boca e depois arremessado. Os outros desenham o
   pássaro entre as mandíbulas enquanto ele está preso.
 
 ## 4. Arquitetura
@@ -244,7 +256,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Atendido |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Atendido |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida) e baleia do limite (ronco grave e espirro no aviso, splash, mordida, mastigada e cuspida). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida) e baleia do limite (sons longos e graves em camadas: ronco áspero e espirro no aviso, canto de baleia no salto, splash pesado com cauda de água, mordida com estalo, mastigadas, cuspida com sopro forte). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma

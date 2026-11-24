@@ -6,23 +6,17 @@
 #include <vector>
 
 // Baleia gigante do limite do mapa. Quem passa de World::kBoundaryRadius sobre o mar pede um WhaleBite a
-// autoridade. Confirmado, todos os computadores animam a mesma baleia a partir do evento: ela salta do mar,
-// abocanha o passaro, mastiga e cospe o passaro de volta para o centro da ilha. A animacao depende so da
-// posicao do evento e do tempo desde que ele chegou, entao nada mais trafega pela rede. O dono do passaro
-// controla o proprio voo durante a sequencia: preso na boca e, depois, arremessado para dentro do mapa.
+// autoridade. Confirmado, todos os computadores animam a mesma baleia a partir do evento: ela salta do mar
+// ate a altura do passaro, abocanha no apice, cai de volta com ele, mastiga e cospe o passaro para o centro
+// da ilha. A animacao depende so da posicao do evento e do tempo desde que ele chegou (os instantes vem de
+// whaleTimeline, em events/WhaleGate), entao nada mais trafega pela rede. O dono do passaro controla o
+// proprio voo durante a sequencia: preso na boca e, depois, arremessado para dentro do mapa.
 namespace whale {
-constexpr float kBiteTime = 1.0f;     // Salto ate a boca fechar no passaro.
-constexpr float kFallEnd = 1.6f;      // A baleia cai de volta com o passaro na boca.
-constexpr float kSpitTime = 3.0f;     // Mastiga ate aqui e cospe.
-constexpr float kSinkStart = 3.35f;   // Depois do tranco da cuspida, mergulha.
-constexpr float kEndTime = kWhaleSequenceSeconds;   // Some debaixo da agua.
 constexpr float kCooldown = 8.0f;     // Segundos depois de cuspir sem outra mordida no mesmo passaro.
 constexpr float kRetrySeconds = 2.0f; // Sem resposta da autoridade, pede de novo.
 constexpr float kSpitSpeed = 115.0f;  // m/s para dentro do mapa.
 constexpr float kSpitClimb = 18.0f;   // m/s para cima na saida da boca.
-constexpr float kThrowSeconds = 2.5f; // Depois da cuspida, voa arremessado para o centro sem perder velocidade.
-constexpr float kThrowEnd = kSpitTime + kThrowSeconds;
-constexpr float kMaxLeap = 75.0f;     // A boca nunca sobe mais que isso acima do mar.
+constexpr float kCoastSeconds = 0.45f;   // O passaro perde o embalo assim, enquanto a baleia sobe ate ele.
 constexpr float kScale = 1.4f;       // O modelo (gfx/WhaleView) tem 46 m; a baleia do jogo tem uns 65 m.
 constexpr float kJawOpen = 0.75f;     // Radianos com a boca toda aberta no salto.
 
@@ -36,18 +30,19 @@ struct Pose {
 };
 Pose poseAt(glm::vec3 bite, float age);
 
-// Pose do passaro preso, ate kSpitTime. start e de onde ele foi puxado (o dono usa a propria posicao).
+// Pose do passaro preso, ate a cuspida. start e velocity sao de onde e como ele voava quando o evento chegou
+// (o dono usa o proprio voo; os outros, a posicao do evento parada).
 struct HeldBird {
     glm::vec3 position{0};
     float yaw = 0, pitch = 0;
 };
-HeldBird heldAt(glm::vec3 bite, glm::vec3 start, float startYaw, float age);
+HeldBird heldAt(glm::vec3 bite, glm::vec3 start, glm::vec3 velocity, float startYaw, float age);
 
 float yawToCenter(glm::vec3 position);   // Guinada que aponta o passaro para o centro da ilha.
 glm::vec3 outward(glm::vec3 position);   // Direcao horizontal do centro para a posicao.
 }
 
-enum class WhaleCueKind { Spout, Splash, Bite, Chew, Spit, Rumble };
+enum class WhaleCueKind { Spout, Splash, Bite, Chew, Spit, Rumble, Song };
 
 // Som pedido pela baleia. volume ja vem de 0 a 1; a distancia ate quem ouve fica com quem toca.
 struct WhaleCue {
@@ -60,8 +55,10 @@ struct WhaleCue {
 struct WhaleAttack {
     PlayerId target = kNoPlayer;
     glm::vec3 bite{0};    // Posicao do evento.
-    glm::vec3 start{0};   // De onde o passaro foi puxado; para os outros jogadores, a propria mordida.
+    glm::vec3 start{0};   // Onde o passaro estava; para os outros jogadores, a propria mordida.
+    glm::vec3 velocity{0};   // Embalo do passaro no evento; zero para os outros jogadores.
     float startYaw = 0;
+    WhaleTimeline timeline;   // Instantes da sequencia, pela altura da mordida.
     float age = 0;
     bool spat = false;    // So o dono usa: o passaro ja foi arremessado.
 };
@@ -86,13 +83,13 @@ public:
     bool waiting() const { return waitTimer_ > 0; }   // Pedido enviado, sem resposta ainda.
     bool heldPose(PlayerId id, whale::HeldBird& pose) const;   // Para desenhar outro jogador preso na boca.
     const std::vector<WhaleAttack>& attacks() const { return attacks_; }
+    const WhaleAttack* localAttack() const;   // A baleia atras do passaro local, se houver.
 
     std::vector<WhaleCue> drainCues();
     WhaleScene scene() const;
 
 private:
     WhaleAttack* localAttack();
-    const WhaleAttack* localAttack() const;
     void advanceAttacks(float seconds, PlayerBird& bird);
     void updateWarning(float seconds, const PlayerBird& bird, const World& world);
     void requestBite(const PlayerBird& bird, const World& world, GameAuthority& authority, bool canTrigger);

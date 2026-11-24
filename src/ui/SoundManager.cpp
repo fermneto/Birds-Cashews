@@ -98,6 +98,7 @@ std::vector<Tone> tonesFor(UiSound sound) {
         case UiSound::WhaleChew:
         case UiSound::WhaleSpit:
         case UiSound::WhaleRumble:
+        case UiSound::WhaleSong:
         case UiSound::Count: break;
     }
     return {};
@@ -144,7 +145,7 @@ int SoundManager::sampleRate() { return kSampleRate; }
 std::vector<int16_t> SoundManager::synthesize(UiSound sound) {
     std::vector<float> mix = sound == UiSound::Flap ? flapWhoosh() : std::vector<float>{};
     if (sound == UiSound::PlaneCrash) mix = synthesizePlaneImpact(kSampleRate);
-    if (sound >= UiSound::WhaleSpout && sound <= UiSound::WhaleRumble)
+    if (sound >= UiSound::WhaleSpout && sound <= UiSound::WhaleSong)
         mix = synthesizeWhaleSound(static_cast<WhaleSound>(static_cast<int>(sound) - static_cast<int>(UiSound::WhaleSpout)), kSampleRate);
     for (const Tone& tone : tonesFor(sound)) addTone(mix, tone);
     std::vector<int16_t> samples(mix.size());

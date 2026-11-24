@@ -164,7 +164,7 @@ void GameplaySession::handleWhaleBite(const GameEvent& event, int carriedBefore)
     if (event.target != localPlayer_ || collector_.carried() >= carriedBefore) return;
     lossCause_ = CargoLossCause::Whale;
     feedback_.push_back(GameplayFeedback::CargoLost);
-    cargoLostNotice_ = whale::kSpitTime + kCargoLostNoticeSeconds;   // O aviso aparece depois da cuspida.
+    cargoLostNotice_ = whaleTimeline(event.position.y).spit + kCargoLostNoticeSeconds;   // O aviso aparece depois da cuspida.
 }
 
 // A carga cai por tres motivos: cacador (NPC), mergulho de outro jogador ou batida em arvore.

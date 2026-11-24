@@ -119,8 +119,9 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 ### Limite do mapa
 
 A ilha é cercada de mar. Perto do limite aparecem a sombra de uma baleia gigante debaixo da água, bolhas, espirros e um
-ronco grave: é hora de voltar. Não há aviso na tela. Quem passa do limite é abocanhado pela baleia, que mastiga um pouco
-e cospe o pássaro com força para o meio da ilha. Durante o ataque a câmera sai para a terceira pessoa, para você ver a
+ronco grave: é hora de voltar. Não há aviso na tela. Quem passa do limite é abocanhado pela baleia, que salta em arco
+até a altura do pássaro, até mesmo no teto de voo (quanto mais alto, mais longo o salto), cai de volta no mar com ele,
+mastiga um pouco e cospe o pássaro com força para o meio da ilha. Durante o ataque a câmera sai para a terceira pessoa, para você ver a
 baleia e o arremesso, e volta para a primeira pessoa quando o voo é devolvido. Os cajus da carga caem no mar e se perdem.
 Todos na sala veem a baleia.
 

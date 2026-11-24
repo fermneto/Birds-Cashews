@@ -231,7 +231,8 @@ void Game::advance(float frameSeconds) {
 }
 
 // Enquanto a baleia ataca, a camera sai do passaro: de lado, para ver o salto e a mordida, e atras dele
-// no arremesso. Depois volta suavemente para a primeira pessoa.
+// no arremesso. Depois volta suavemente para a primeira pessoa. Num salto alto ela se afasta e olha para
+// baixo enquanto a baleia sobe, para ver o arco, e volta a se aproximar conforme a baleia chega e cai com ele.
 void Game::updateChaseCamera(float frameSeconds) {
     const BoundaryWhale& whale = session_->whale();
     const FlightModel& flight = player_.flight();
@@ -244,8 +245,13 @@ void Game::updateChaseCamera(float frameSeconds) {
         const glm::vec2 flat(bird.x, bird.z);
         const glm::vec2 in = glm::length(flat) > 1.0f ? -glm::normalize(flat) : glm::vec2(0, -1);
         const glm::vec3 inward(in.x, 0, in.y), side(-in.y, 0, in.x);
-        eye = inward * 34.0f + side * 26.0f + glm::vec3(0, 10, 0);
-        look = -inward * 10.0f + glm::vec3(0, -3, 0);
+        const WhaleAttack* attack = whale.localAttack();
+        const glm::vec3 mouth = attack ? whale::poseAt(attack->bite, attack->age).mouth : bird;
+        const float below = std::max(0.0f, bird.y - mouth.y);   // Quanto a baleia ainda tem de subir.
+        const float zoom = 1.0f + std::clamp((below - 20.0f) / 110.0f, 0.0f, 2.2f) + std::clamp((bird.y - 60.0f) / 300.0f, 0.0f, 0.8f);
+        const float down = 3.0f + std::max(0.2f * std::min(below, 400.0f), 0.12f * std::clamp(bird.y - 20.0f, 0.0f, 300.0f));
+        eye = (inward * 34.0f + side * 26.0f + glm::vec3(0, 10, 0)) * zoom;
+        look = -inward * 10.0f + glm::vec3(0, -down, 0);
     } else if (whale.busy()) {
         const glm::vec3 side(-forward.z, 0, forward.x);
         eye = -forward * 30.0f + side * 9.0f + glm::vec3(0, 24, 0);
@@ -344,7 +350,7 @@ void Game::playWhaleCues(glm::vec3 listener) {
     if (!ui_->playing()) return;
     for (const WhaleCue& cue : cues) {
         const float distance = glm::length(cue.position - listener);
-        const float volume = cue.volume * std::clamp(1.0f - (distance - 40.0f) / 560.0f, 0.0f, 1.0f);
+        const float volume = cue.volume * std::clamp(1.0f - (distance - 60.0f) / 840.0f, 0.0f, 1.0f);   // Ouvida de longe: e gigante.
         const UiSound sound = static_cast<UiSound>(static_cast<int>(UiSound::WhaleSpout) + static_cast<int>(cue.kind));
         ui_->playSound(sound, volume);
     }
@@ -664,9 +670,10 @@ void Game::aimAt(glm::vec3 eye, glm::vec3 target) {
 }
 
 // Fotografa a baleia do limite atacando outro jogador, o passaro local preso na boca e o aviso no mar.
+// Tambem o salto mais alto possivel, ate o teto do voo: de perto, pela camera do jogo, e de longe, para ver o arco.
 void Game::captureWhaleShots(const std::string& outputDir) {
     BoundaryWhale& whale = session_->whale();
-    const glm::vec3 bite(0, 30, 1160);
+    glm::vec3 bite(0, 30, 1160);
     const auto start = [&](PlayerId target, float age) {
         whale = BoundaryWhale(session_->localPlayer());
         GameEvent event;
@@ -676,8 +683,11 @@ void Game::captureWhaleShots(const std::string& outputDir) {
         whale.handle(event, player_.flight());
         whale.update(age, player_, world_, session_->authority(), false);
     };
-    const struct { const char* name; float age; } moments[] = {
-        {"baleia_1_salto", 0.75f}, {"baleia_2_mordida", 1.1f}, {"baleia_3_mastiga", 2.2f}, {"baleia_4_cospe", 3.15f}};
+    const WhaleTimeline low = whaleTimeline(bite.y);
+    const struct { const char* name; float age; } moments[] = {{"baleia_1_salto", 0.75f * low.bite},
+                                                               {"baleia_2_mordida", low.bite + 0.1f},
+                                                               {"baleia_3_mastiga", low.fallEnd + 0.6f},
+                                                               {"baleia_4_cospe", low.spit + 0.15f}};
     for (const auto& moment : moments) {
         aimAt(bite + glm::vec3(75, 4, -70), bite + glm::vec3(0, -4, 12));
         start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
@@ -696,8 +706,24 @@ void Game::captureWhaleShots(const std::string& outputDir) {
         renderer_.setViewModelVisible(true);
         chaseOn_ = false;
     };
-    thirdPerson("baleia_5_na_boca", 2.1f);
-    thirdPerson("baleia_7_arremesso", 3.2f);
+    thirdPerson("baleia_5_na_boca", low.fallEnd + 0.5f);
+    thirdPerson("baleia_7_arremesso", low.spit + 0.2f);
+    bite = glm::vec3(0, FlightModel::kCeiling - 5.0f, 1160);
+    const WhaleTimeline high = whaleTimeline(bite.y);
+    thirdPerson("baleia_8_alto_sobe", 0.7f * high.bite);
+    thirdPerson("baleia_9_alto_mordida", high.bite + 0.05f);
+    thirdPerson("baleia_10_alto_queda", high.bite + 0.6f * (high.brake - high.bite));
+    thirdPerson("baleia_11_alto_splash", high.brake + 0.25f);
+    const struct { const char* name; float age; } far[] = {{"baleia_12_alto_arco", 0.75f * high.bite},
+                                                           {"baleia_13_alto_cai", high.bite + 0.5f * (high.brake - high.bite)},
+                                                           {"baleia_14_alto_splash_longe", high.brake + 0.35f}};
+    for (const auto& moment : far) {
+        aimAt(glm::vec3(330, 110, 860), glm::vec3(0, 190, 1170));
+        start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
+        renderer_.setViewModelVisible(false);
+        cv::imwrite(outputDir + "/" + moment.name + ".png", captureFrame(3.0f));
+        renderer_.setViewModelVisible(true);
+    }
     whale = BoundaryWhale(session_->localPlayer());
     aimAt(glm::vec3(0, 45, 1105), glm::vec3(0, 0, 1180));
     for (int i = 0; i < 150; i++) whale.update(1.0f / 60.0f, player_, world_, session_->authority(), false);
