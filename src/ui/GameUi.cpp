@@ -387,7 +387,6 @@ HudScene GameUi::hudScene() const {
     scene.view = &gameplay_->view();
     scene.bannerOpacity = banner_.opacity();
     scene.bannerScale = banner_.scale();
-    scene.bodyLost = poseSource_ && !poseSource_->bodyDetected();
     scene.showPreview = showsCornerPreview();
     scene.coinsOpacity = coinsOpacity();
     return scene;

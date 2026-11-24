@@ -56,7 +56,6 @@ struct CalibrationScene {
 struct HudScene {
     const GameplayView* view = nullptr;
     float bannerOpacity = 0, bannerScale = 1;
-    bool bodyLost = false;
     bool showPreview = false;
     float coinsOpacity = 0;     // As moedas so aparecem quando mudam.
 };

@@ -48,7 +48,7 @@ As asas vistas em primeira pessoa acompanham a altura de cada braço. Em alta ve
 
 O controle usa só ombros e punhos. Os quadris, quando aparecem, apenas refinam a escala do corpo, e as pernas não entram,
 então o jogador pode ficar perto da câmera, mostrando da cintura para cima. Se ombros ou punhos saírem do quadro, o
-pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena, com o esqueleto desenhado por
+pássaro plana nivelado, sem aviso na tela. A webcam aparece espelhada em uma janela pequena, com o esqueleto desenhado por
 cima. Antes de jogar, uma tela de calibração confere se os ombros e as duas mãos estão visíveis e se as mãos são
 detectadas nas quatro bordas do quadro espelhado (faixas de 25%; com o jogador perto, as mãos baixadas na cintura já
 alcançam a de baixo). As marcas valem em qualquer ordem,

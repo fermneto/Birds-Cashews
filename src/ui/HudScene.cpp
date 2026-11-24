@@ -238,9 +238,9 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     drawThief(kit, view);
     drawRobbery(kit, view);
     if (scene.showPreview) drawPreviewFrame(kit);
-    if (scene.bodyLost) drawWarning(kit, "Ombros e mãos fora do quadro: o pássaro plana nivelado");
-    // O aviao e a baleia nao tem aviso na tela: o jogador ve e ouve o evento no proprio mundo.
-    else if (view.cargoLostNow && !silentCargoLoss(view.cargoLossCause)) drawWarning(kit, cargoLostText(view.cargoLossCause));
+    // O aviao e a baleia nao tem aviso na tela: o jogador ve e ouve o evento no proprio mundo. Sem ombros ou maos no
+    // quadro o passaro so plana nivelado, sem aviso: a janela da webcam ja mostra o enquadramento.
+    if (view.cargoLostNow && !silentCargoLoss(view.cargoLossCause)) drawWarning(kit, cargoLostText(view.cargoLossCause));
     else if (view.alarmNow) drawWarning(kit, "Alarme: estão roubando o seu ninho!");
     else if (view.knockedRivalNow) drawWarning(kit, "Mergulho certeiro: a carga do rival caiu!");
     drawBanner(kit, scene);
