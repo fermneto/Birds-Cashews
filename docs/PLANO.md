@@ -88,14 +88,25 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
 - **Mergulho:** quem está em mergulho e encosta em outro jogador com carga derruba toda a carga dele.
 - **Árvore:** bater com força (a partir de 6 m/s contra a superfície) reduz a velocidade e derruba um caju. Não existe
   morte.
-- **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho ou pela árvore caem até o chão ou uma copa e ficam
+- **Avião no teto:** o voo tem teto em 420 m. Quem passa de 410 m chama um avião, que aparece a 700 m, à frente do
+  pássaro e um pouco acima, com o ronco do motor crescendo e o aviso "Um avião vem na sua direção: desça!". Ele voa a
+  95 m/s, o dobro do pássaro mais rápido, sempre apontando para o alvo, então sempre chega, depois de uns 6 a 8 s. Ele
+  não desce abaixo de 360 m: quem mergulha antes vê o avião passar por cima e ir embora. Se acertar, o pássaro é jogado
+  para baixo (cai cerca de 40 m), a tela treme, fica tonto por 1,8 s sem controle do voo e toda a carga cai no mundo.
+  Depois de cada avião, o mesmo jogador espera 25 s para chamar outro.
+- **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho, pelo avião ou pela árvore caem até o chão ou uma copa e ficam
   30 s no mundo. Qualquer um pega, como caju comum. Quem derrubou espera 2 s para pegar o próprio caju de volta.
 - **Cajus roubados valem moeda, mas não somam no record.** Isso impede dois jogadores de inflarem o total trocando cajus.
 - Um ninho só existe no mundo enquanto o dono está conectado, então ninguém é roubado offline. Se o dono sai, quem
   estava roubando decola.
 - **Quem decide:** o host confirma cada roubo (o ladrão precisa estar no poleiro, o ninho precisa ter moedas fora do
   Cofre e o intervalo mínimo é de 3 s), detecta os mergulhos e escolhe o id de cada caju caído. O cliente só derruba a
-  própria carga, na batida em árvore. O perfil é local, então cada computador desconta a moeda do próprio dono.
+  própria carga, na batida em árvore.
+- **Avião em rede:** o dono do pássaro pede o avião ao chegar ao teto. O host confere a altura (com folga de 40 m) e o
+  intervalo de 20 s por alvo, numera o avião, escolhe o ponto de partida e confirma para todos. Cada computador simula o
+  mesmo avião a partir desse ponto, perseguindo a posição que conhece do alvo, então todos veem o avião e a batida. Só o
+  dono decide a batida, com a posição real do próprio pássaro: aplica o tranco na hora e avisa o host, que confere o
+  número do avião e derruba a carga do alvo para todos. O perfil é local, então cada computador desconta a moeda do próprio dono.
 
 ### 3.4 Pontuação e record
 
@@ -176,6 +187,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
 | `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
 | `ai/` | `NpcEcosystem` |
+| `events/` | `SkyPlane`, `SkyPlaneLedger` e `SkyPlaneEvent`: o avião do teto, com modelo e sons próprios |
 | `net/` | `UdpSession`, `Protocol`, `HostAuthority`, `ClientAuthority`, `RemoteTrack` e `NetMatch` (implementa `NetSession`) |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
@@ -197,7 +209,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Falta validar o áudio |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Falta validar o áudio |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma

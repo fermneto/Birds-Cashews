@@ -111,6 +111,8 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 - Defesa deixa o roubo mais lento, o Cofre guarda parte das moedas e o Alarme mostra na bússola quem está roubando.
 - Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
 - Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
+- Quem sobe até o teto (cerca de 410 m) chama um avião. Ele aparece ao longe, com o ronco do motor crescendo, e vem
+  direto em você. Desça antes que ele chegue: se acertar, você despenca, fica tonto por um instante e perde a carga.
 
 ### Com o corpo
 
