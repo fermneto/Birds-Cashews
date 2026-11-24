@@ -12,7 +12,7 @@ enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denie
                      Flap,                                              // Sopro de uma batida de asa.
                      ChirpTweet, ChirpTrill, ChirpWhistle, ChirpCaw,     // Cantos dos NPCs, do menor ao maior.
                      PlaneCrash,                                        // Batida do aviao do teto.
-                     WhaleSpout, WhaleSplash, WhaleBite, WhaleChew, WhaleSpit, WhaleRumble,   // Baleia do limite (ui/WhaleSounds).
+                     WhaleSpout, WhaleSplash, WhaleBite, WhaleChew, WhaleSpit, WhaleRumble, WhaleSong,   // Baleia do limite (ui/WhaleSounds).
                      Count };
 
 UiSound soundFor(GameplayFeedback feedback);
@@ -46,7 +46,7 @@ private:
         size_t position = 0;
         float gain = 1;
     };
-    static constexpr int kVoices = 8;
+    static constexpr int kVoices = 12;   // Os sons da baleia sao longos e se sobrepoem.
 
     static void audioCallback(void* self, Uint8* stream, int bytes);
     void mix(int16_t* output, int count);

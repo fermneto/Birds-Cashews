@@ -165,7 +165,7 @@ bool HostAuthority::validateWhaleBite(GameEvent& event) {
     if (!whales_.accept(event, known)) return false;
     event.value = carried_[event.target];
     carried_[event.target] = 0;
-    knockableAt_[event.target] = now_ + kWhaleSequenceSeconds;
+    knockableAt_[event.target] = now_ + whaleTimeline(event.position.y).end;
     return true;
 }
 
