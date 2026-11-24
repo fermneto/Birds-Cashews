@@ -398,10 +398,10 @@ void testCalibrationScreen(TestRun& t) {
             ui.calibration().complete() && ui.screen() == UiScreen::Calibration);
     feedPose(ui, camera, ScriptedPoseSource::withWrist(body, {400, 30}), 1.0f);
     t.check("calibracao: concluida volta sozinha ao menu", ui.screen() == UiScreen::MainMenu);
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("calibracao: braco ainda erguido nao escolhe no menu", ui.screen() == UiScreen::MainMenu);
-    ui.updateMenus(FlightControls{});
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(FlightControls{}, 0);
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("calibracao: depois de baixar o braco o menu responde", ui.screen() != UiScreen::MainMenu);
 }
 
