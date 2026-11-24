@@ -137,6 +137,63 @@ void testNavigationMapping(TestRun& t) {
     t.check("nav: cursor acompanha a lista menor", cursor.index() == 1);
 }
 
+FlightControls raised(ArmSide side) {
+    FlightControls controls;
+    controls.raisedArm = side;
+    return controls;
+}
+
+// Conta quantas vezes a acao sai em uma sequencia de quadros com o mesmo braco erguido.
+int countRepeats(GestureRepeat& repeat, ArmSide side, NavAction action, float seconds, float frame) {
+    int count = 0;
+    for (float time = 0; time < seconds - 1e-4f; time += frame)
+        count += repeat.update(raised(side), frame) == action ? 1 : 0;
+    return count;
+}
+
+void testGestureRepeat(TestRun& t) {
+    constexpr float kFrame = 1.0f / 60.0f;
+    GestureRepeat repeat;
+    t.check("repeticao: gesto esquerdo avanca na hora", repeat.update(pressed(ArmSide::Left), kFrame) == NavAction::Next);
+    t.check("repeticao: nada antes do atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kDelay - 0.05f, kFrame) == 0);
+    t.check("repeticao: braco mantido avanca de novo apos o atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, 0.1f, kFrame) == 1);
+    t.check("repeticao: segue no ritmo do intervalo",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kInterval * 3, kFrame) == 3);
+
+    repeat.update(FlightControls{}, kFrame);
+    t.check("repeticao: abaixar o braco para de avancar",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, 2.0f, kFrame) == 0);
+    repeat.update(pressed(ArmSide::Left), kFrame);
+    t.check("repeticao: abaixar zera o atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kDelay - 0.05f, kFrame) == 0);
+
+    GestureRepeat confirm;
+    t.check("repeticao: gesto direito confirma uma vez", confirm.update(pressed(ArmSide::Right), kFrame) == NavAction::Confirm);
+    t.check("repeticao: braco direito mantido nao confirma de novo",
+            countRepeats(confirm, ArmSide::Right, NavAction::Confirm, 3.0f, kFrame) == 0);
+
+    GestureRepeat swap;
+    swap.update(pressed(ArmSide::Left), kFrame);
+    t.check("repeticao: trocar de braco nao repete o esquerdo",
+            countRepeats(swap, ArmSide::Right, NavAction::Next, 2.0f, kFrame) == 0);
+
+    GestureRepeat keyboard;
+    keyboard.update(pressed(ArmSide::Left, false), kFrame);
+    t.check("repeticao: Q do teclado avanca uma unica vez",
+            countRepeats(keyboard, ArmSide::None, NavAction::Next, 2.0f, kFrame) == 0);
+
+    TempDir dir("repeticao");
+    DemoGameplaySource demo;
+    GameUi ui(testConfig(dir), demo);
+    ui.updateMenus(pressed(ArmSide::Left), kFrame);
+    for (int i = 0; i < 27; ++i) ui.updateMenus(raised(ArmSide::Left), kFrame);
+    t.check("repeticao: menu avanca so uma vez no primeiro meio segundo", ui.selectedRow() == 1);
+    for (int i = 0; i < 6; ++i) ui.updateMenus(raised(ArmSide::Left), kFrame);
+    t.check("repeticao: menu avanca de novo com o braco mantido", ui.selectedRow() == 2);
+}
+
 void testTextField(TestRun& t) {
     TextField field(6);
     field.insert("ação");
@@ -158,18 +215,18 @@ void testUiNavigation(TestRun& t) {
     TempDir dir("nav");
     DemoGameplaySource demo;
     GameUi ui(testConfig(dir), demo);
-    ui.updateMenus(pressed(ArmSide::Left));
+    ui.updateMenus(pressed(ArmSide::Left), 0);
     t.check("ui: gesto esquerdo move a opcao", ui.selectedRow() == 1);
     sendKey(ui, SDLK_UP);
     t.check("ui: seta move a opcao", ui.selectedRow() == 0);
     sendKeys(ui, SDLK_DOWN, 4);
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("ui: gesto direito confirma", ui.screen() == UiScreen::Profile);
 
     sendText(ui, "Qe");
-    ui.updateMenus(pressed(ArmSide::Left, false));
+    ui.updateMenus(pressed(ArmSide::Left, false), 0);
     t.check("ui: Q digitado fica no campo", ui.selectedRow() == 0 && ui.rows()[0].value == "Qe");
-    ui.updateMenus(pressed(ArmSide::Left));
+    ui.updateMenus(pressed(ArmSide::Left), 0);
     t.check("ui: gesto sai do campo de texto", ui.selectedRow() == 1);
     sendKey(ui, SDLK_ESCAPE);
     t.check("ui: Esc volta ao menu", ui.screen() == UiScreen::MainMenu);
@@ -277,7 +334,7 @@ void testCalibrationScreen(TestRun& t) {
     sendKeys(ui, SDLK_DOWN, 3);
     sendKey(ui, SDLK_RETURN);
     t.check("calibracao: tela abre pelo menu", ui.screen() == UiScreen::Calibration && !ui.showsCornerPreview());
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("calibracao: gesto nao sai antes de concluir", ui.screen() == UiScreen::Calibration);
     camera.setPose(ScriptedPoseSource::withWrist(ScriptedPoseSource::standingPose(), {40, 240}));
     ui.update(0.5f);
@@ -710,6 +767,7 @@ int runUiSelfTest() {
     testFlowPause(t);
     testFlowExit(t);
     testNavigationMapping(t);
+    testGestureRepeat(t);
     testTextField(t);
     testUiNavigation(t);
     testUiPauseSaves(t);

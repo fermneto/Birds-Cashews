@@ -15,6 +15,23 @@ NavAction navFromKey(SDL_Keycode key, bool editingText);
 // Q e E digitados em um campo nao podem navegar. O gesto real sempre vem com o braco erguido.
 bool isBodyGesture(const FlightControls& controls);
 
+// Braco que continua erguido depois de avancar segue avancando sozinho, como uma tecla segurada.
+// Confirmar e voltar nunca se repetem: cada escolha pede um gesto novo.
+class GestureRepeat {
+public:
+    static constexpr float kDelay = 0.5f;      // Espera antes da primeira repeticao.
+    static constexpr float kInterval = 0.4f;   // Ritmo das repeticoes seguintes.
+
+    // Acao do quadro: o gesto recem-feito ou a repeticao do braco ainda erguido.
+    NavAction update(const FlightControls& controls, float seconds);
+    void reset();
+
+private:
+    NavAction held_ = NavAction::None;
+    ArmSide arm_ = ArmSide::None;
+    float wait_ = 0;
+};
+
 // Opcao destacada em uma lista circular.
 class MenuCursor {
 public:

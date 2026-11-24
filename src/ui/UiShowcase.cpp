@@ -181,9 +181,9 @@ void runUiShowcase(GameUi& ui, DemoGameplaySource& demo, ScriptedPoseSource& cam
     FlightControls raised;
     raised.raisedArm = ArmSide::Right;
     raised.menuProgress = 0.6f;
-    ui.updateMenus(raised);
+    ui.updateMenus(raised, 0);
     shot("ui_02_menu_gesto");
-    ui.updateMenus(FlightControls{});
+    ui.updateMenus(FlightControls{}, 0);
 
     showCalibration(ui, camera, shot);
     showProfiles(ui, shot);

@@ -59,6 +59,7 @@ void GameUi::enterScreen(UiScreen screen) {
     rooms_.clearError();
     raisedArm_ = ArmSide::None;
     armProgress_ = 0;
+    repeat_.reset();   // Na tela nova, o braco ainda erguido nao continua passando opcoes.
     cursor_.select(0);
     if (screen == UiScreen::MainMenu) {
         const RecordManager record(savesDir_);
@@ -175,14 +176,19 @@ void GameUi::handleEvent(const SDL_Event& event) {
     }
 }
 
-void GameUi::updateMenus(const FlightControls& controls) {
+void GameUi::updateMenus(const FlightControls& controls, float seconds) {
     raisedArm_ = controls.raisedArm;
     armProgress_ = controls.menuProgress;
     const bool calibrating = flow_.current() == UiScreen::Calibration && poseSource_;
     const bool gestureAllowed = !calibrating || tracker_.acceptsGesture(controls);
-    const NavAction action = navFromControls(controls);
-    if (action == NavAction::None || !gestureAllowed) return;
-    if (activeField() && !isBodyGesture(controls)) return;
+    if (!gestureAllowed) {
+        repeat_.reset();
+        return;
+    }
+    // A repeticao so nasce de braco erguido, entao so o Q digitado precisa ser barrado no campo.
+    const NavAction action = repeat_.update(controls, seconds);
+    if (action == NavAction::None) return;
+    if (activeField() && controls.menuPressed != ArmSide::None && !isBodyGesture(controls)) return;
     apply(action);
 }
 

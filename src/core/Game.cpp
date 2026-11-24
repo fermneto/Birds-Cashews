@@ -238,7 +238,7 @@ void Game::updateScreens(float frameSeconds) {
     if (ui_->playing()) {
         advance(frameSeconds);
     } else {
-        ui_->updateMenus(input_->poll());
+        ui_->updateMenus(input_->poll(), frameSeconds);
         // Em sala o mundo nao para: eventos, cajus e NPCs seguem enquanto o jogador esta nos menus.
         if (match_.online()) {
             updateCashews(frameSeconds);
