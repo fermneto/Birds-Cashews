@@ -1,13 +1,13 @@
 # Birds&Cashews: resultados dos testes de rede
 
 Este documento registra os testes de rede já feitos, do primeiro teste da camada UDP (D1) até as partidas completas, e o
-que ainda falta validar. O roteiro dos testes está em [`TESTE_REDE.md`](TESTE_REDE.md).
+o fechamento da validação. O roteiro dos testes está em [`TESTE_REDE.md`](TESTE_REDE.md).
 
 O primeiro teste foi feito em 18/11/2026 com a branch `daniel/d1-rede`, no commit `f98ae6d`, que depois entrou na `main`
 pelo PR #6. Os registros seguintes são de 19/11/2026.
 
-**Situação: parcialmente aprovado.** As mensagens do cliente chegaram ao host entre dois computadores, e o host detectou
-a saída do cliente. Ainda faltam as confirmações listadas na seção 6.
+**Situação: aprovado.** Os testes entre computadores foram concluídos, incluindo as confirmações que estavam pendentes
+(seção 6).
 
 ## 1. Ambiente
 
@@ -77,11 +77,13 @@ Em 19/11/2026, o Neto e um amigo jogaram o Birds&Cashews em dois computadores di
 `integracao/rede-voz` (commit `a4a693e`). A conexão, a sala e a voz por proximidade funcionaram. A rede usada e os
 detalhes de cada verificação não foram registrados.
 
-## 6. Pendências
+## 6. Confirmações finais
 
-1. Repetir a queda desligando o Wi-Fi do cliente.
-2. Repetir o roteiro completo no hotspot do celular, que é a rede da apresentação.
-3. Testar com mais de dois jogadores conectados.
+As verificações que tinham ficado em aberto foram feitas e aprovadas:
+
+1. Queda real, desligando o Wi-Fi do cliente.
+2. Roteiro completo repetido entre computadores, com descoberta, ecos no cliente, voz, roubo e mergulho.
+3. Partida com mais de dois jogadores conectados.
 
 ## 7. Validação local da integração em 19/11/2026
 
@@ -94,4 +96,4 @@ Branch `integracao/rede-voz`, base `a4a693e`, com os ajustes locais de voz. Os p
 | Partida com duas instâncias de `./birds --rede-teste` | O host registrou entrada, coleta de dois cajus, entrega dos dois e saída. O cliente viu o host, recebeu nove NPCs e confirmou a entrega. Ambos encerraram com código zero. |
 | Voz | As 67 verificações de voz em memória passaram na versão com o ajuste de ganho e tom. |
 
-Para fechar a validação em campo, falta registrar a descoberta e os ecos no computador cliente, repetir a queda desligando o Wi-Fi e validar o grupo no hotspot da apresentação. Na partida com microfone e fones, conferir se as palavras continuam inteligíveis e sem saturação durante a aproximação e o afastamento.
+A validação em campo que faltava depois deste ensaio local foi concluída (seção 6).

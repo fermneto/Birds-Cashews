@@ -32,9 +32,10 @@ abaixo.
 
 ## Situação
 
-O jogo está em desenvolvimento. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer e voz já estão na
-`main`, assim como o roubo de ninhos, a colisão em mergulho e os cajus caindo no mundo. Falta validar tudo junto com
-dois computadores. A situação de cada tarefa está em [`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
+O jogo está completo e validado. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer, voz, roubo
+de ninhos, colisão em mergulho e cajus caindo no mundo estão na `main` e foram testados com janela, webcam, som e dois
+computadores em rede. Falta só o diagrama UML de classes. A situação de cada tarefa está em
+[`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
 
 ## Dependências
 

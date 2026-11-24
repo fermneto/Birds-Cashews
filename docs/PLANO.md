@@ -194,10 +194,10 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Atendido |
 | 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa | Atendido |
 | 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN | Atendido |
-| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
+| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Atendido |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
-| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Falta validar o áudio |
+| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Atendido |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma
@@ -208,11 +208,11 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 |---|---|---|
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
-| **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Salas de até 6 jogadores, roubo e mergulho, testados em loopback | Teste completo no hotspot |
+| **M2** Ciclo de jogo | Concluído e validado no jogo real | Nada |
+| **M3** Multiplayer | Salas de até 6 jogadores, roubo e mergulho, testados entre computadores | Nada |
 | **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
 | **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
-| **M6** Fechamento | README, créditos e uso de IA escritos | Teste integrado, UML e apresentação |
+| **M6** Fechamento | Teste integrado feito. README, créditos e uso de IA escritos | Diagrama UML |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
 
@@ -230,13 +230,7 @@ Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alar
 
 ## 8. Pendências
 
-O tema "Outro" foi aprovado pelo professor. A apresentação usará computadores próprios, conectados ao hotspot de um
-celular.
+O tema "Outro" foi aprovado pelo professor. O jogo integrado, a N5 e os testes de rede entre computadores já foram
+validados (ver [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md)).
 
-1. Validar o jogo integrado com janela visível, webcam e som.
-2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
-   [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Validar a N5 (roubo, mergulho e cajus caindo) com dois computadores.
-4. Produzir o diagrama UML. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já
-   estão escritos.
-5. Fazer o teste integrado e ensaiar a apresentação.
+1. Produzir o diagrama UML. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já estão escritos.

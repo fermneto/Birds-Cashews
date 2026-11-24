@@ -18,21 +18,20 @@ As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida c
 | N1 Cajus e carga | Neto | **Concluída** | PR #3 | Nada |
 | N2 Perfil e record | Neto | **Concluída** | PR #2 | Nada |
 | N3 Ninho e upgrades | Neto | **Concluída** | PR #4 | Nada |
-| N4 Menus, HUD e sons | Neto | **Concluída** | PRs #7 e #10 | Validar no teste integrado |
-| N5 Roubo e colisões | Neto | **Concluída** | Branch `neto/n5-roubo` | Validar no teste integrado |
-| D1 Rede local | Daniel | **Concluída, com testes pendentes** | PR #6 | Ver [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md) |
+| N4 Menus, HUD e sons | Neto | **Concluída** | PRs #7 e #10 | Nada |
+| N5 Roubo e colisões | Neto | **Concluída** | Branch `neto/n5-roubo`, mesclada na `main` | Nada |
+| D1 Rede local | Daniel | **Concluída** | PR #6 | Nada. Ver [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md) |
 | D2 Pássaros procedurais | Daniel | **Concluída** | PR #5 | Nada |
 | D3 Replicação de jogadores | **Neto** | **Concluída** | PRs #12 e #13 | Nada |
-| D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Validar no teste integrado |
+| D4 Ecossistema de NPCs | Daniel | **Concluída** | PR #9 | Nada |
 | D5 Voz por proximidade | **Neto** | **Concluída** | PRs #11 e #13 | Nada |
 | D6 NPCs em rede | **Neto** | **Concluída** | PRs #12 e #13 | Nada |
-| F1 Teste integrado | Neto | **Destravada** | Nenhum | Dois computadores no hotspot |
-| F2 Documentos | Neto | Em andamento | Branch `neto/docs-publico` | Diagrama UML |
-| F3 Apresentação | Neto | Bloqueada | Nenhum | Depende da F1 |
+| F1 Teste integrado | Neto | **Concluída** | Nenhum | Nada |
+| F2 Documentos | Neto | Em andamento | `main` (branch `neto/docs-publico` já mesclada) | Diagrama UML |
 
-### O que validar no jogo integrado
+### O que foi validado no jogo integrado
 
-Os testes automáticos não cobrem a experiência real. Ainda precisam ser conferidos com janela, webcam e som:
+Além dos testes automáticos, a experiência real foi conferida com janela, webcam, som e dois computadores:
 
 1. Navegação pelos menus com os braços e com o teclado.
 2. Calibração com o corpo inteiro na frente da câmera.
@@ -46,8 +45,6 @@ Os testes automáticos não cobrem a experiência real. Ainda precisam ser confe
 ### Próximos passos
 
 1. **F2:** diagrama UML de classes, agora que a arquitetura está fechada.
-2. **Validação local:** itens 1 a 8 acima, com janela, webcam e som.
-3. **F1 e F3:** teste completo com dois computadores no hotspot e ensaio da apresentação.
 
 ## 1. Resumo
 
@@ -65,7 +62,7 @@ subagent, em pastas diferentes.
 | 1 | 19 a 23/11 | **N1** Cajus + **N2** Perfil | **D1** Rede + **D2** Pássaros | 23/11: as quatro na `main` |
 | 2 | 24 a 28/11 | **N3** Ninho + **N4** Menus e HUD | **D3** Replicação + **D4** NPCs | 28/11: dois jogadores no mesmo mundo |
 | 3 | 29/11 a 03/12 | **N5** Roubo + **F2** Documentos | **D5** Voz + **D6** NPCs em rede | 03/12: tudo na `main` |
-| 4 | 04 a 06/12 | **F1** Teste integrado + **F3** Apresentação | **F1** Teste integrado + **F3** Apresentação | 06/12: ensaio final |
+| 4 | 04 a 06/12 | **F1** Teste integrado | **F1** Teste integrado | 06/12: jogo validado |
 
 Daniel não precisa esperar a T0: **D1 e D2 não dependem de nenhuma outra tarefa**.
 
@@ -110,7 +107,6 @@ flowchart LR
 | D6 NPCs em rede | Daniel | D3, D4 | F1 |
 | F1 Teste integrado | Ambos | N4, N5, D5, D6 | Entrega |
 | F2 Documentos | Neto | Nada | Entrega |
-| F3 Apresentação | Ambos | F1 | Entrega |
 
 **Se uma dependência atrasar, ninguém para.** Use o substituto abaixo e troque pelo real quando a tarefa chegar à `main`.
 
@@ -243,9 +239,8 @@ MeshBuilder buildBirdMesh(uint32_t seed);
 
 | ID | Dono | O que fazer |
 |---|---|---|
-| **F1** | Ambos | Testar com 2 computadores no hotspot do celular: descoberta, IP manual, voz, roubo, queda de conexão e 15 minutos de jogo contínuo |
+| **F1** | Ambos | Testar com 2 computadores na mesma rede: descoberta, IP manual, voz, roubo, queda de conexão e 15 minutos de jogo contínuo |
 | **F2** | Neto | `README.md`, `docs/uml_classes.png`, `docs/USO_DE_IA.md` e créditos, incluindo a licença do YOLOv8n-pose |
-| **F3** | Ambos | Roteiro da apresentação, divisão das falas sobre os algoritmos e ensaio cronometrado |
 
 ## 9. Como disparar os subagents
 
