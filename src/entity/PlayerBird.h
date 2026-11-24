@@ -1,5 +1,6 @@
 #pragma once
 #include "entity/FlightModel.h"
+#include <algorithm>
 
 // Pose das asas e do bico vistos em primeira pessoa.
 struct BirdAnimation {
@@ -25,6 +26,7 @@ public:
     void step(const World& world, float dt);
     void animate(float dt);
     void setBeakTarget(BeakSource source, float openness);
+    void jolt(float strength) { animation_.shake = std::max(animation_.shake, strength); }   // Tremor da camera.
 
     FlightModel& flight() { return flight_; }
     const FlightModel& flight() const { return flight_; }

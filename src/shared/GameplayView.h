@@ -21,7 +21,7 @@ struct NestMenuView {
     float holdProgress = 0;
 };
 
-enum class CargoLossCause { Hunter, Player, Tree };
+enum class CargoLossCause { Hunter, Player, Tree, Plane };
 
 // Pousado no ninho de um rival: a barra enche e cada volta completa leva 1 caju.
 enum class RobBlock { None, EmptyNest, CargoFull, Waiting };
@@ -54,6 +54,8 @@ struct GameplayView {
     bool alarmNow = false;     // Alguem roubou o seu ninho e o Alarme mostra quem foi.
     float thiefBearing = 0;    // Mesma convencao de nestBearing.
     float thiefDistance = 0;
+    bool planeIncoming = false;   // Um aviao vem bater no jogador, que chegou ao teto.
+    bool planeHitNow = false;     // O aviao acabou de bater no jogador.
 };
 
 enum class GameplayFeedback { CashewCollected, CashewDelivered, UpgradeBought, UpgradeDenied,

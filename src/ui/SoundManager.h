@@ -11,6 +11,7 @@ enum class UiSound { Move, Confirm, Back, Mark, Collect, Deliver, Upgrade, Denie
                      Spill, Steal, Alarm, Knock,
                      Flap,                                              // Sopro de uma batida de asa.
                      ChirpTweet, ChirpTrill, ChirpWhistle, ChirpCaw,     // Cantos dos NPCs, do menor ao maior.
+                     PlaneCrash,                                        // Batida do aviao do teto.
                      Count };
 
 UiSound soundFor(GameplayFeedback feedback);
@@ -32,6 +33,8 @@ public:
     // Volume desejado de cada camada do ambiente. A mistura chega nele aos poucos, sem estalos.
     void setAmbience(const AmbientMix& mix);
     AmbientMix ambience() const;
+    // Motor do aviao do teto: volume (0 a 1) e velocidade de leitura do loop, que faz o Doppler.
+    void setPlaneEngine(float volume, float rate);
 
     static std::vector<int16_t> synthesize(UiSound sound);
     static int sampleRate();
@@ -58,4 +61,9 @@ private:
     std::array<std::atomic<float>, kAmbientLayers> ambientTarget_{};
     std::array<float, kAmbientLayers> ambientGain_{};     // So a thread de audio mexe.
     std::array<size_t, kAmbientLayers> ambientPosition_{};
+    void mixPlaneEngine(int count);
+    std::vector<int16_t> engineLoop_;
+    std::atomic<float> engineTarget_{0}, engineRateTarget_{1};
+    float engineGain_ = 0, engineRate_ = 1;   // So a thread de audio mexe.
+    double enginePosition_ = 0;
 };

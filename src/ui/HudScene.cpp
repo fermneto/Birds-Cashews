@@ -98,6 +98,7 @@ std::string cargoLostText(CargoLossCause cause) {
     switch (cause) {
         case CargoLossCause::Player: return "Um rival mergulhou em você e derrubou a carga!";
         case CargoLossCause::Tree: return "Você bateu na árvore e derrubou um caju!";
+        case CargoLossCause::Plane: return "Um avião acertou você e derrubou a carga!";
         case CargoLossCause::Hunter: break;
     }
     return "Um caçador derrubou a sua carga!";
@@ -239,5 +240,7 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     else if (view.cargoLostNow) drawWarning(kit, cargoLostText(view.cargoLossCause));
     else if (view.alarmNow) drawWarning(kit, "Alarme: estão roubando o seu ninho!");
     else if (view.knockedRivalNow) drawWarning(kit, "Mergulho certeiro: a carga do rival caiu!");
+    else if (view.planeHitNow) drawWarning(kit, "Um avião acertou você!");
+    else if (view.planeIncoming) drawWarning(kit, "Um avião vem na sua direção: desça!");
     drawBanner(kit, scene);
 }

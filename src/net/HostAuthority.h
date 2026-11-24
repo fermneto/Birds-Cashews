@@ -2,6 +2,7 @@
 #include "net/Protocol.h"
 #include "net/RemoteTrack.h"
 #include "net/UdpSession.h"
+#include "events/SkyPlane.h"
 #include "shared/CashewSpill.h"
 #include "shared/GameAuthority.h"
 #include "shared/VoiceLink.h"
@@ -103,6 +104,7 @@ private:
     std::vector<GameEvent> pending_, outgoing_;
     std::vector<NpcPublicState> npcs_;
     std::deque<VoiceFrame> voice_;
+    SkyPlaneLedger skyPlanes_;   // Avioes do teto: numero, ponto de partida e batidas.
 };
 
 } // namespace net

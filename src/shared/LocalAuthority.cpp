@@ -9,6 +9,7 @@ void LocalAuthority::request(const GameEvent& event) {
     pending_.push_back(confirmed);
     if (confirmed.type == GameEventType::CashewDropped)
         for (const GameEvent& spilled : spill_.spill(confirmed)) pending_.push_back(spilled);
+    if (confirmed.type == GameEventType::PlaneStruck) request(SkyPlaneLedger::cargoDropFor(confirmed));
 }
 
 // So acompanha a carga: as outras regras ficam com quem pede, como sempre foi no jogo sozinho.
@@ -32,6 +33,13 @@ bool LocalAuthority::accept(GameEvent& event) {
             event.value = static_cast<uint8_t>(std::min<int>(event.value, carried_[event.target]));
             carried_[event.target] -= event.value;
             return event.value > 0;
+        case GameEventType::PlaneLaunched: {
+            const auto target = std::find_if(players_.begin(), players_.end(),
+                                             [&](const PlayerPublicState& p) { return p.id == event.target; });
+            return skyPlanes_.acceptLaunch(event, 0, target != players_.end() ? &*target : nullptr, false);
+        }
+        case GameEventType::PlaneStruck:
+            return skyPlanes_.acceptStrike(event, 0, false);
         default:
             return true;
     }
