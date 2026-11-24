@@ -125,11 +125,11 @@ Fique de frente para a webcam, com o corpo inteiro no quadro. A tela de calibra�
 | Braços erguidos acima dos ombros | Sobe, trocando velocidade por altitude |
 | Braços abaixados junto ao corpo | Mergulha e acelera |
 | Inclinar a linha entre os punhos | Faz a curva, como um avião |
-| Erguer o braço esquerdo por 0,7 s | Nos menus, passa para a próxima opção |
-| Erguer o braço direito por 0,7 s | Nos menus, confirma |
+| Erguer o braço esquerdo por 0,7 s | Nos menus, passa para a próxima opção. Mantido erguido, segue passando a cada 0,4 s após meio segundo |
+| Erguer o braço direito por 0,7 s | Nos menus, confirma. Para confirmar de novo, abaixe e erga outra vez |
 
 No menu do ninho, a primeira escolha é entre comer (braço esquerdo) e investir (braço direito). Dentro de uma lista, o
-braço esquerdo passa para a próxima opção e o direito compra.
+braço esquerdo passa para a próxima opção e o direito compra. Aqui o braço mantido não repete: cada opção pede um gesto.
 
 ### Com o teclado
 

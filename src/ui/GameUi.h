@@ -35,7 +35,8 @@ public:
 
     void handleEvent(const SDL_Event& event);
     void closeWindow();
-    void updateMenus(const FlightControls& controls);   // Fora do jogo, quem le os comandos e a interface.
+    // Fora do jogo, quem le os comandos e a interface. O tempo do quadro marca a repeticao do braco erguido.
+    void updateMenus(const FlightControls& controls, float seconds);
     void update(float seconds);
 
     // Redesenha a camada so quando algo mudou. Retorna true se ela precisa ser reenviada ao Renderer.
@@ -100,6 +101,7 @@ private:
     ScreenFlow flow_;
     UiScreen shown_ = UiScreen::MainMenu;
     MenuCursor cursor_;
+    GestureRepeat repeat_;
     ProfilePicker profiles_;
     RoomsModel rooms_;
     TextField profileName_{32}, roomName_{32}, hostAddress_{21};
