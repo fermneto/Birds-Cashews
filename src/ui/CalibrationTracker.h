@@ -1,16 +1,19 @@
 #pragma once
 #include "entity/FlightControls.h"
+#include "vision/GestureRecognizer.h"
 #include "vision/Pose.h"
 #include <array>
 
 enum class CalRegion { Left, Right, Top, Bottom };
 constexpr int kCalRegionCount = 4;
 
-// Faixa de cada regiao, como fracao do quadro espelhado. Com o corpo inteiro no quadro, os bracos
-// abertos chegam perto de 20% das laterais, entao a faixa precisa ser um pouco maior que isso.
+// Faixa de cada regiao, como fracao do quadro espelhado. Os bracos abertos chegam perto de 20% das
+// laterais, entao a faixa precisa ser um pouco maior que isso. A mesma faixa serve embaixo: com o
+// jogador perto da camera, as maos baixadas na cintura ja ficam no quarto inferior da imagem.
 constexpr float kCalRegionBand = 0.25f;
 
-// Confere se o jogador e detectado em todo o video: corpo inteiro e maos nas quatro bordas.
+// Confere se o jogador e detectado em todo o video: os pontos do controle (ombros e punhos)
+// dentro do quadro e as maos nas quatro bordas. Pernas e quadris nao sao exigidos.
 // As marcas sao independentes: valem em qualquer ordem e as duas maos podem marcar ao mesmo tempo.
 class CalibrationTracker {
 public:
@@ -19,7 +22,7 @@ public:
     void update(const Pose& mirroredPose, cv::Size frame, float seconds, bool newSample = true);
 
     static bool inRegion(CalRegion region, cv::Point2f normalized);
-    static bool isFullBody(const Pose& pose, cv::Size frame);
+    static bool showsControlJoints(const Pose& pose, cv::Size frame);
 
     bool bodyVisibleNow() const { return bodyNow_; }
     bool bodyConfirmed() const { return body_.done; }

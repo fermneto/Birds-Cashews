@@ -331,6 +331,8 @@ void testOverNetwork(TestRun& t) {
                                  countOf(onHost.log, GameEventType::PlaneLaunched) > 0; }, 6.0f);
     const GameEvent* hostLaunch = lastOf(onHost.log, GameEventType::PlaneLaunched);
     const GameEvent* clientLaunch = lastOf(onClient.log, GameEventType::PlaneLaunched);
+    // O log cresce depois: guarda o numero do aviao agora, porque o ponteiro deixa de valer.
+    const uint8_t launchSerial = hostLaunch ? hostLaunch->value : 0;
     t.check("aviao em rede: o host confirma e o cliente recebe o mesmo aviao",
             hostLaunch && clientLaunch && hostLaunch->target == me && clientLaunch->value == hostLaunch->value &&
                 glm::length(clientLaunch->position - hostLaunch->position) < 0.01f);
@@ -361,7 +363,7 @@ void testOverNetwork(TestRun& t) {
     GameEvent again;
     again.type = GameEventType::PlaneStruck;
     again.target = me;
-    again.value = hostLaunch ? hostLaunch->value : 0;
+    again.value = launchSerial;
     client.request(again);
     runUntil(frame, [] { return false; }, 0.5f);
     t.check("aviao em rede: a mesma batida repetida e recusada", countOf(onHost.log, GameEventType::PlaneStruck) == 1);

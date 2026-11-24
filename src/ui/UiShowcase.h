@@ -17,8 +17,9 @@ public:
     void setDetected(bool detected) { detected_ = detected; }
     const cv::Mat& frame() const { return frame_; }
 
-    // Pose de pe, com o corpo inteiro dentro do quadro de 640x480.
-    static Pose standingPose();
+    // Jogador perto da camera, no quadro de 640x480: cabeca, ombros e bracos aparecem,
+    // os quadris ficam rentes a borda de baixo e as pernas fora da imagem.
+    static Pose upperBodyPose();
     static Pose withWrist(Pose pose, cv::Point2f position);
 
 private:

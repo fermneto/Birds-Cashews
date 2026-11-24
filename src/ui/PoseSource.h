@@ -6,5 +6,5 @@ class PoseSource {
 public:
     virtual ~PoseSource() = default;
     virtual bool latestPose(cv::Mat& mirroredFrame, Pose& pose) = 0;   // Retorna true quando ha quadro novo.
-    virtual bool bodyDetected() const = 0;
+    virtual bool bodyDetected() const = 0;   // Ombros e punhos visiveis para o controle.
 };

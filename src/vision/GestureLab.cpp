@@ -12,6 +12,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <vector>
 
 int runInferenceBenchmark(const std::string& modelPath) {
@@ -236,7 +237,7 @@ void testTracking(TestRun& run) {
 
     Pose pose = syntheticPose(1, 0, 1, 0).mirrored(640);
     run.check("espelhar preserva os rotulos do corpo",
-              pose.at(LShoulder).x == 639 - 280.0f && pose.at(RShoulder).x == 639 - 360.0f);
+              pose.at(LShoulder).x == 640 - 280.0f && pose.at(RShoulder).x == 640 - 360.0f);
 }
 
 void testMenu(TestRun& run) {
@@ -259,6 +260,66 @@ void testMenu(TestRun& run) {
 }
 }
 
+// Centro do alvo claro da imagem, em coordenadas continuas (o pixel i cobre [i, i+1)).
+cv::Point2f brightCenter(const cv::Mat& image) {
+    cv::Mat gray, mask;
+    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    cv::threshold(gray, mask, 127, 255, cv::THRESH_BINARY);
+    const cv::Moments m = cv::moments(mask, true);
+    if (m.m00 <= 0) return {-1000, -1000};
+    return {static_cast<float>(m.m10 / m.m00) + 0.5f, static_cast<float>(m.m01 / m.m00) + 0.5f};
+}
+
+std::string pixels(float value) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(2) << value;
+    return out.str();
+}
+
+// Faz o caminho de um ponto conhecido pela cadeia da visao: imagem da camera, letterbox,
+// saida da rede numa celula, volta a imagem e espelho. O ponto final precisa cair sobre
+// o mesmo alvo na imagem espelhada que o jogador ve.
+void testCoordinateChain(TestRun& run) {
+    const cv::Point2f cell = PoseDetector::keypointFromCell(0, 0, 5, 3, 32);
+    run.check("ponto da rede parte do canto da celula, como na Ultralytics", cell == cv::Point2f(160, 96));
+    run.check("deslocamento bruto vale duas celulas por unidade",
+              PoseDetector::keypointFromCell(0.25f, -0.5f, 10, 7, 8) == cv::Point2f(84, 48));
+
+    for (const cv::Size& size : {cv::Size(640, 480), cv::Size(1280, 720), cv::Size(480, 640)}) {
+        const std::string name = std::to_string(size.width) + "x" + std::to_string(size.height);
+        cv::Mat frame(size, CV_8UC3, cv::Scalar::all(0));
+        const cv::Rect target(size.width * 3 / 4, size.height / 5, 8, 8);
+        cv::rectangle(frame, target, cv::Scalar::all(255), cv::FILLED);
+        const cv::Point2f truth = brightCenter(frame);
+
+        cv::Point2f scale, pad;
+        const cv::Mat square = PoseDetector::letterbox(frame, scale, pad);
+        const cv::Point2f seen = brightCenter(square);
+        run.check("letterbox " + name + " vira quadrado do modelo", square.size() == cv::Size(320, 320));
+
+        // Rede ideal: devolve o alvo pela formula da Ultralytics na celula de passo 32 que o contem.
+        const int stride = 32, cx = static_cast<int>(seen.x / stride), cy = static_cast<int>(seen.y / stride);
+        Pose pose;
+        pose.valid = true;
+        pose.joints[RWrist] = {PoseDetector::keypointFromCell((seen.x / stride - cx) / 2, (seen.y / stride - cy) / 2, cx, cy, stride), 1};
+        PoseDetector::restoreCoordinates(pose, scale, pad);
+        const float error = static_cast<float>(cv::norm(pose.at(RWrist) - truth));
+        run.check("ida e volta do letterbox " + name + " acha o alvo (erro " + pixels(error) + " px)", error < 1.5f);
+
+        cv::Mat mirrored;
+        cv::flip(frame, mirrored, 1);
+        const Pose shown = pose.mirrored(size.width);
+        const float mirrorError = static_cast<float>(cv::norm(shown.at(RWrist) - brightCenter(mirrored)));
+        run.check("espelho " + name + " leva o ponto ao alvo espelhado (erro " + pixels(mirrorError) + " px)", mirrorError < 1.5f);
+
+        // O esqueleto desenhado sobre a imagem espelhada marca o pixel do alvo.
+        cv::Mat drawn(size, CV_8UC3, cv::Scalar::all(0));
+        drawVisionSkeleton(drawn, shown);
+        const cv::Point center(static_cast<int>(brightCenter(mirrored).x), static_cast<int>(brightCenter(mirrored).y));
+        run.check("ponto " + name + " desenhado sobre o alvo", drawn.at<cv::Vec3b>(center) == cv::Vec3b(40, 200, 255));
+    }
+}
+
 int runGestureSelfTest() {
     TestRun run;
     testGlideAndBank(run);
@@ -276,5 +337,6 @@ int runGestureSelfTest() {
     testFlap(run);
     testTracking(run);
     testMenu(run);
+    testCoordinateChain(run);
     return run.failures;
 }

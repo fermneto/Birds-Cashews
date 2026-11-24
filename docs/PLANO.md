@@ -46,11 +46,16 @@ Todas as medidas são divididas pela largura dos ombros, para não depender da d
 
 As asas vistas em primeira pessoa acompanham a altura de cada braço. Em alta velocidade, rajadas de vento aparecem na tela.
 
-Se o corpo sair do quadro, o pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena,
-com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração confere se o corpo inteiro está visível
-e se as mãos são detectadas nas quatro bordas do quadro espelhado (faixas de 25%). As marcas valem em qualquer ordem,
+O controle usa só ombros e punhos. Os quadris, quando aparecem, apenas refinam a escala do corpo, e as pernas não entram,
+então o jogador pode ficar perto da câmera, mostrando da cintura para cima. Se ombros ou punhos saírem do quadro, o
+pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena, com o esqueleto desenhado por
+cima. Antes de jogar, uma tela de calibração confere se os ombros e as duas mãos estão visíveis e se as mãos são
+detectadas nas quatro bordas do quadro espelhado (faixas de 25%; com o jogador perto, as mãos baixadas na cintura já
+alcançam a de baixo). As marcas valem em qualquer ordem,
 as duas mãos marcam juntas e cada uma exige ao menos duas poses do detector, tolerando falhas de até 0,3 s. Com tudo
-marcado, a tela segue sozinha depois de 1 s.
+marcado, a tela segue sozinha depois de 1 s. Os testes automáticos levam um ponto de posição conhecida pela cadeia
+inteira (imagem da câmera, letterbox, saída da rede, espelho e tela) e conferem que ele é desenhado sobre o mesmo pixel
+da imagem.
 
 ### 3.2 Ciclo de jogo
 
@@ -255,7 +260,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN | Atendido |
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Atendido |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
-| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Atendido |
+| 9 | Detecção em todo o vídeo | Calibração exige ombros e mãos visíveis e a mão nas quatro bordas, com o jogador perto da câmera (seção 3.1) | Atendido |
 | 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida) e baleia do limite (sons longos e graves em camadas: ronco áspero e espirro no aviso, canto de baleia no salto, splash pesado com cauda de água, mordida com estalo, mastigadas, cuspida com sopro forte). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 

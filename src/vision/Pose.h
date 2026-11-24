@@ -20,10 +20,12 @@ struct Pose {
     cv::Point2f at(int joint) const { return joints[joint].pos; }
 
     // Espelha na horizontal mantendo os rotulos anatomicos. A deteccao roda na imagem
-    // original porque o modelo erra o lado do corpo em imagens invertidas.
+    // original porque o modelo erra o lado do corpo em imagens invertidas. As coordenadas sao
+    // continuas (o pixel i cobre [i, i+1)), entao o cv::flip, que leva o pixel i a W-1-i,
+    // corresponde a x' = W - x.
     Pose mirrored(int imageWidth) const {
         Pose out = *this;
-        for (auto& joint : out.joints) joint.pos.x = static_cast<float>(imageWidth - 1) - joint.pos.x;
+        for (auto& joint : out.joints) joint.pos.x = static_cast<float>(imageWidth) - joint.pos.x;
         return out;
     }
 };

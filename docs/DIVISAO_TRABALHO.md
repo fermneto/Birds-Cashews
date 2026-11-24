@@ -34,7 +34,7 @@ As seções 1 a 10 abaixo registram a divisão original entre os dois, mantida c
 Além dos testes automáticos, a experiência real foi conferida com janela, webcam, som e dois computadores:
 
 1. Navegação pelos menus com os braços e com o teclado.
-2. Calibração com o corpo inteiro na frente da câmera.
+2. Calibração com os ombros e as mãos na frente da câmera.
 3. Voo com o corpo: batidas, subida com os braços erguidos, mergulho, curvas e asas independentes.
 4. Ciclo completo: coletar cajus, pousar no ninho, comprar upgrades e decolar batendo os braços.
 5. NPCs: bando, disputa por cajus e caçador derrubando a carga.

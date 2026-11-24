@@ -13,16 +13,28 @@ PoseDetector::PoseDetector(const std::string& modelPath) {
 }
 
 // Redimensiona mantendo a proporcao e completa o restante com bordas.
-cv::Mat PoseDetector::letterbox(const cv::Mat& frame, float& scale, cv::Point2f& pad) const {
-    scale = static_cast<float>(kInputSize) / std::max(frame.cols, frame.rows);
+// A escala guardada e a do tamanho arredondado de fato, por eixo, para a volta ser exata.
+cv::Mat PoseDetector::letterbox(const cv::Mat& frame, cv::Point2f& scale, cv::Point2f& pad) {
+    const double fit = static_cast<double>(kInputSize) / std::max(frame.cols, frame.rows);
+    const cv::Size size(std::max(1, static_cast<int>(std::lround(frame.cols * fit))),
+                        std::max(1, static_cast<int>(std::lround(frame.rows * fit))));
     cv::Mat resized;
-    cv::resize(frame, resized, cv::Size(), scale, scale, cv::INTER_LINEAR);
+    cv::resize(frame, resized, size, 0, 0, cv::INTER_LINEAR);
+    scale = cv::Point2f(static_cast<float>(size.width) / frame.cols, static_cast<float>(size.height) / frame.rows);
     int padX = (kInputSize - resized.cols) / 2, padY = (kInputSize - resized.rows) / 2;
     pad = cv::Point2f(static_cast<float>(padX), static_cast<float>(padY));
     cv::Mat square;
     cv::copyMakeBorder(resized, square, padY, kInputSize - resized.rows - padY, padX,
                        kInputSize - resized.cols - padX, cv::BORDER_CONSTANT, cv::Scalar::all(114));
     return square;
+}
+
+// Igual ao kpts_decode da Ultralytics: (bruto * 2 + (ancora - 0.5)) * passo, com a ancora no
+// centro da celula (x + 0.5). Os pontos partem do canto da celula; so a caixa usa o centro.
+// Somar mais meia celula deslocava o esqueleto meio passo para a direita e para baixo,
+// o que na imagem espelhada aparecia como pontos a esquerda do corpo.
+cv::Point2f PoseDetector::keypointFromCell(float rawX, float rawY, int cellX, int cellY, int stride) {
+    return {(rawX * 2 + static_cast<float>(cellX)) * stride, (rawY * 2 + static_cast<float>(cellY)) * stride};
 }
 
 // Distribution Focal Loss: a distancia e o valor esperado de 16 faixas.
@@ -67,16 +79,17 @@ void PoseDetector::decodeScale(const cv::Mat& box, const cv::Mat& cls, const cv:
                 const float rawX = kptData[(j * 3) * rows * cols + cell];
                 const float rawY = kptData[(j * 3 + 1) * rows * cols + cell];
                 const float rawC = kptData[(j * 3 + 2) * rows * cols + cell];
-                best.pose.joints[j].pos = cv::Point2f((rawX * 2 + x + 0.5f) * stride,
-                                                      (rawY * 2 + y + 0.5f) * stride);
+                best.pose.joints[j].pos = keypointFromCell(rawX, rawY, x, y, stride);
                 best.pose.joints[j].conf = sigmoid(rawC);
             }
         }
     }
 }
 
-void PoseDetector::restoreCoordinates(Pose& pose, float scale, cv::Point2f pad) const {
-    for (auto& joint : pose.joints) joint.pos = (joint.pos - pad) * (1.0f / scale);
+// Desfaz o letterbox: tira a borda e volta a escala de cada eixo.
+void PoseDetector::restoreCoordinates(Pose& pose, cv::Point2f scale, cv::Point2f pad) {
+    for (auto& joint : pose.joints)
+        joint.pos = cv::Point2f((joint.pos.x - pad.x) / scale.x, (joint.pos.y - pad.y) / scale.y);
 }
 
 // Media movel exponencial reduz a tremedeira; falhas curtas mantem o ultimo esqueleto.
@@ -96,8 +109,7 @@ Pose PoseDetector::smooth(const Pose& current) {
 }
 
 Pose PoseDetector::detect(const cv::Mat& frame) {
-    float scale;
-    cv::Point2f pad;
+    cv::Point2f scale, pad;
     cv::Mat input = letterbox(frame, scale, pad);
     cv::Mat blob = cv::dnn::blobFromImage(input, 1.0 / 255.0, cv::Size(), cv::Scalar(), true, false);
     net_.setInput(blob);
