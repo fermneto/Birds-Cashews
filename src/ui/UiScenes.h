@@ -47,6 +47,7 @@ struct CalibrationScene {
     cv::Mat frame;
     Pose pose;
     const CalibrationTracker* tracker = nullptr;
+    std::string doneText;       // Aviso mostrado entre concluir e sair sozinho da tela.
     std::vector<MenuRow> rows;
     int selected = 0;
     GestureHint gesture;

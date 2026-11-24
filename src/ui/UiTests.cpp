@@ -290,6 +290,8 @@ void testCalibrationRegions(TestRun& t) {
     t.check("calibracao: centro nao marca", !CalibrationTracker::inRegion(CalRegion::Left, {0.5f, 0.5f})
                                                 && !CalibrationTracker::inRegion(CalRegion::Top, {0.5f, 0.5f}));
     t.check("calibracao: fora do quadro nao marca", !CalibrationTracker::inRegion(CalRegion::Left, {-0.1f, 0.5f}));
+    t.check("calibracao: faixa alcanca os bracos abertos", CalibrationTracker::inRegion(CalRegion::Left, {0.22f, 0.5f})
+                                                         && CalibrationTracker::inRegion(CalRegion::Right, {0.78f, 0.5f}));
 
     const cv::Size frame(640, 480);
     Pose body = ScriptedPoseSource::standingPose();
@@ -303,26 +305,70 @@ void testCalibrationRegions(TestRun& t) {
     t.check("calibracao: pose invalida nao conta", !CalibrationTracker::isFullBody(Pose{}, frame));
 }
 
+Pose withBothWrists(Pose pose, cv::Point2f left, cv::Point2f right) {
+    pose.joints[LWrist].pos = left;
+    pose.joints[RWrist].pos = right;
+    return pose;
+}
+
 void testCalibrationTracker(TestRun& t) {
     const cv::Size frame(640, 480);
     const Pose body = ScriptedPoseSource::standingPose();
+    const Pose left = ScriptedPoseSource::withWrist(body, {40, 240});
     CalibrationTracker tracker;
-    tracker.update(ScriptedPoseSource::withWrist(body, {40, 240}), frame, 0.05f);
+    tracker.update(left, frame, 0.05f);
     t.check("calibracao: toque rapido nao marca", !tracker.reached(CalRegion::Left));
-    tracker.update(ScriptedPoseSource::withWrist(body, {40, 240}), frame, 0.3f);
+    tracker.update(left, frame, 0.3f);
     t.check("calibracao: mao mantida marca a regiao", tracker.reached(CalRegion::Left));
     tracker.update(body, frame, 1.0f);
     t.check("calibracao: marca continua depois de sair", tracker.reached(CalRegion::Left) && tracker.bodyConfirmed());
     t.check("calibracao: incompleta nao aceita gesto", !tracker.acceptsGesture(pressed(ArmSide::Right)));
 
     for (const cv::Point2f& wrist : {cv::Point2f(600, 240), cv::Point2f(320, 30), cv::Point2f(320, 450)})
-        tracker.update(ScriptedPoseSource::withWrist(body, wrist), frame, 0.3f);
+        for (int sample = 0; sample < 2; sample++) tracker.update(ScriptedPoseSource::withWrist(body, wrist), frame, 0.1f);
     t.check("calibracao: completa com as cinco marcas", tracker.complete() && tracker.marksDone() == 5);
     t.check("calibracao: braco ainda erguido nao confirma", !tracker.acceptsGesture(pressed(ArmSide::Right)));
     tracker.acceptsGesture(FlightControls{});
     t.check("calibracao: depois de baixar o braco aceita gesto", tracker.acceptsGesture(pressed(ArmSide::Right)));
     tracker.reset();
     t.check("calibracao: reiniciar limpa as marcas", tracker.marksDone() == 0);
+
+    // Um unico quadro ruidoso, repetido enquanto o detector nao entrega outro, nao marca nada.
+    tracker.update(left, frame, 0.05f);
+    tracker.update(left, frame, 1.0f, false);
+    t.check("calibracao: uma pose so nao marca", !tracker.reached(CalRegion::Left) && !tracker.bodyConfirmed());
+
+    tracker.reset();
+    tracker.update(left, frame, 0.1f);
+    tracker.update(body, frame, 0.1f);
+    tracker.update(left, frame, 0.06f);
+    t.check("calibracao: falha curta do detector nao recomeca", tracker.reached(CalRegion::Left));
+
+    tracker.reset();
+    tracker.update(left, frame, 0.1f);
+    tracker.update(body, frame, 0.5f);
+    tracker.update(left, frame, 0.06f);
+    t.check("calibracao: ausencia longa recomeca a contagem", !tracker.reached(CalRegion::Left));
+
+    tracker.reset();
+    const Pose open = withBothWrists(body, {40, 240}, {600, 240});
+    tracker.update(open, frame, 0.1f);
+    tracker.update(open, frame, 0.1f);
+    t.check("calibracao: duas maos marcam esquerda e direita juntas",
+            tracker.reached(CalRegion::Left) && tracker.reached(CalRegion::Right));
+    const Pose upDown = withBothWrists(body, {320, 30}, {320, 450});
+    tracker.update(upDown, frame, 0.1f);
+    tracker.update(upDown, frame, 0.1f);
+    t.check("calibracao: em qualquer ordem e rapido", tracker.complete());
+}
+
+// Como a webcam, entrega uma pose nova a cada quadro.
+void feedPose(GameUi& ui, ScriptedPoseSource& camera, const Pose& pose, float seconds) {
+    constexpr float kFrame = 1.0f / 30.0f;
+    for (float time = 0; time < seconds; time += kFrame) {
+        camera.setPose(pose);
+        ui.update(kFrame);
+    }
 }
 
 void testCalibrationScreen(TestRun& t) {
@@ -336,12 +382,27 @@ void testCalibrationScreen(TestRun& t) {
     t.check("calibracao: tela abre pelo menu", ui.screen() == UiScreen::Calibration && !ui.showsCornerPreview());
     ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("calibracao: gesto nao sai antes de concluir", ui.screen() == UiScreen::Calibration);
-    camera.setPose(ScriptedPoseSource::withWrist(ScriptedPoseSource::standingPose(), {40, 240}));
-    ui.update(0.5f);
+    const Pose body = ScriptedPoseSource::standingPose();
+    feedPose(ui, camera, ScriptedPoseSource::withWrist(body, {40, 240}), 0.3f);
     t.check("calibracao: tela le a webcam simulada", ui.calibration().reached(CalRegion::Left));
     t.check("calibracao: Enter ainda pode pular", ui.rows()[0].label == "Pular calibração");
     sendKey(ui, SDLK_RETURN);
     t.check("calibracao: pular volta ao menu", ui.screen() == UiScreen::MainMenu);
+
+    // Corpo inteiro e as duas maos abertas, depois no alto e embaixo: tudo em menos de dois segundos.
+    sendKeys(ui, SDLK_DOWN, 3);
+    sendKey(ui, SDLK_RETURN);
+    feedPose(ui, camera, withBothWrists(body, {40, 240}, {600, 240}), 0.5f);
+    feedPose(ui, camera, withBothWrists(body, {320, 30}, {320, 450}), 0.3f);
+    t.check("calibracao: completa mostra o resultado antes de sair",
+            ui.calibration().complete() && ui.screen() == UiScreen::Calibration);
+    feedPose(ui, camera, ScriptedPoseSource::withWrist(body, {400, 30}), 1.0f);
+    t.check("calibracao: concluida volta sozinha ao menu", ui.screen() == UiScreen::MainMenu);
+    ui.updateMenus(pressed(ArmSide::Right));
+    t.check("calibracao: braco ainda erguido nao escolhe no menu", ui.screen() == UiScreen::MainMenu);
+    ui.updateMenus(FlightControls{});
+    ui.updateMenus(pressed(ArmSide::Right));
+    t.check("calibracao: depois de baixar o braco o menu responde", ui.screen() != UiScreen::MainMenu);
 }
 
 void testProfiles(TestRun& t) {

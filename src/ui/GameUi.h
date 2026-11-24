@@ -110,6 +110,8 @@ private:
     cv::Mat calibrationFrame_;
     Pose calibrationPose_;
     uint64_t calibrationSerial_ = 0;
+    float calibrationDoneFor_ = 0;
+    bool waitArmsDown_ = false;     // Depois da calibracao, gestos so valem com os bracos baixados.
     ArmSide raisedArm_ = ArmSide::None;
     float armProgress_ = 0;
     std::string error_, recordFooter_, lastKey_;

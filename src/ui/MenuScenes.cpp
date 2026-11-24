@@ -143,13 +143,35 @@ void drawSkeleton(UiKit& kit, const Pose& pose, cv::Size frame, const cv::Rect& 
         if (pose.has(joint)) kit.canvas.dot(place(joint), joint == LWrist || joint == RWrist ? 10 : 6, theme::kGold);
 }
 
-void drawVideoStatus(UiKit& kit, const cv::Rect& video, const CalibrationTracker& tracker) {
-    const bool visible = tracker.bodyVisibleNow();
-    const std::string text = visible ? "Corpo inteiro visível" : "Afaste-se: mostre o corpo inteiro";
+std::string missingRegions(const CalibrationTracker& tracker) {
+    std::string text;
+    for (int i = 0; i < kCalRegionCount; i++) {
+        const auto region = static_cast<CalRegion>(i);
+        if (tracker.reached(region)) continue;
+        text += (text.empty() ? "" : ", ") + std::string(regionName(region));
+    }
+    return text;
+}
+
+// Diz o que falta, na ordem em que costuma ser feito: afastar-se, depois levar as maos as bordas.
+void drawVideoStatus(UiKit& kit, const cv::Rect& video, const CalibrationTracker& tracker, const std::string& doneText) {
+    std::string text;
+    cv::Scalar color = theme::kInk;
+    if (tracker.complete()) {
+        text = doneText;
+        color = theme::kGreen;
+    } else if (!tracker.bodyConfirmed() && !tracker.bodyVisibleNow()) {
+        text = "Afaste-se: mostre o corpo inteiro";
+        color = theme::kRed;
+    } else if (!tracker.bodyConfirmed()) {
+        text = "Corpo inteiro visível: fique parado";
+    } else {
+        text = "Leve as mãos a: " + missingRegions(tracker);
+    }
     const int width = kit.text.width(text, 22) + 40;
     const int bottomBand = static_cast<int>(video.height * kCalRegionBand);
     const cv::Rect chip(video.x + (video.width - width) / 2, video.y + video.height - bottomBand - 58, width, 48);
-    kit.canvas.fill(chip, visible ? theme::kInk : theme::kRed, 0.82f, 12);
+    kit.canvas.fill(chip, color, 0.82f, 12);
     kit.text.draw(kit.canvas, text, {chip.x + width / 2, chip.y + 32}, style(22, theme::kWhite, TextAlign::Center));
 }
 
@@ -213,14 +235,14 @@ void drawMenuScene(UiKit& kit, const MenuScene& scene) {
 void drawCalibrationScene(UiKit& kit, const CalibrationScene& scene) {
     kit.canvas.fill({0, 0, kit.canvas.width(), kit.canvas.height()}, theme::kPanel, 0.96f);
     kit.text.draw(kit.canvas, "Calibração", {28, 54}, style(36));
-    kit.text.drawFit(kit.canvas, "Vídeo em modo espelho", {262, 52}, 400, style(17, theme::kMuted));
+    kit.text.drawFit(kit.canvas, "Vídeo em modo espelho. Marque em qualquer ordem, com as duas mãos", {262, 52}, 570, style(17, theme::kMuted));
 
     const cv::Rect video(28, 72, 816, 612);
     if (scene.hasCamera && !scene.frame.empty()) {
         kit.canvas.video(scene.frame, video);
         drawRegions(kit, video, *scene.tracker);
         drawSkeleton(kit, scene.pose, scene.frame.size(), video);
-        drawVideoStatus(kit, video, *scene.tracker);
+        drawVideoStatus(kit, video, *scene.tracker, scene.doneText);
     } else if (scene.hasCamera) {
         kit.canvas.fill(video, theme::kInk, 0.9f, 14);
         kit.text.draw(kit.canvas, "Aguardando a imagem da webcam...", {video.x + video.width / 2, video.y + video.height / 2},
