@@ -13,6 +13,7 @@ struct BirdInstance {
     uint32_t key = 0;          // Identidade estavel entre quadros: guarda o estado da batida de asa.
     bool perched = false;      // Pousado: asas recolhidas junto ao corpo.
     float glideFlaps = 0;      // Fracao do planeio gasta em rajadas curtas de batidas (0 = so plana).
+    float flail = 0;           // 0 a 1: arremessado, as asas se debatem sem conseguir bater no ritmo.
 };
 
 // Pose das asas: angulo de elevacao, abertura (1 = aberta) e quanto a ponta recua.
@@ -20,6 +21,7 @@ struct WingPose {
     float lift = 0.08f;
     float spread = 1.0f;
     float sweep = 0.0f;
+    float tilt = 0.0f;     // Diferenca entre as asas: a direita sobe tilt e a esquerda desce tilt.
 };
 
 // Anima as asas com estado proprio por passaro, para que a troca de modo nunca de salto
@@ -31,7 +33,7 @@ public:
 
 private:
     struct State {
-        float phase = 0, flap = 0, fold = 0, perch = 0, lastTime = 0;
+        float phase = 0, flap = 0, fold = 0, perch = 0, flail = 0, lastTime = 0;
         glm::vec3 lastPosition{0};
         bool started = false;
     };

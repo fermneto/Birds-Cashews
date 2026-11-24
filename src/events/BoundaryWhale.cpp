@@ -214,6 +214,20 @@ bool BoundaryWhale::throwsLocal() const {
     return attack && attack->spat && attack->age < attack->timeline.throwEnd;
 }
 
+// Igual em todos os computadores, so pelo tempo do ataque: debate-se na boca e mais ainda no arremesso,
+// acalmando no fim dele, quando o jogador recupera o voo.
+float BoundaryWhale::flailOf(PlayerId id) const {
+    for (const WhaleAttack& attack : attacks_) {
+        if (attack.target != id) continue;
+        const WhaleTimeline& line = attack.timeline;
+        if (attack.age < line.bite) return 0.0f;
+        if (attack.age < line.spit) return 0.55f;
+        if (attack.age < line.throwEnd) return 1.0f - glm::smoothstep(line.throwEnd - 0.6f, line.throwEnd, attack.age);
+        return 0.0f;
+    }
+    return 0.0f;
+}
+
 bool BoundaryWhale::busy() const { return localAttack() != nullptr; }
 
 // Cuspido da boca ja de frente para o centro da ilha, com forca e subindo. Durante o arremesso a velocidade

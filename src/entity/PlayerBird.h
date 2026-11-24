@@ -26,6 +26,7 @@ public:
     void step(const World& world, float dt);
     void animate(float dt);
     void setBeakTarget(BeakSource source, float openness);
+    void setFlail(float amount) { flail_ = amount; }   // 0 a 1: arremessado, as asas se debatem.
     void jolt(float strength) { animation_.shake = std::max(animation_.shake, strength); }   // Tremor da camera.
 
     FlightModel& flight() { return flight_; }
@@ -49,4 +50,5 @@ private:
     bool nearBoundary_ = false;
     float solidImpact_ = 0;
     float flapSound_ = 0, lastStroke_ = 0;
+    float flail_ = 0, flailBlend_ = 0, flailTime_ = 0;
 };

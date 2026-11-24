@@ -98,11 +98,23 @@ void PlayerBird::animate(float dt) {
     if (flapTimer_ > 0)
         angle += 36.0f * std::sin(6.2831853f * (1.0f - flapTimer_ / kFlapDuration)) * controls_.flapStrength;
     const float blend = 1.0f - std::exp(-18.0f * dt);
-    const float left = controls_.bodyControlled ? -4.0f + controls_.leftWingHeight * 57.0f : angle;
-    const float right = controls_.bodyControlled ? -4.0f + controls_.rightWingHeight * 57.0f : angle;
+    float left = controls_.bodyControlled ? -4.0f + controls_.leftWingHeight * 57.0f : angle;
+    float right = controls_.bodyControlled ? -4.0f + controls_.rightWingHeight * 57.0f : angle;
+    float wingSweep = sweep;
+    // Arremessado, cada asa tenta bater num tempo proprio e falha, e o vento joga as duas para tras.
+    flailBlend_ += (flail_ - flailBlend_) * (1.0f - std::exp(-(flail_ > flailBlend_ ? 10.0f : 3.0f) * dt));
+    if (flailBlend_ > 0.001f) {
+        flailTime_ += dt;
+        const float t = flailTime_;
+        const float flailLeft = 8.0f + 42.0f * std::sin(t * 13.0f + 0.8f * std::sin(t * 3.1f)) * (0.6f + 0.4f * std::sin(t * 5.3f));
+        const float flailRight = 8.0f + 42.0f * std::sin(t * 14.7f + 1.9f + 0.8f * std::sin(t * 3.9f)) * (0.6f + 0.4f * std::sin(t * 4.6f));
+        left += (flailLeft - left) * flailBlend_;
+        right += (flailRight - right) * flailBlend_;
+        wingSweep += (28.0f + 18.0f * std::sin(t * 5.7f) - wingSweep) * flailBlend_;
+    }
     animation_.leftWingAngle += (left - animation_.leftWingAngle) * blend;
     animation_.rightWingAngle += (right - animation_.rightWingAngle) * blend;
-    animation_.wingSweep += (sweep - animation_.wingSweep) * blend;
+    animation_.wingSweep += (wingSweep - animation_.wingSweep) * blend;
     animation_.shake *= std::exp(-5.0f * dt);
     animation_.kick *= std::exp(-6.0f * dt);
     const float speed = glm::length(flight_.velocity());

@@ -101,7 +101,8 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
   95 m/s, o dobro do pássaro mais rápido, sempre apontando para o alvo, então sempre chega, depois de uns 6 a 8 s. Ele
   não desce abaixo de 360 m: quem mergulha antes vê o avião passar por cima e ir embora. Se acertar, o pássaro é jogado
   para baixo a 140 m/s e continua despencando durante a tontura (cai mais de 200 m), a tela treme, fica 3 s sem controle
-  do voo e toda a carga cai no mundo. A câmera continua em primeira pessoa.
+  do voo e toda a carga cai no mundo. A câmera continua em primeira pessoa, e as asas se debatem, cada uma num tempo,
+  sem conseguir bater, até a tontura passar.
   Depois de cada avião, o mesmo jogador espera 25 s para chamar outro.
 - **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho, pelo avião ou pela árvore caem até o chão ou uma copa e ficam
   30 s no mundo. Qualquer um pega, como caju comum. Quem derrubou espera 2 s para pegar o próprio caju de volta.
@@ -203,6 +204,8 @@ abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
   chamaria o avião. Ele voa arremessado por
   2,5 s sem perder velocidade nem responder aos comandos, avança mais de 200 m para dentro do limite e só então o jogador
   volta a controlar o voo, ainda rápido, chegando a uns 450 m da borda.
+  Preso na boca e, mais ainda, durante o arremesso, as asas se debatem: cada uma tenta bater num tempo próprio e falha,
+  e o vento joga as pontas para trás. Todos na sala veem o mesmo, porque o movimento sai só do tempo do ataque.
 - **Carga:** os cajus caem no mar com a mordida e se perdem. Diferente da carga derrubada por mergulho ou por árvore
   (seção 3.3), eles não ficam no mundo: o mar está fora do mapa e ninguém consegue alcançá-los. A perda também impede que a
   baleia vire um atalho gratuito, já que a cuspida leva o pássaro rápido até o meio da ilha.

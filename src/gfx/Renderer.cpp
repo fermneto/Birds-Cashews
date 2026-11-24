@@ -307,7 +307,7 @@ void Renderer::drawBird(const BirdInstance& bird, const WingPose& wings) {
         auto shoulder = flyer.rightShoulder;
         shoulder.x *= side;
         auto wing = glm::translate(model, shoulder);
-        wing = glm::rotate(wing, side * wings.lift, glm::vec3(0, 0, 1));
+        wing = glm::rotate(wing, side * (wings.lift + side * wings.tilt), glm::vec3(0, 0, 1));
         wing = glm::rotate(wing, -side * wings.sweep, glm::vec3(0, 1, 0));
         wing = glm::scale(wing, glm::vec3(wings.spread, 1.0f, 1.0f));
         worldShader_.set("uModel", glm::translate(wing, -shoulder));

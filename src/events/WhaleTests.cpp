@@ -315,11 +315,21 @@ void testSolo(TestRun& t, const World& world) {
                 glm::dot(flight.heading(), toCenter) > 0.99f && !rig.session.view().whaleNow);
 
     bool free = true, inward = true;
+    float leftLow = 1e9f, leftHigh = -1e9f, apart = 0, flailing = 0;
     for (int i = 0; i < 240; i++) {
         rig.tick();
         free = free && isFree(world, flight.position());
         if (i < 60) inward = inward && glm::dot(flight.velocity(), -whale::outward(flight.position())) > 0;
+        if (i >= 10 && i < 70) {   // Arremessado: as asas se debatem, cada uma num tempo.
+            const BirdAnimation& wings = rig.bird.animation();
+            leftLow = std::min(leftLow, wings.leftWingAngle);
+            leftHigh = std::max(leftHigh, wings.leftWingAngle);
+            apart = std::max(apart, std::abs(wings.leftWingAngle - wings.rightWingAngle));
+            flailing = std::max(flailing, whale.flailOf(rig.session.localPlayer()));
+        }
     }
+    t.check("baleia sozinho: arremessado, as asas se debatem fora de ritmo",
+            flailing > 0.9f && leftHigh - leftLow > 40.0f && apart > 15.0f && whale.flailOf(rig.session.localPlayer()) == 0.0f);
     const glm::vec3 end = flight.position();
     t.check("baleia sozinho: depois de cuspido fica dentro do mapa, no ar e livre",
             radiusOf(end) < World::kBoundaryRadius - 50.0f && inward && free && end.y > std::max(world.island().heightAt(end.x, end.z), 0.0f) + 5.0f);

@@ -436,6 +436,7 @@ void Game::prepareBirds() {
         BirdInstance self{profile ? profile->birdSeed() : options_.seed, flight.position(), flight.yaw(),
                           flight.pitch(), flight.roll(), kBirdScale, FlightMode::Glide};
         self.key = 999u;
+        self.flail = session_->whale().flailOf(session_->localPlayer());
         birds.push_back(self);
     }
     if (match_.online()) {
@@ -443,6 +444,7 @@ void Game::prepareBirds() {
             if (other.id != match_.localPlayer() && other.id != kNoPlayer) {
                 BirdInstance bird{other.birdSeed, other.position, other.yaw, other.pitch, other.roll, kBirdScale, other.mode};
                 bird.key = 1000u + other.id;
+                bird.flail = session_->whale().flailOf(other.id);
                 // Preso na boca da baleia, o passaro e desenhado entre as mandibulas, sem esperar o estado dele.
                 whale::HeldBird held;
                 if (session_->whale().heldPose(other.id, held)) {

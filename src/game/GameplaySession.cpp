@@ -124,6 +124,7 @@ void GameplaySession::update(float frameSeconds) {
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
     skyPlane_.update(frameSeconds, bird_, players_, *authority_, perched_);
     whale_.update(frameSeconds, bird_, world_, *authority_, !perched_);
+    bird_.setFlail(std::max(whale_.flailOf(localPlayer_), skyPlane_.stunned() ? skyPlane_.stunLevel() : 0.0f));
     rivals_.update(players_, localPlayer_);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
     cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);

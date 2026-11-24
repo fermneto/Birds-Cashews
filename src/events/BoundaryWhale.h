@@ -82,6 +82,7 @@ public:
     float cooldown() const { return cooldown_; }
     bool waiting() const { return waitTimer_ > 0; }   // Pedido enviado, sem resposta ainda.
     bool heldPose(PlayerId id, whale::HeldBird& pose) const;   // Para desenhar outro jogador preso na boca.
+    float flailOf(PlayerId id) const;   // 0 a 1: asas se debatendo, preso na boca ou arremessado pela cuspida.
     const std::vector<WhaleAttack>& attacks() const { return attacks_; }
     const WhaleAttack* localAttack() const;   // A baleia atras do passaro local, se houver.
 

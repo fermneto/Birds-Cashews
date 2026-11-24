@@ -94,6 +94,7 @@ public:
                 bool perched);
 
     bool stunned() const { return stun_ > 0; }
+    float stunLevel() const { return stun_ / kPlaneStunSeconds; }   // 1 logo apos a batida, 0 recuperado.
     FlightControls stunControls() const;     // Comandos enquanto o passaro esta tonto.
     bool incoming() const;                   // Um aviao persegue o jogador local.
     bool hitRecently() const { return hitNotice_ > 0; }
