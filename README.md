@@ -112,6 +112,12 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 - Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
 - Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
 
+### Limite do mapa
+
+A ilha é cercada de mar. Perto do limite aparecem a sombra de uma baleia gigante debaixo da água, bolhas, espirros e um
+ronco grave: é hora de voltar. Quem passa do limite é abocanhado pela baleia, que mastiga um pouco e cospe o pássaro de
+volta para o meio da ilha. Os cajus da carga caem no mar e se perdem. Todos na sala veem a baleia.
+
 ### Com o corpo
 
 Fique de frente para a webcam, com o corpo inteiro no quadro. A tela de calibração confere isso antes de jogar. A imagem
