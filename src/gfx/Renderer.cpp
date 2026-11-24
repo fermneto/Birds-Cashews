@@ -571,6 +571,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawCashews();
     drawNest();
     drawRivalNests();
+    drawSkyPlanes();
     drawWater(camera, time);
     drawWind(animation);
     drawLabels(camera);
@@ -606,4 +607,32 @@ cv::Mat Renderer::capture(const Camera3D& camera, const BirdAnimation& animation
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     cv::flip(image, image, 0);
     return image;
+}
+
+void Renderer::setSkyPlaneMeshes(const MeshBuilder& body, const MeshBuilder& propeller) {
+    skyPlaneBody_ = std::make_unique<Mesh>(body.vertices());
+    skyPlanePropeller_ = std::make_unique<Mesh>(propeller.vertices());
+}
+
+void Renderer::setSkyPlanes(std::vector<glm::mat4> bodies, std::vector<glm::mat4> propellers) {
+    skyPlaneBodies_ = std::move(bodies);
+    skyPlanePropellers_ = std::move(propellers);
+}
+
+// As pecas finas (asas, leme, pas) sao vistas dos dois lados.
+void Renderer::drawSkyPlanes() {
+    if (!skyPlaneBody_ || skyPlaneBodies_.empty()) return;
+    glDisable(GL_CULL_FACE);
+    worldShader_.set("uGlow", 0.12f);
+    for (const glm::mat4& transform : skyPlaneBodies_) {
+        worldShader_.set("uModel", transform);
+        skyPlaneBody_->draw();
+    }
+    for (const glm::mat4& transform : skyPlanePropellers_) {
+        worldShader_.set("uModel", transform);
+        skyPlanePropeller_->draw();
+    }
+    worldShader_.set("uGlow", 0.0f);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    glEnable(GL_CULL_FACE);
 }

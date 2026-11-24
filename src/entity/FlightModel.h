@@ -23,6 +23,7 @@ public:
     float applyContact(const Contact& contact);
     void leaveGround() { grounded_ = false; }
     void steerToward(float targetYaw, float rate, float dt);
+    void setVelocity(glm::vec3 velocity);   // Tranco de fora, como a batida do aviao: vira para onde foi empurrado.
 
     glm::vec3& position() { return position_; }
     glm::vec3 position() const { return position_; }

@@ -39,7 +39,7 @@ GameplaySession::GameplaySession(const World& world, uint32_t seed, CashewField&
     : world_(world), bird_(bird), localPlayer_(localPlayer), authority_(orLocal(std::move(authority))),
       collector_(cashews, *authority_, localPlayer), nest_(chooseNestSite(world, seed, localPlayer)),
       rivals_(world, seed),
-      store_(saveDir), records_(saveDir), perchSite_(nest_) {
+      store_(saveDir), records_(saveDir), perchSite_(nest_), skyPlane_(localPlayer) {
     refreshView();
 }
 
@@ -76,7 +76,8 @@ std::vector<GameplayFeedback> GameplaySession::drainFeedback() {
     return drained;
 }
 
-void GameplaySession::applyControls(const FlightControls& controls) {
+void GameplaySession::applyControls(const FlightControls& input) {
+    const FlightControls controls = skyPlane_.stunned() ? skyPlane_.stunControls() : input;   // Tonto pelo aviao.
     flightMode_ = perched_ || controls.mode == FlightMode::Lost ? FlightMode::Glide : controls.mode;
     if (!perched_) {
         bird_.applyControls(controls);
@@ -116,6 +117,7 @@ void GameplaySession::checkTreeHit() {
 void GameplaySession::update(float frameSeconds) {
     players_ = authority_->players();
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
+    skyPlane_.update(frameSeconds, bird_, players_, *authority_, perched_);
     rivals_.update(players_, localPlayer_);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
     cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);
@@ -135,6 +137,7 @@ void GameplaySession::update(float frameSeconds) {
 void GameplaySession::handleEvent(const GameEvent& event) {
     const int carriedBefore = collector_.carried();
     collector_.handle(event);
+    skyPlane_.handle(event);
     if (event.type == GameEventType::CashewCollected && collector_.carried() > carriedBefore)
         feedback_.push_back(GameplayFeedback::CashewCollected);
     if (event.type == GameEventType::CashewDropped) handleCargoDrop(event, carriedBefore);
@@ -152,6 +155,7 @@ void GameplaySession::handleEvent(const GameEvent& event) {
 void GameplaySession::handleCargoDrop(const GameEvent& event, int carriedBefore) {
     if (event.target == localPlayer_ && collector_.carried() < carriedBefore) {
         lossCause_ = event.actor == kNoPlayer      ? CargoLossCause::Hunter
+                     : event.actor == kSkyPlaneActor ? CargoLossCause::Plane
                      : event.actor == localPlayer_ ? CargoLossCause::Tree
                                                    : CargoLossCause::Player;
         feedback_.push_back(GameplayFeedback::CargoLost);
@@ -406,6 +410,8 @@ void GameplaySession::refreshView() {
     view_.cargoLossCause = lossCause_;
     view_.knockedRivalNow = knockedNotice_ > 0;
     view_.nearBoundary = bird_.nearBoundary();
+    view_.planeIncoming = skyPlane_.incoming();
+    view_.planeHitNow = skyPlane_.hitRecently();
     view_.perchedOnNest = perched_ && perchRival_ == kNoPlayer;
     refreshRobbery();
     refreshAlarm();

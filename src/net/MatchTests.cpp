@@ -1040,11 +1040,11 @@ uint32_t wireFingerprint() {
 }
 
 void testWireFormatLocked(TestRun& t) {
-    constexpr uint32_t kVersion5Fingerprint = 4186852064u;
+    constexpr uint32_t kVersion6Fingerprint = 2961360089u;
     const uint32_t fingerprint = wireFingerprint();
-    if (fingerprint != kVersion5Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
-    t.check("protocolo: formato fixo da versao 5 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
-            kProtocolVersion == 5 && fingerprint == kVersion5Fingerprint);
+    if (fingerprint != kVersion6Fingerprint) std::cerr << "Resumo do formato atual: " << fingerprint << "\n";
+    t.check("protocolo: formato fixo da versao 6 (mudou o formato? aumente kProtocolVersion e atualize o resumo)",
+            kProtocolVersion == 6 && fingerprint == kVersion6Fingerprint);
 }
 
 // Um host de outra versao que conecta, mas manda um estado que o cliente nao consegue ler.

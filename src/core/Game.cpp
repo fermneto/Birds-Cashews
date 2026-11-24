@@ -1,5 +1,8 @@
 #include "core/Game.h"
 #include "core/BirdShots.h"
+#include "events/SkyPlaneModel.h"
+#include "events/SkyPlaneShots.h"
+#include "events/SkyPlaneSound.h"
 #include "game/CashewModel.h"
 #include "game/NameTags.h"
 #include "game/NestModel.h"
@@ -73,6 +76,7 @@ Game::Game(const GameOptions& options)
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
     renderer_.setRivalBeaconMesh(buildRivalBeaconMesh());
+    renderer_.setSkyPlaneMeshes(buildSkyPlaneMesh(), buildSkyPlanePropeller());
     player_.spawn(world_.spawnPoint(), 0.0f);
     window_.drawableSize(width_, height_);
     renderer_.resize(width_, height_);
@@ -287,7 +291,12 @@ void Game::updateFlightSounds(float frameSeconds) {
     listener.playing = ui_->playing() && !session_->perched();
     ui_->setAmbience(ambientMixFor(listener));
     const float flap = player_.takeFlap();
+    // Aviao do teto: motor com Doppler pela distancia e velocidade, e o estrondo de cada batida.
+    const PlaneEngineMix engine = planeEngineFor(listener.position, flight.velocity(), session_->skyPlane().planes());
+    ui_->setPlaneEngine(ui_->playing() ? engine.volume : 0.0f, engine.rate);
+    const std::vector<glm::vec3> impacts = session_->skyPlane().takeImpacts();
     if (!ui_->playing()) return;
+    for (const glm::vec3& impact : impacts) ui_->playSound(UiSound::PlaneCrash, planeImpactVolume(listener.position, impact));
     if (flap > 0) ui_->playSound(UiSound::Flap, 0.45f + 0.45f * flap);
     for (const ChirpRequest& chirp : chorus_.update(frameSeconds, listener.position, singingBirds()))
         ui_->playSound(chirp.sound, chirp.volume);
@@ -400,6 +409,7 @@ void Game::renderFrame() {
     prepareNest(camera);
     prepareBirds();
     prepareNameTags(camera);
+    showSkyPlanes(renderer_, session_->skyPlane().planes(), time_);
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -410,6 +420,7 @@ cv::Mat Game::captureFrame(float time) {
     prepareNest(camera);
     prepareBirds();
     prepareNameTags(camera);
+    showSkyPlanes(renderer_, session_->skyPlane().planes(), time);
     return renderer_.capture(camera, player_.animation(), time);
 }
 
@@ -476,6 +487,10 @@ int Game::renderTest(const std::string& outputDir) {
     captureUiShots(outputDir);
     captureLiveNestShots(outputDir);
     captureRivalNestShots(outputDir);
+    captureSkyPlaneShots(outputDir, [&](glm::vec3 eye, glm::vec3 target) {
+        aimAt(eye, target);
+        return captureFrame(3.0f);
+    }, *session_);
     return 0;
 }
 

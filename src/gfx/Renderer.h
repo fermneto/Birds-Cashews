@@ -46,6 +46,9 @@ public:
     void setRivalBeacons(std::vector<glm::mat4> transforms) { rivalBeacons_ = std::move(transforms); }
     void setLabels(std::vector<WorldLabel> labels);   // Desenhadas na ordem recebida; a ultima fica por cima.
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
+    // Avioes do evento do teto: uma malha de corpo e uma de helice, com uma transformacao de cada por aviao.
+    void setSkyPlaneMeshes(const MeshBuilder& body, const MeshBuilder& propeller);
+    void setSkyPlanes(std::vector<glm::mat4> bodies, std::vector<glm::mat4> propellers);
 
 private:
     void drawSky(const Camera3D& camera, float time);
@@ -97,4 +100,7 @@ private:
     int overlayWidth_ = 0, overlayHeight_ = 0;
     bool previewVisible_ = true;
     bool viewModelVisible_ = true;
+    void drawSkyPlanes();
+    std::unique_ptr<Mesh> skyPlaneBody_, skyPlanePropeller_;
+    std::vector<glm::mat4> skyPlaneBodies_, skyPlanePropellers_;
 };

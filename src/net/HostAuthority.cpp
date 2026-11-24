@@ -92,6 +92,9 @@ bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
             event.type == GameEventType::PlayerLeft || event.type == GameEventType::CashewSpilled) return false;
         // Um cliente so derruba a propria carga (batida em arvore); mergulhos e cacadores sao decididos aqui.
         if (event.type == GameEventType::CashewDropped && event.target != sender) return false;
+        // O aviao do teto so e pedido e so bate no passaro de quem enviou.
+        if ((event.type == GameEventType::PlaneLaunched || event.type == GameEventType::PlaneStruck) &&
+            event.target != sender) return false;
         event.actor = sender;
     }
     switch (event.type) {
@@ -125,6 +128,13 @@ bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
             return true;
         case GameEventType::CashewSpilled:
             return false;   // So nasce em confirm, a partir de um CashewDropped.
+        case GameEventType::PlaneLaunched: {
+            PlayerPublicState target;
+            const bool known = stateOf(event.target, target);
+            return skyPlanes_.acceptLaunch(event, now_, known ? &target : nullptr, true);
+        }
+        case GameEventType::PlaneStruck:
+            return skyPlanes_.acceptStrike(event, now_, true);
         default:
             return true;
     }
@@ -180,6 +190,7 @@ void HostAuthority::confirm(GameEvent event, bool remote, PlayerId sender) {
     if (!validate(event, remote, sender)) return;
     pending_.push_back(event);
     outgoing_.push_back(event);
+    if (event.type == GameEventType::PlaneStruck) confirm(SkyPlaneLedger::cargoDropFor(event), false, kHostPlayer);
     if (event.type != GameEventType::CashewDropped) return;
     for (const GameEvent& spilled : spill_.spill(event)) {
         pending_.push_back(spilled);
@@ -283,6 +294,7 @@ void HostAuthority::dropPlayer(PlayerId id) {
     remotes_[id] = Remote{};
     carried_[id] = 0;
     lastRobAt_[id] = -1.0e9;
+    skyPlanes_.forget(id);
     std::cout << "Rede: jogador " << static_cast<int>(id) << " saiu\n";
     confirm(eventOf(GameEventType::PlayerLeft, id), false, kHostPlayer);
     rosterDirty_ = true;

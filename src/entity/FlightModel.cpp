@@ -148,3 +148,11 @@ void FlightModel::steerToward(float targetYaw, float rate, float dt) {
     const float difference = std::remainder(targetYaw - yaw_, 6.2831853f);
     yaw_ += std::clamp(difference, -rate * dt, rate * dt);
 }
+
+void FlightModel::setVelocity(glm::vec3 velocity) {
+    const float horizontal = glm::length(glm::vec2(velocity.x, velocity.z));
+    if (horizontal > 0.5f) yaw_ = std::atan2(velocity.x, -velocity.z);
+    speed_ = horizontal;
+    verticalSpeed_ = velocity.y;
+    grounded_ = false;
+}
