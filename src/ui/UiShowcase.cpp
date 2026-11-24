@@ -5,9 +5,12 @@
 namespace {
 constexpr float kFrame = 1.0f / 30.0f;
 
+// Como a webcam, entrega uma pose nova a cada quadro.
 void hold(GameUi& ui, ScriptedPoseSource& camera, const Pose& pose, float seconds) {
-    camera.setPose(pose);
-    for (float t = 0; t < seconds; t += kFrame) ui.update(kFrame);
+    for (float t = 0; t < seconds; t += kFrame) {
+        camera.setPose(pose);
+        ui.update(kFrame);
+    }
 }
 
 void showCalibration(GameUi& ui, ScriptedPoseSource& camera, const std::function<void(const std::string&)>& shot) {

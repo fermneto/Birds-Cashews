@@ -11,6 +11,7 @@ public:
     RoomMode roomMode() const { return roomMode_; }
     bool hasProfile() const { return hasProfile_; }
     bool calibrated() const { return calibrated_; }
+    bool playPending() const { return playPending_; }
     bool closed() const { return current_ == UiScreen::Closed; }
 
     void chooseMain(MainOption option);

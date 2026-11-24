@@ -47,7 +47,10 @@ Todas as medidas são divididas pela largura dos ombros, para não depender da d
 As asas vistas em primeira pessoa acompanham a altura de cada braço. Em alta velocidade, rajadas de vento aparecem na tela.
 
 Se o corpo sair do quadro, o pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena,
-com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração confere se o corpo inteiro está visível.
+com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração confere se o corpo inteiro está visível
+e se as mãos são detectadas nas quatro bordas do quadro espelhado (faixas de 25%). As marcas valem em qualquer ordem,
+as duas mãos marcam juntas e cada uma exige ao menos duas poses do detector, tolerando falhas de até 0,3 s. Com tudo
+marcado, a tela segue sozinha depois de 1 s.
 
 ### 3.2 Ciclo de jogo
 
