@@ -113,7 +113,7 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 - Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
 - Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
 - Quem sobe até o teto (cerca de 410 m) chama um avião. Ele aparece ao longe, com o ronco do motor crescendo, e vem
-  direto em você. Não há aviso na tela: desça antes que ele chegue. Se acertar, você despenca mais de 100 m, fica tonto
+  direto em você. Não há aviso na tela: desça antes que ele chegue. Se acertar, você despenca mais de 200 m, fica tonto
   por um instante e perde a carga.
 
 ### Limite do mapa

@@ -128,14 +128,14 @@ void testTriggerAndStrike(TestRun& t) {
             pilot.planes.stunned() && pilot.bird.flight().verticalSpeed() < -40.0f && pilot.planes.hitRecently() &&
                 !pilot.planes.incoming());
     const float before = pilot.bird.flight().position().y;
-    runUntil(frame, [] { return false; }, 3.0f);
-    t.check("aviao: perde altura de repente e volta a voar", before - pilot.bird.flight().position().y > 100.0f && !pilot.planes.stunned());
+    runUntil(frame, [] { return false; }, 3.4f);
+    t.check("aviao: perde altura de repente e volta a voar", before - pilot.bird.flight().position().y > 180.0f && !pilot.planes.stunned());
     t.check("aviao: depois da batida o aviao vai embora", !pilot.planes.planes().empty() &&
                                                          pilot.planes.planes().front().phase == SkyPlanePhase::Departing);
 
     // Intervalo: mesmo de volta ao teto, nada de outro aviao ate o fim do intervalo.
     pilot.hoverOver(kHigh);
-    runUntil(frame, [] { return false; }, kPlaneCooldown - 4.0f);
+    runUntil(frame, [] { return false; }, kPlaneCooldown - 4.5f);
     t.check("aviao: intervalo impede outro logo em seguida", countOf(pilot.log, GameEventType::PlaneLaunched) == 1);
     t.check("aviao: o aviao some depois de passar", pilot.planes.planes().empty());
     runUntil(frame, [&] { return countOf(pilot.log, GameEventType::PlaneLaunched) == 2; }, 5.0f);

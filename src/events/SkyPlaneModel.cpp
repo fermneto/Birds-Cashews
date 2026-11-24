@@ -10,7 +10,7 @@ const glm::vec3 kWhite(0.93f, 0.93f, 0.90f), kRed(0.82f, 0.17f, 0.13f), kGlass(0
 const glm::vec3 kDark(0.16f, 0.16f, 0.18f), kGrey(0.55f, 0.56f, 0.58f);
 constexpr float kPropellerZ = -7.15f;
 constexpr float kPropellerTurns = 38.0f;   // Radianos por segundo: borrao de helice.
-constexpr float kPlaneScale = 1.5f;        // Um pouco maior que um aviao de turismo, para ser visto de longe.
+constexpr float kPlaneScale = 3.5f;        // Bem maior que um aviao de turismo: impressiona de perto e se ve de longe.
 
 // Bloco de 8 cantos: os 4 primeiros formam a face de baixo e os 4 ultimos a de cima, na mesma ordem.
 void slab(MeshBuilder& mesh, const std::array<glm::vec3, 8>& c, glm::vec3 color) {

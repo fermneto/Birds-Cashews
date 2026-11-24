@@ -95,7 +95,7 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
   pássaro e um pouco acima, com o ronco do motor crescendo. Não há aviso na tela: o jogador vê e ouve o avião. Ele voa a
   95 m/s, o dobro do pássaro mais rápido, sempre apontando para o alvo, então sempre chega, depois de uns 6 a 8 s. Ele
   não desce abaixo de 360 m: quem mergulha antes vê o avião passar por cima e ir embora. Se acertar, o pássaro é jogado
-  para baixo a 95 m/s e continua despencando durante a tontura (cai mais de 100 m), a tela treme, fica 2,6 s sem controle
+  para baixo a 140 m/s e continua despencando durante a tontura (cai mais de 200 m), a tela treme, fica 3 s sem controle
   do voo e toda a carga cai no mundo. A câmera continua em primeira pessoa.
   Depois de cada avião, o mesmo jogador espera 25 s para chamar outro.
 - **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho, pelo avião ou pela árvore caem até o chão ou uma copa e ficam

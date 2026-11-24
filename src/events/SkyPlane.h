@@ -21,16 +21,16 @@ constexpr float kPlaneFloor = FlightModel::kCeiling - 60.0f;   // O aviao nao de
 constexpr float kPlaneSpawnDistance = 700.0f;   // Metros entre o alvo e o ponto onde o aviao aparece.
 constexpr float kPlaneSpawnRise = 30.0f;        // O aviao aparece um pouco acima do alvo.
 constexpr float kPlaneSpeed = 95.0f;            // m/s: o dobro do passaro mais rapido, para sempre alcancar.
-constexpr float kPlaneHitRadius = 10.0f;        // Metros entre o aviao e o passaro para a batida.
+constexpr float kPlaneHitRadius = 18.0f;        // Metros entre o aviao e o passaro para a batida, pelo tamanho do modelo.
 constexpr float kPlaneApproachLimit = 25.0f;    // Segundos de perseguicao antes de desistir.
 constexpr float kPlaneDepartSeconds = 9.0f;     // Depois de passar, segue reto ate sumir.
 constexpr float kPlaneCooldown = 25.0f;         // O dono espera isso depois de um aviao para chamar outro.
 constexpr float kPlaneRelaunchInterval = 20.0f; // A autoridade nao aceita dois avioes para o mesmo alvo nesse tempo.
 constexpr float kPlaneLaunchSlack = 40.0f;      // Folga de altura no host, que ve o cliente um pouco atrasado.
 constexpr float kPlaneStrikeWindow = kPlaneApproachLimit + 5.0f;
-constexpr float kPlaneStunSeconds = 2.6f;       // Tontura depois da batida: sem controle do voo.
-constexpr float kPlaneKnockDown = 95.0f;        // m/s para baixo logo depois da batida; cai cerca de 130 m tonto.
-constexpr float kPlaneKnockPush = 20.0f;        // m/s na direcao em que o aviao voava.
+constexpr float kPlaneStunSeconds = 3.0f;       // Tontura depois da batida: sem controle do voo.
+constexpr float kPlaneKnockDown = 140.0f;       // m/s para baixo logo depois da batida; cai mais de 200 m tonto.
+constexpr float kPlaneKnockPush = 30.0f;        // m/s na direcao em que o aviao voava.
 
 // Autor do CashewDropped causado pelo aviao, para a interface dizer o motivo.
 constexpr PlayerId kSkyPlaneActor = 254;
