@@ -1,6 +1,7 @@
 #include "ui/UiWidgets.h"
 #include <opencv2/imgproc.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 constexpr int kMenuX = 64, kMenuWidth = 540, kRowHeight = 50, kRowGap = 4, kHeroHeight = 66, kMaxVisibleRows = 7;
@@ -132,11 +133,7 @@ void drawSkeleton(UiKit& kit, const Pose& pose, cv::Size frame, const cv::Rect& 
     static const int bones[][2] = {{LShoulder, RShoulder}, {LShoulder, LElbow}, {LElbow, LWrist}, {RShoulder, RElbow},
                                    {RElbow, RWrist}, {LShoulder, LHip}, {RShoulder, RHip}, {LHip, RHip},
                                    {LHip, LKnee}, {LKnee, LAnkle}, {RHip, RKnee}, {RKnee, RAnkle}};
-    const auto place = [&](int joint) {
-        const cv::Point2f p = pose.at(joint);
-        return cv::Point(video.x + static_cast<int>(p.x * video.width / frame.width),
-                         video.y + static_cast<int>(p.y * video.height / frame.height));
-    };
+    const auto place = [&](int joint) { return videoPoint(pose.at(joint), frame, video); };
     for (const auto& bone : bones)
         if (pose.has(bone[0]) && pose.has(bone[1])) kit.canvas.line(place(bone[0]), place(bone[1]), theme::kGreen, 4);
     for (int joint = 0; joint < JointCount; joint++)
@@ -153,7 +150,7 @@ std::string missingRegions(const CalibrationTracker& tracker) {
     return text;
 }
 
-// Diz o que falta, na ordem em que costuma ser feito: afastar-se, depois levar as maos as bordas.
+// Diz o que falta, na ordem em que costuma ser feito: enquadrar ombros e maos, depois levar as maos as bordas.
 void drawVideoStatus(UiKit& kit, const cv::Rect& video, const CalibrationTracker& tracker, const std::string& doneText) {
     std::string text;
     cv::Scalar color = theme::kInk;
@@ -161,10 +158,10 @@ void drawVideoStatus(UiKit& kit, const cv::Rect& video, const CalibrationTracker
         text = doneText;
         color = theme::kGreen;
     } else if (!tracker.bodyConfirmed() && !tracker.bodyVisibleNow()) {
-        text = "Afaste-se: mostre o corpo inteiro";
+        text = "Mostre os ombros e as duas mãos";
         color = theme::kRed;
     } else if (!tracker.bodyConfirmed()) {
-        text = "Corpo inteiro visível: fique parado";
+        text = "Ombros e mãos visíveis: fique parado";
     } else {
         text = "Leve as mãos a: " + missingRegions(tracker);
     }
@@ -197,7 +194,7 @@ void drawNoCamera(UiKit& kit, const cv::Rect& area) {
 
 void drawChecklist(UiKit& kit, cv::Point origin, const CalibrationTracker& tracker) {
     struct Item { const char* label; bool done; };
-    const Item items[] = {{"Corpo inteiro no vídeo", tracker.bodyConfirmed()},
+    const Item items[] = {{"Ombros e mãos no vídeo", tracker.bodyConfirmed()},
                           {"Mão na região esquerda", tracker.reached(CalRegion::Left)},
                           {"Mão na região direita", tracker.reached(CalRegion::Right)},
                           {"Mão na região alta", tracker.reached(CalRegion::Top)},
@@ -209,6 +206,19 @@ void drawChecklist(UiKit& kit, cv::Point origin, const CalibrationTracker& track
         y += 38;
     }
 }
+}
+
+cv::Rect fitVideo(cv::Size frame, const cv::Rect& area) {
+    if (frame.width <= 0 || frame.height <= 0) return area;
+    const double scale = std::min(static_cast<double>(area.width) / frame.width, static_cast<double>(area.height) / frame.height);
+    const int width = static_cast<int>(std::lround(frame.width * scale)), height = static_cast<int>(std::lround(frame.height * scale));
+    return {area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height};
+}
+
+// O pixel i cobre [i, i+1), como no cv::resize, entao basta escalar e truncar para baixo.
+cv::Point videoPoint(cv::Point2f p, cv::Size frame, const cv::Rect& video) {
+    return {video.x + static_cast<int>(std::floor(p.x * video.width / std::max(frame.width, 1))),
+            video.y + static_cast<int>(std::floor(p.y * video.height / std::max(frame.height, 1)))};
 }
 
 void drawMenuScene(UiKit& kit, const MenuScene& scene) {
@@ -237,8 +247,10 @@ void drawCalibrationScene(UiKit& kit, const CalibrationScene& scene) {
     kit.text.draw(kit.canvas, "Calibração", {28, 54}, style(36));
     kit.text.drawFit(kit.canvas, "Vídeo em modo espelho. Marque em qualquer ordem, com as duas mãos", {262, 52}, 570, style(17, theme::kMuted));
 
-    const cv::Rect video(28, 72, 816, 612);
+    const cv::Rect area(28, 72, 816, 612);
+    const cv::Rect video = scene.frame.empty() ? area : fitVideo(scene.frame.size(), area);
     if (scene.hasCamera && !scene.frame.empty()) {
+        if (video != area) kit.canvas.fill(area, theme::kInk, 0.9f, 14);   // Webcam fora de 4:3 ganha faixas.
         kit.canvas.video(scene.frame, video);
         drawRegions(kit, video, *scene.tracker);
         drawSkeleton(kit, scene.pose, scene.frame.size(), video);

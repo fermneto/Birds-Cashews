@@ -126,9 +126,10 @@ Todos na sala veem a baleia.
 
 ### Com o corpo
 
-Fique de frente para a webcam, com o corpo inteiro no quadro. A tela de calibração confere isso antes de jogar e pede
-uma mão em cada borda do vídeo (esquerda, direita, alto e baixo), em qualquer ordem e com as duas mãos ao mesmo tempo:
-abra os braços e depois leve uma mão ao alto e a outra até os joelhos. Com tudo marcado, ela segue sozinha. A imagem
+Fique de frente para a webcam, perto o bastante para aparecer da cintura para cima, com os ombros e as duas mãos no
+quadro. As pernas não são usadas. A tela de calibração confere os ombros e as mãos antes de jogar e pede uma mão em cada
+borda do vídeo (esquerda, direita, alto e baixo), em qualquer ordem e com as duas mãos ao mesmo tempo: abra os braços e
+depois leve uma mão ao alto e baixe a outra até a cintura. Com tudo marcado, ela segue sozinha. A imagem
 é espelhada, como um espelho.
 
 | Gesto | Efeito |

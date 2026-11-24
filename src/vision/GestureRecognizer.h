@@ -8,6 +8,11 @@ enum class ArmSide { None, Left, Right };
 
 const char* flightModeName(FlightMode mode);
 
+// Pontos sem os quais nao ha comando: o voo inteiro sai de ombros e punhos. Os quadris so
+// refinam a escala quando aparecem, e pernas nao entram, entao o jogador pode ficar perto.
+constexpr int kControlJoints[] = {LShoulder, RShoulder, LWrist, RWrist};
+constexpr float kControlMinConfidence = 0.3f;
+
 // Resultado do reconhecimento. Os contadores sao cumulativos para que quem consome
 // nao perca eventos quando roda em ritmo diferente da camera.
 struct GestureState {
