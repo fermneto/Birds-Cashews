@@ -18,6 +18,7 @@ public:
 
     void place(glm::vec3 position, float yaw, float speed);
     void setAttitude(float pitch, float roll) { pitch_ = pitch; roll_ = roll; }
+    void setVerticalSpeed(float speed) { verticalSpeed_ = speed; }   // Arremessos, como a cuspida da baleia.
     void flap(float strength);
     void step(const FlightControls& controls, float dt);
     float applyContact(const Contact& contact);

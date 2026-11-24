@@ -1,5 +1,6 @@
 #include "ui/SoundManager.h"
 #include "events/SkyPlaneSound.h"
+#include "ui/WhaleSounds.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -91,6 +92,12 @@ std::vector<Tone> tonesFor(UiSound sound) {
                                         {0.3f, 0.18f, 500, 420, 0.25f, Wave::Square}};
         case UiSound::Flap:
         case UiSound::PlaneCrash:
+        case UiSound::WhaleSpout:
+        case UiSound::WhaleSplash:
+        case UiSound::WhaleBite:
+        case UiSound::WhaleChew:
+        case UiSound::WhaleSpit:
+        case UiSound::WhaleRumble:
         case UiSound::Count: break;
     }
     return {};
@@ -137,6 +144,8 @@ int SoundManager::sampleRate() { return kSampleRate; }
 std::vector<int16_t> SoundManager::synthesize(UiSound sound) {
     std::vector<float> mix = sound == UiSound::Flap ? flapWhoosh() : std::vector<float>{};
     if (sound == UiSound::PlaneCrash) mix = synthesizePlaneImpact(kSampleRate);
+    if (sound >= UiSound::WhaleSpout && sound <= UiSound::WhaleRumble)
+        mix = synthesizeWhaleSound(static_cast<WhaleSound>(static_cast<int>(sound) - static_cast<int>(UiSound::WhaleSpout)), kSampleRate);
     for (const Tone& tone : tonesFor(sound)) addTone(mix, tone);
     std::vector<int16_t> samples(mix.size());
     std::transform(mix.begin(), mix.end(), samples.begin(), [](float value) {

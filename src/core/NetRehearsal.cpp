@@ -24,6 +24,7 @@ const char* eventName(GameEventType type) {
         case GameEventType::CashewSpilled: return "caju caiu no mundo";
         case GameEventType::PlaneLaunched: return "aviao no teto";
         case GameEventType::PlaneStruck: return "aviao bateu";
+        case GameEventType::WhaleBite: return "baleia abocanhou";
     }
     return "?";
 }

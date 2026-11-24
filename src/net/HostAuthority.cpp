@@ -95,6 +95,7 @@ bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
         // O aviao do teto so e pedido e so bate no passaro de quem enviou.
         if ((event.type == GameEventType::PlaneLaunched || event.type == GameEventType::PlaneStruck) &&
             event.target != sender) return false;
+        if (event.type == GameEventType::WhaleBite && event.target != sender) return false;
         event.actor = sender;
     }
     switch (event.type) {
@@ -135,6 +136,8 @@ bool HostAuthority::validate(GameEvent& event, bool remote, PlayerId sender) {
         }
         case GameEventType::PlaneStruck:
             return skyPlanes_.acceptStrike(event, now_, true);
+        case GameEventType::WhaleBite:
+            return validateWhaleBite(event);
         default:
             return true;
     }
@@ -151,6 +154,27 @@ bool HostAuthority::validateRobbery(const GameEvent& event) {
         if (!perch || glm::length(thief.position - *perch) > kRobRange) return false;
     }
     return true;
+}
+
+// O passaro precisa estar mesmo alem do limite. A carga cai no mar e se perde; durante a sequencia
+// ninguem derruba a carga dele em mergulho.
+bool HostAuthority::validateWhaleBite(GameEvent& event) {
+    PlayerPublicState state;
+    std::optional<glm::vec3> known;
+    if (stateOf(event.target, state)) known = state.position;
+    if (!whales_.accept(event, known)) return false;
+    event.value = carried_[event.target];
+    carried_[event.target] = 0;
+    knockableAt_[event.target] = now_ + kWhaleSequenceSeconds;
+    return true;
+}
+
+// Quem volta para dentro do raio de aviso pode ser mordido de novo numa proxima saida.
+void HostAuthority::watchWhales() {
+    for (PlayerId id = 0; id < kMaxPlayers; id++) {
+        PlayerPublicState state;
+        if (stateOf(id, state)) whales_.observe(id, state.position);
+    }
 }
 
 bool HostAuthority::stateOf(PlayerId id, PlayerPublicState& state) const {
@@ -220,6 +244,7 @@ void HostAuthority::update(float seconds) {
 
     spill_.advance(seconds);
     checkDiveHits();
+    watchWhales();
     flushConfirmed();
     if (rosterDirty_) sendRoster();
     snapshotTimer_ += std::max(0.0f, seconds);
@@ -295,6 +320,7 @@ void HostAuthority::dropPlayer(PlayerId id) {
     carried_[id] = 0;
     lastRobAt_[id] = -1.0e9;
     skyPlanes_.forget(id);
+    whales_.forget(id);
     std::cout << "Rede: jogador " << static_cast<int>(id) << " saiu\n";
     confirm(eventOf(GameEventType::PlayerLeft, id), false, kHostPlayer);
     rosterDirty_ = true;

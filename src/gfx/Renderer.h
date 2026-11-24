@@ -4,6 +4,7 @@
 #include "gfx/Camera3D.h"
 #include "gfx/Mesh.h"
 #include "gfx/Shader.h"
+#include "gfx/WhaleView.h"
 #include <opencv2/core.hpp>
 #include "entity/FlightControls.h"
 #include <cstdint>
@@ -45,6 +46,7 @@ public:
     void setRivalBeaconMesh(const MeshBuilder& beacon);
     void setRivalBeacons(std::vector<glm::mat4> transforms) { rivalBeacons_ = std::move(transforms); }
     void setLabels(std::vector<WorldLabel> labels);   // Desenhadas na ordem recebida; a ultima fica por cima.
+    void setWhaleScene(WhaleScene scene) { whaleScene_ = std::move(scene); }   // Baleia do limite do mapa.
     cv::Mat capture(const Camera3D& camera, const BirdAnimation& animation, float time);
     // Avioes do evento do teto: uma malha de corpo e uma de helice, com uma transformacao de cada por aviao.
     void setSkyPlaneMeshes(const MeshBuilder& body, const MeshBuilder& propeller);
@@ -103,4 +105,6 @@ private:
     void drawSkyPlanes();
     std::unique_ptr<Mesh> skyPlaneBody_, skyPlanePropeller_;
     std::vector<glm::mat4> skyPlaneBodies_, skyPlanePropellers_;
+    std::unique_ptr<WhaleView> whaleView_;
+    WhaleScene whaleScene_;
 };

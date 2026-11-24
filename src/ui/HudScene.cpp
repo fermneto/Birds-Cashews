@@ -99,6 +99,7 @@ std::string cargoLostText(CargoLossCause cause) {
         case CargoLossCause::Player: return "Um rival mergulhou em você e derrubou a carga!";
         case CargoLossCause::Tree: return "Você bateu na árvore e derrubou um caju!";
         case CargoLossCause::Plane: return "Um avião acertou você e derrubou a carga!";
+        case CargoLossCause::Whale: return "Os seus cajus caíram no mar com a mordida da baleia!";
         case CargoLossCause::Hunter: break;
     }
     return "Um caçador derrubou a sua carga!";
@@ -236,7 +237,8 @@ void drawHudScene(UiKit& kit, const HudScene& scene) {
     drawRobbery(kit, view);
     if (scene.showPreview) drawPreviewFrame(kit);
     if (scene.bodyLost) drawWarning(kit, "Corpo fora do quadro: o pássaro plana nivelado");
-    else if (view.nearBoundary) drawWarning(kit, "Volte para a ilha");
+    else if (view.whaleNow) drawWarning(kit, "A baleia te abocanhou!");
+    else if (view.nearBoundary) drawWarning(kit, "Cuidado com a baleia: volte para a ilha");
     else if (view.cargoLostNow) drawWarning(kit, cargoLostText(view.cargoLossCause));
     else if (view.alarmNow) drawWarning(kit, "Alarme: estão roubando o seu ninho!");
     else if (view.knockedRivalNow) drawWarning(kit, "Mergulho certeiro: a carga do rival caiu!");

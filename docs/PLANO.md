@@ -27,7 +27,7 @@ jogadores dividem o mundo pela rede local, conversam por voz de proximidade e po
 | Record | Total acumulado de cajus entregues |
 | Voz | Microfone aberto por detecção de fala, com filtro de voz de pássaro |
 | Esforço | Bater os braços livremente, sem barra de energia |
-| Mapa | Ilha low-poly gerada por semente, com o mar como limite |
+| Mapa | Ilha low-poly gerada por semente, com o mar como limite: quem passa do limite é abocanhado por uma baleia gigante e cuspido de volta (seção 3.7) |
 
 ## 3. Mecânicas
 
@@ -169,6 +169,33 @@ irregular, para não cortar, e aplica:
 Microfone, codificação, mixagem e saída rodam em uma thread de áudio própria, separada do jogo, para um quadro lento não
 cortar a voz. O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
 
+### 3.7 Limite do mapa: a baleia gigante
+
+O mapa é um círculo de 1150 m de raio, todo cercado de mar. Não existe parede: quem passa do limite sobre o mar é
+abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
+
+- **Aviso (de 1050 a 1150 m):** a sombra da baleia ronda por baixo da água, perto do pássaro, cada vez maior. Sobem bolhas,
+  ela espirra pelo espiráculo e um ronco grave fica mais alto. O HUD avisa "Cuidado com a baleia: volte para a ilha". Dá
+  tempo de virar.
+- **Mordida (1 s):** passou de 1150 m, a baleia salta do mar de boca aberta, vindo de fora do mapa, e fecha a boca no
+  pássaro. Se ele estiver muito alto, é puxado para baixo até a boca, que salta no máximo 75 m acima do mar.
+- **Mastigada (2 s):** a baleia cai de volta com o pássaro preso entre as mandíbulas e mastiga com a cabeça fora da água. A
+  câmera treme a cada mordida e os comandos não respondem.
+- **Cuspida:** a baleia cospe o pássaro para o centro da ilha a 70 m/s, subindo. O jogador volta a controlar o voo no ar.
+  Em 4 s ele está mais de 50 m para dentro do limite, sem encostar em nada.
+- **Carga:** os cajus caem no mar com a mordida e se perdem. Diferente da carga derrubada por mergulho ou por árvore
+  (seção 3.3), eles não ficam no mundo: o mar está fora do mapa e ninguém consegue alcançá-los. A perda também impede que a
+  baleia vire um atalho gratuito, já que a cuspida leva o pássaro rápido até o meio da ilha.
+- **Cooldown e garantias:** depois de cuspir, a baleia espera 8 s antes de atacar o mesmo pássaro de novo, e a autoridade
+  só aceita outra mordida depois que o pássaro voltou para dentro do raio de aviso. Nesse intervalo o vento antigo volta a
+  empurrar o pássaro para a ilha, e uma parede invisível a 1330 m impede que alguém se perca no mar.
+- **Quem decide:** o dono do pássaro pede a mordida (evento `WhaleBite`) quando passa do limite. A autoridade (o host, ou a
+  `LocalAuthority` no jogo sozinho) confere se o pássaro está mesmo além do limite, se ainda não foi mordido nesta saída e
+  quantos cajus ele levava, e envia o evento a todos. O evento leva o alvo e a posição da mordida. Cada computador anima a
+  mesma baleia a partir do instante em que recebe o evento, sem mais nada pela rede: a pose depende só da posição e do
+  tempo. O dono controla o próprio pássaro durante a sequência, preso na boca e depois arremessado. Os outros desenham o
+  pássaro entre as mandíbulas enquanto ele está preso.
+
 ## 4. Arquitetura
 
 ```
@@ -186,6 +213,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `world/` | `World`, `Island`, `CashewTree` |
 | `entity/` | `PlayerBird`, `FlightModel` |
 | `game/` | `GameplaySession`, `CashewField`, `CashewCollector`, `NestMenu` |
+| `events/` | `BoundaryWhale` (baleia do limite do mapa) e `WhaleGate` (regra da autoridade para a mordida) |
 | `save/` | `Profile`, `ProfileStore`, `WorldStore`, `RecordManager` |
 | `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
 | `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
@@ -196,7 +224,7 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
 | `voice/` | `VoiceChat`, `SpeechDetector`, `PitchShifter`, `VoiceEncoder`, `VoiceDecoder`, `VoiceMixer` |
 
-**Rede:** o host decide cajus, NPCs, roubos e colisões. Cada cliente simula o próprio voo para responder sem atraso. O
+**Rede:** o host decide cajus, NPCs, roubos, colisões e as mordidas da baleia. Cada cliente simula o próprio voo para responder sem atraso. O
 host envia o estado 20 vezes por segundo e os clientes interpolam os outros pássaros.
 
 ## 5. Requisitos do enunciado
@@ -212,7 +240,7 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Atendido |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
 | 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Atendido |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida) e baleia do limite (ronco grave e espirro no aviso, splash, mordida, mastigada e cuspida). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma

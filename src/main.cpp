@@ -3,6 +3,7 @@
 #include "core/Game.h"
 #include "core/NetRehearsal.h"
 #include "events/SkyPlaneTests.h"
+#include "events/WhaleTests.h"
 #include "game/CashewTests.h"
 #include "game/NestTests.h"
 #include "net/MatchTests.h"
@@ -67,7 +68,8 @@ int runSelfTests() {
     const int failures = runGestureSelfTest() + runFlightSelfTest() + runContractSelfTest() + runCashewSelfTest()
                        + runSaveSelfTest() + runNestSelfTest() + runUiSelfTest() + runNpcSelfTest()
                        + runNetworkSelfTest() + runMatchSelfTest() + runBirdFactorySelfTest() + runVoiceSelfTest()
-                       + runSkyPlaneSelfTest();
+                       + runSkyPlaneSelfTest()
+                       + runWhaleSelfTest();
     std::cout << (failures == 0 ? "Todos os testes passaram\n" : "Ha testes falhando\n");
     return failures == 0 ? 0 : 1;
 }

@@ -3,8 +3,8 @@
 
 enum class GameEventType { CashewCollected, CashewDelivered, CashewDropped, CashewRespawned,
                            NestRobbed, UpgradeBought, PlayerJoined, PlayerLeft, CashewSpilled,
-                           PlaneLaunched, PlaneStruck };
-constexpr GameEventType kLastGameEventType = GameEventType::PlaneStruck;
+                           PlaneLaunched, PlaneStruck, WhaleBite };
+constexpr GameEventType kLastGameEventType = GameEventType::WhaleBite;
 
 // NestRobbed: actor e o ladrao e target o dono do ninho; vale 1 caju.
 // CashewDropped: target perdeu value cajus, e actor e quem bateu nele (kNoPlayer para NPC, ele mesmo para arvore).
@@ -12,6 +12,9 @@ constexpr GameEventType kLastGameEventType = GameEventType::PlaneStruck;
 // PlaneLaunched: o dono pede ao chegar ao teto; a autoridade completa. target e o perseguido, value o numero
 //   do aviao e position onde ele aparece (events/SkyPlane.h).
 // PlaneStruck: o dono avisa que o aviao value bateu em target, em position. A autoridade derruba a carga.
+// WhaleBite: actor e target sao quem passou do limite do mapa e pediu; position e onde o passaro estava.
+//   A autoridade confirma (events/WhaleGate) e poe em value os cajus perdidos no mar. Cada computador anima
+//   a baleia a partir do instante em que recebe o evento (events/BoundaryWhale).
 
 // Fato do jogo. O cliente pede com GameAuthority::request e so aplica o que voltar em pollEvents.
 struct GameEvent {

@@ -39,7 +39,7 @@ GameplaySession::GameplaySession(const World& world, uint32_t seed, CashewField&
     : world_(world), bird_(bird), localPlayer_(localPlayer), authority_(orLocal(std::move(authority))),
       collector_(cashews, *authority_, localPlayer), nest_(chooseNestSite(world, seed, localPlayer)),
       rivals_(world, seed),
-      store_(saveDir), records_(saveDir), perchSite_(nest_), skyPlane_(localPlayer) {
+      store_(saveDir), records_(saveDir), perchSite_(nest_), skyPlane_(localPlayer), whale_(localPlayer) {
     refreshView();
 }
 
@@ -79,6 +79,11 @@ std::vector<GameplayFeedback> GameplaySession::drainFeedback() {
 void GameplaySession::applyControls(const FlightControls& input) {
     const FlightControls controls = skyPlane_.stunned() ? skyPlane_.stunControls() : input;   // Tonto pelo aviao.
     flightMode_ = perched_ || controls.mode == FlightMode::Lost ? FlightMode::Glide : controls.mode;
+    if (whale_.holdsLocal()) {   // Preso na boca da baleia, os comandos so voltam depois da cuspida.
+        flightMode_ = FlightMode::Glide;
+        bird_.applyControls(FlightControls{});
+        return;
+    }
     if (!perched_) {
         bird_.applyControls(controls);
         return;
@@ -94,7 +99,7 @@ void GameplaySession::applyControls(const FlightControls& input) {
 }
 
 void GameplaySession::stepBird(float dt) {
-    if (perched_) return;
+    if (perched_ || whale_.stepBird(bird_)) return;
     bird_.step(world_, dt);
     checkTreeHit();
 }
@@ -118,6 +123,7 @@ void GameplaySession::update(float frameSeconds) {
     players_ = authority_->players();
     for (const GameEvent& event : authority_->pollEvents()) handleEvent(event);
     skyPlane_.update(frameSeconds, bird_, players_, *authority_, perched_);
+    whale_.update(frameSeconds, bird_, world_, *authority_, !perched_);
     rivals_.update(players_, localPlayer_);
     recordNotice_ = std::max(0.0f, recordNotice_ - frameSeconds);
     cargoLostNotice_ = std::max(0.0f, cargoLostNotice_ - frameSeconds);
@@ -128,7 +134,7 @@ void GameplaySession::update(float frameSeconds) {
     else watchForLanding();
 
     const glm::vec3 position = bird_.flight().position();
-    collector_.setCollecting(!perched_);
+    collector_.setCollecting(!perched_ && !whale_.holdsLocal());
     collector_.update(frameSeconds, position);
     bird_.setBeakTarget(BeakSource::Cashew, perched_ ? 0.0f : collector_.beakTarget(position));
     refreshView();
@@ -149,6 +155,16 @@ void GameplaySession::handleEvent(const GameEvent& event) {
         handleRobbery(event);
     }
     if (event.type == GameEventType::CashewDelivered && event.actor == localPlayer_) confirmDelivery(event);
+    if (event.type == GameEventType::WhaleBite) handleWhaleBite(event, carriedBefore);
+}
+
+// Todo computador anima a baleia; so o dono fica preso e ve o aviso dos cajus perdidos no mar.
+void GameplaySession::handleWhaleBite(const GameEvent& event, int carriedBefore) {
+    whale_.handle(event, bird_.flight());
+    if (event.target != localPlayer_ || collector_.carried() >= carriedBefore) return;
+    lossCause_ = CargoLossCause::Whale;
+    feedback_.push_back(GameplayFeedback::CargoLost);
+    cargoLostNotice_ = whale::kSpitTime + kCargoLostNoticeSeconds;   // O aviso aparece depois da cuspida.
 }
 
 // A carga cai por tres motivos: cacador (NPC), mergulho de outro jogador ou batida em arvore.
@@ -409,9 +425,10 @@ void GameplaySession::refreshView() {
     view_.cargoLostNow = cargoLostNotice_ > 0;
     view_.cargoLossCause = lossCause_;
     view_.knockedRivalNow = knockedNotice_ > 0;
-    view_.nearBoundary = bird_.nearBoundary();
+    view_.nearBoundary = bird_.nearBoundary() && !whale_.busy();
     view_.planeIncoming = skyPlane_.incoming();
     view_.planeHitNow = skyPlane_.hitRecently();
+    view_.whaleNow = whale_.holdsLocal();
     view_.perchedOnNest = perched_ && perchRival_ == kNoPlayer;
     refreshRobbery();
     refreshAlarm();

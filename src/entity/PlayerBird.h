@@ -34,6 +34,7 @@ public:
     bool nearBoundary() const { return nearBoundary_; }
     float takeSolidImpact();   // Maior impacto em copa ou tronco desde a ultima chamada, em m/s.
     float takeFlap();          // Forca (0 a 1) da batida de asa mais forte desde a ultima chamada; 0 sem batida.
+    void shake(float amount) { animation_.shake = std::max(animation_.shake, amount); }   // Tremor da camera.
 
 private:
     void enforceBoundary(float dt);

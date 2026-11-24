@@ -21,8 +21,9 @@ CashewCollector::CashewCollector(CashewField& field, GameAuthority& authority, P
 
 void CashewCollector::handle(const GameEvent& event) {
     if (event.type == GameEventType::CashewCollected) applyCollected(event);
-    // Quem derruba a carga perde primeiro o que roubou.
-    if (event.type == GameEventType::CashewDropped && event.target == localPlayer_) {
+    // Quem derruba a carga perde primeiro o que roubou. Na mordida da baleia, os cajus caem no mar.
+    const bool lost = event.type == GameEventType::CashewDropped || event.type == GameEventType::WhaleBite;
+    if (lost && event.target == localPlayer_) {
         carried_ = std::max(0, carried_ - event.value);
         stolen_ = std::min(std::max(0, stolen_ - event.value), carried_);
     }
