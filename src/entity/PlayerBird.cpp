@@ -9,6 +9,7 @@ constexpr float kBaseFov = 72.0f, kMinFov = 64.0f, kMaxFov = 112.0f;
 constexpr float kFovPerSpeed = 0.85f, kDiveFovBonus = 6.0f;
 constexpr float kFovOpenRate = 7.0f, kFovCloseRate = 3.5f;
 constexpr float kBeakOpenRate = 12.0f, kBeakCloseRate = 5.0f;
+constexpr float kOuterRadius = World::kBoundaryRadius + 180.0f;   // Ninguem passa disso, nem esperando a baleia.
 }
 
 void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, yaw, FlightModel::kCruiseSpeed); }
@@ -31,14 +32,19 @@ void PlayerBird::applyControls(const FlightControls& controls) {
     }
 }
 
-// Alem do limite, o vento vira o passaro de volta para a ilha.
+// Alem do limite quem age e a baleia (events/BoundaryWhale). O vento continua como reserva, para quando
+// ela ainda nao respondeu ou acabou de atacar, e uma parede invisivel garante que ninguem se perde no mar.
 void PlayerBird::enforceBoundary(float dt) {
-    const glm::vec3 p = flight_.position();
+    glm::vec3& p = flight_.position();
     const float radius = glm::length(glm::vec2(p.x, p.z));
     nearBoundary_ = radius > World::kWarningRadius;
     if (radius <= World::kBoundaryRadius) return;
     const float strength = std::clamp((radius - World::kBoundaryRadius) / 120.0f, 0.15f, 1.0f);
     flight_.steerToward(std::atan2(-p.x, p.z), 2.5f * strength, dt);
+    if (radius > kOuterRadius) {
+        p.x *= kOuterRadius / radius;
+        p.z *= kOuterRadius / radius;
+    }
 }
 
 void PlayerBird::step(const World& world, float dt) {

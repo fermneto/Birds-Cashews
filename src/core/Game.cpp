@@ -287,10 +287,23 @@ void Game::updateFlightSounds(float frameSeconds) {
     listener.playing = ui_->playing() && !session_->perched();
     ui_->setAmbience(ambientMixFor(listener));
     const float flap = player_.takeFlap();
+    playWhaleCues(listener.position);
     if (!ui_->playing()) return;
     if (flap > 0) ui_->playSound(UiSound::Flap, 0.45f + 0.45f * flap);
     for (const ChirpRequest& chirp : chorus_.update(frameSeconds, listener.position, singingBirds()))
         ui_->playSound(chirp.sound, chirp.volume);
+}
+
+// A baleia e ouvida por todos na sala, mais baixo quanto mais longe. Nos menus os sons sao descartados.
+void Game::playWhaleCues(glm::vec3 listener) {
+    const std::vector<WhaleCue> cues = session_->whale().drainCues();
+    if (!ui_->playing()) return;
+    for (const WhaleCue& cue : cues) {
+        const float distance = glm::length(cue.position - listener);
+        const float volume = cue.volume * std::clamp(1.0f - (distance - 40.0f) / 560.0f, 0.0f, 1.0f);
+        const UiSound sound = static_cast<UiSound>(static_cast<int>(UiSound::WhaleSpout) + static_cast<int>(cue.kind));
+        ui_->playSound(sound, volume);
+    }
 }
 
 void Game::presentUi(float frameSeconds) {
@@ -339,6 +352,8 @@ void Game::prepareNest(const Camera3D& camera) {
     renderer_.setRivalBeacons(std::move(beacons));
 }
 
+void Game::prepareWhales() { renderer_.setWhaleScene(session_->whale().scene()); }
+
 // NPCs e outros jogadores sao passaros procedurais pela semente. No cliente os NPCs vem do host.
 void Game::prepareBirds() {
     std::vector<BirdInstance> birds;
@@ -361,6 +376,14 @@ void Game::prepareBirds() {
             if (other.id != match_.localPlayer() && other.id != kNoPlayer) {
                 BirdInstance bird{other.birdSeed, other.position, other.yaw, other.pitch, other.roll, kBirdScale, other.mode};
                 bird.key = 1000u + other.id;
+                // Preso na boca da baleia, o passaro e desenhado entre as mandibulas, sem esperar o estado dele.
+                whale::HeldBird held;
+                if (session_->whale().heldPose(other.id, held)) {
+                    bird.position = held.position;
+                    bird.yaw = held.yaw;
+                    bird.pitch = held.pitch;
+                    bird.roll = 0;
+                }
                 birds.push_back(bird);
             }
     }
@@ -398,6 +421,7 @@ void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareWhales();
     prepareBirds();
     prepareNameTags(camera);
     renderer_.render(camera, player_.animation(), time_);
@@ -408,6 +432,7 @@ cv::Mat Game::captureFrame(float time) {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareWhales();
     prepareBirds();
     prepareNameTags(camera);
     return renderer_.capture(camera, player_.animation(), time);
@@ -476,6 +501,7 @@ int Game::renderTest(const std::string& outputDir) {
     captureUiShots(outputDir);
     captureLiveNestShots(outputDir);
     captureRivalNestShots(outputDir);
+    captureWhaleShots(outputDir);
     return 0;
 }
 
@@ -567,6 +593,38 @@ void Game::aimAt(glm::vec3 eye, glm::vec3 target) {
     player_.applyControls(FlightControls{});
     player_.setBeakTarget(BeakSource::Cashew, session_->collector().beakTarget(eye));
     for (int i = 0; i < 40; i++) player_.animate(1.0f / 60.0f);
+}
+
+// Fotografa a baleia do limite atacando outro jogador, o passaro local preso na boca e o aviso no mar.
+void Game::captureWhaleShots(const std::string& outputDir) {
+    BoundaryWhale& whale = session_->whale();
+    const glm::vec3 bite(0, 30, 1160);
+    const auto start = [&](PlayerId target, float age) {
+        whale = BoundaryWhale(session_->localPlayer());
+        GameEvent event;
+        event.type = GameEventType::WhaleBite;
+        event.actor = event.target = target;
+        event.position = bite;
+        whale.handle(event, player_.flight());
+        whale.update(age, player_, world_, session_->authority(), false);
+    };
+    const struct { const char* name; float age; } moments[] = {
+        {"baleia_1_salto", 0.75f}, {"baleia_2_mordida", 1.1f}, {"baleia_3_mastiga", 2.2f}, {"baleia_4_cospe", 3.15f}};
+    for (const auto& moment : moments) {
+        aimAt(bite + glm::vec3(75, 4, -70), bite + glm::vec3(0, -4, 12));
+        start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
+        cv::imwrite(outputDir + "/" + moment.name + ".png", captureFrame(3.0f));
+    }
+    aimAt(bite, bite + glm::vec3(0, 0, -10));
+    start(session_->localPlayer(), 2.1f);
+    whale.stepBird(player_);
+    cv::imwrite(outputDir + "/baleia_5_na_boca.png", captureFrame(3.0f));
+    whale = BoundaryWhale(session_->localPlayer());
+    aimAt(glm::vec3(0, 45, 1105), glm::vec3(0, 0, 1180));
+    for (int i = 0; i < 150; i++) whale.update(1.0f / 60.0f, player_, world_, session_->authority(), false);
+    cv::imwrite(outputDir + "/baleia_6_aviso.png", captureFrame(3.0f));
+    whale = BoundaryWhale(session_->localPlayer());
+    player_.spawn(world_.spawnPoint(), 0.0f);
 }
 
 // Fotografa um caju de varias distancias e confere a coleta e o indicador de carga.

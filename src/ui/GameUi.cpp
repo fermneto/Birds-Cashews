@@ -404,7 +404,7 @@ std::string GameUi::frameKey() const {
         << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << v.nearBoundary << ',' << quantized(coinsOpacity(), 20.0f) << ',' << std::lround(v.nestDistance) << ','
         << quantized(v.nestBearing, 60.0f) << ',' << quantized(banner_.opacity(), 30.0f) << ','
         << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected()) << ','
-        << static_cast<int>(v.cargoLossCause) << ',' << v.knockedRivalNow << ',' << v.alarmNow << ','
+        << static_cast<int>(v.cargoLossCause) << ',' << v.knockedRivalNow << ',' << v.alarmNow << ',' << v.whaleNow << ','
         << quantized(v.thiefBearing, 60.0f) << ',' << std::lround(v.thiefDistance);
     const RobView& rob = v.robbery;
     key << '|' << rob.active << ',' << quantized(rob.progress, 60.0f) << ',' << static_cast<int>(rob.blocked) << ',' << rob.stolenNow;

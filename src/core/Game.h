@@ -51,6 +51,7 @@ private:
     void updateVoice(float frameSeconds);
     void syncMatch(float frameSeconds);
     void updateFlightSounds(float frameSeconds);
+    void playWhaleCues(glm::vec3 listener);
     std::vector<SingingBird> singingBirds() const;
     void rebuildSession();
     void restoreWorld();
@@ -62,12 +63,14 @@ private:
     Camera3D buildCamera() const;
     void prepareCashews(const Camera3D& camera);
     void prepareNest(const Camera3D& camera);
+    void prepareWhales();
     void renderFrame();
     cv::Mat captureFrame(float time);
     void captureDiveShot(const std::string& outputDir);
     void captureCashewShots(const std::string& outputDir);
     void captureNestShots(const std::string& outputDir);
     void captureRivalNestShots(const std::string& outputDir);
+    void captureWhaleShots(const std::string& outputDir);
     void aimAt(glm::vec3 eye, glm::vec3 target);
     void measureFrames(const std::string& label);
     void captureUiShots(const std::string& outputDir);

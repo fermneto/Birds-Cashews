@@ -32,6 +32,16 @@ bool LocalAuthority::accept(GameEvent& event) {
             event.value = static_cast<uint8_t>(std::min<int>(event.value, carried_[event.target]));
             carried_[event.target] -= event.value;
             return event.value > 0;
+        case GameEventType::WhaleBite: {
+            // Os cajus caem no mar com a mordida e se perdem.
+            std::optional<glm::vec3> known;
+            for (const PlayerPublicState& p : players_)
+                if (p.id == event.target) known = p.position;
+            if (!whales_.accept(event, known)) return false;
+            event.value = static_cast<uint8_t>(std::min(carried_[event.target], 255));
+            carried_[event.target] = 0;
+            return true;
+        }
         default:
             return true;
     }
@@ -48,6 +58,7 @@ void LocalAuthority::publishLocalPlayer(const PlayerPublicState& state) {
                                     [&](const PlayerPublicState& p) { return p.id == state.id; });
     if (found != players_.end()) *found = state;
     else players_.push_back(state);
+    whales_.observe(state.id, state.position);
 }
 
 void LocalAuthority::removePlayer(PlayerId id) {
@@ -55,4 +66,5 @@ void LocalAuthority::removePlayer(PlayerId id) {
                                   [&](const PlayerPublicState& p) { return p.id == id; }),
                    players_.end());
     if (id < kMaxPlayers) carried_[id] = 0;
+    whales_.forget(id);
 }

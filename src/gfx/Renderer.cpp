@@ -222,6 +222,7 @@ Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, g
     configureTexture(previewTexture_);
     configureTexture(overlayTexture_);
     glEnable(GL_CULL_FACE);
+    whaleView_ = std::make_unique<WhaleView>();
 }
 
 Renderer::~Renderer() {
@@ -571,6 +572,7 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawCashews();
     drawNest();
     drawRivalNests();
+    whaleView_->draw(worldShader_, whaleScene_);
     drawWater(camera, time);
     drawWind(animation);
     drawLabels(camera);

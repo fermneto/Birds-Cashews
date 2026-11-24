@@ -22,6 +22,7 @@ const char* eventName(GameEventType type) {
         case GameEventType::PlayerJoined: return "jogador entrou";
         case GameEventType::PlayerLeft: return "jogador saiu";
         case GameEventType::CashewSpilled: return "caju caiu no mundo";
+        case GameEventType::WhaleBite: return "baleia abocanhou";
     }
     return "?";
 }
