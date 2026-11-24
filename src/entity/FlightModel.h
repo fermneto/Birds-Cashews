@@ -18,11 +18,13 @@ public:
 
     void place(glm::vec3 position, float yaw, float speed);
     void setAttitude(float pitch, float roll) { pitch_ = pitch; roll_ = roll; }
+    void setVerticalSpeed(float speed) { verticalSpeed_ = speed; }   // Arremessos, como a cuspida da baleia.
     void flap(float strength);
     void step(const FlightControls& controls, float dt);
     float applyContact(const Contact& contact);
     void leaveGround() { grounded_ = false; }
     void steerToward(float targetYaw, float rate, float dt);
+    void setVelocity(glm::vec3 velocity);   // Tranco de fora, como a batida do aviao: vira para onde foi empurrado.
 
     glm::vec3& position() { return position_; }
     glm::vec3 position() const { return position_; }

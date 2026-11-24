@@ -1,7 +1,9 @@
 #pragma once
+#include "events/WhaleGate.h"
 #include "net/Protocol.h"
 #include "net/RemoteTrack.h"
 #include "net/UdpSession.h"
+#include "events/SkyPlane.h"
 #include "shared/CashewSpill.h"
 #include "shared/GameAuthority.h"
 #include "shared/VoiceLink.h"
@@ -79,6 +81,8 @@ private:
     bool validateRobbery(const GameEvent& event);
     bool stateOf(PlayerId id, PlayerPublicState& state) const;   // Local ou remoto ja com estado.
     void checkDiveHits();
+    bool validateWhaleBite(GameEvent& event);
+    void watchWhales();
     void flushConfirmed();
     void sendRoster();
     void sendSnapshot();
@@ -99,10 +103,12 @@ private:
     std::array<uint8_t, kMaxPlayers> carried_{};   // Carga segundo os eventos confirmados.
     std::set<CashewId> collected_;
     CashewSpill spill_;
+    WhaleGate whales_;   // Baleia do limite do mapa: uma mordida por saida.
     std::array<double, kMaxPlayers> lastRobAt_{}, knockableAt_{};
     std::vector<GameEvent> pending_, outgoing_;
     std::vector<NpcPublicState> npcs_;
     std::deque<VoiceFrame> voice_;
+    SkyPlaneLedger skyPlanes_;   // Avioes do teto: numero, ponto de partida e batidas.
 };
 
 } // namespace net

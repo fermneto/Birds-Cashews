@@ -18,7 +18,9 @@ namespace net {
 // Versao 3: o jogador publica a Defesa e as moedas roubaveis do ninho, e existe o evento CashewSpilled.
 // Versao 4: o host envia a lista de nomes dos jogadores (Roster).
 // Versao 5: o cliente avisa quando troca de perfil dentro da sala (Identity).
-inline constexpr uint8_t kProtocolVersion = 5;
+// Versao 6: eventos do aviao no teto (PlaneLaunched e PlaneStruck).
+// Versao 7: existe o evento WhaleBite (baleia no limite do mapa).
+inline constexpr uint8_t kProtocolVersion = 7;
 inline constexpr size_t kMaxNameLength = 32;
 inline constexpr size_t kMaxNpcs = 24;
 inline constexpr uint8_t kNpcRoleLimit = 16;   // Papel vai nos 4 bits baixos do byte de comportamento.

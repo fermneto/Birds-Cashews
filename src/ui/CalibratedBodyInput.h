@@ -13,7 +13,8 @@ public:
     FlightControls poll() override;
     bool preview(cv::Mat& image) override;
     bool latestPose(cv::Mat& mirroredFrame, Pose& pose) override;
-    bool bodyDetected() const override { return view_.pose.valid; }
+    // Vale o mesmo criterio do voo: sem ombros e punhos o passaro plana, com ou sem pernas no quadro.
+    bool bodyDetected() const override { return view_.gesture.mode != FlightMode::Lost; }
 
 private:
     VisionPipeline vision_;

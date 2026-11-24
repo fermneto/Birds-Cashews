@@ -40,6 +40,35 @@ bool isBodyGesture(const FlightControls& controls) {
     return controls.menuPressed != ArmSide::None && controls.raisedArm == controls.menuPressed;
 }
 
+// So o gesto real arma a repeticao. Q segurado no teclado avanca uma unica vez.
+NavAction GestureRepeat::update(const FlightControls& controls, float seconds) {
+    const NavAction action = navFromControls(controls);
+    if (action != NavAction::None) {
+        reset();
+        const bool repeatable = action == NavAction::Next || action == NavAction::Previous;
+        if (repeatable && isBodyGesture(controls)) {
+            held_ = action;
+            arm_ = controls.menuPressed;
+            wait_ = kDelay;
+        }
+        return action;
+    }
+    if (held_ == NavAction::None || controls.raisedArm != arm_) {
+        reset();
+        return NavAction::None;
+    }
+    wait_ -= seconds;
+    if (wait_ > 0) return NavAction::None;
+    wait_ = kInterval;
+    return held_;
+}
+
+void GestureRepeat::reset() {
+    held_ = NavAction::None;
+    arm_ = ArmSide::None;
+    wait_ = 0;
+}
+
 void MenuCursor::setCount(int count) {
     count_ = std::max(count, 0);
     index_ = count_ == 0 ? 0 : std::clamp(index_, 0, count_ - 1);

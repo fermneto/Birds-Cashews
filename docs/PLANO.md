@@ -27,7 +27,7 @@ jogadores dividem o mundo pela rede local, conversam por voz de proximidade e po
 | Record | Total acumulado de cajus entregues |
 | Voz | Microfone aberto por detecção de fala, com filtro de voz de pássaro |
 | Esforço | Bater os braços livremente, sem barra de energia |
-| Mapa | Ilha low-poly gerada por semente, com o mar como limite |
+| Mapa | Ilha low-poly gerada por semente, com o mar como limite: quem passa do limite é abocanhado por uma baleia gigante e cuspido de volta (seção 3.7) |
 
 ## 3. Mecânicas
 
@@ -46,8 +46,16 @@ Todas as medidas são divididas pela largura dos ombros, para não depender da d
 
 As asas vistas em primeira pessoa acompanham a altura de cada braço. Em alta velocidade, rajadas de vento aparecem na tela.
 
-Se o corpo sair do quadro, o pássaro plana nivelado e a tela avisa. A webcam aparece espelhada em uma janela pequena,
-com o esqueleto desenhado por cima. Antes de jogar, uma tela de calibração confere se o corpo inteiro está visível.
+O controle usa só ombros e punhos. Os quadris, quando aparecem, apenas refinam a escala do corpo, e as pernas não entram,
+então o jogador pode ficar perto da câmera, mostrando da cintura para cima. Se ombros ou punhos saírem do quadro, o
+pássaro plana nivelado, sem aviso na tela. A webcam aparece espelhada em uma janela pequena, com o esqueleto desenhado por
+cima. Antes de jogar, uma tela de calibração confere se os ombros e as duas mãos estão visíveis e se as mãos são
+detectadas nas quatro bordas do quadro espelhado (faixas de 25%; com o jogador perto, as mãos baixadas na cintura já
+alcançam a de baixo). As marcas valem em qualquer ordem,
+as duas mãos marcam juntas e cada uma exige ao menos duas poses do detector, tolerando falhas de até 0,3 s. Com tudo
+marcado, a tela segue sozinha depois de 1 s. Os testes automáticos levam um ponto de posição conhecida pela cadeia
+inteira (imagem da câmera, letterbox, saída da rede, espelho e tela) e conferem que ele é desenhado sobre o mesmo pixel
+da imagem.
 
 ### 3.2 Ciclo de jogo
 
@@ -88,14 +96,27 @@ esquerdo passa para a próxima opção e o direito compra. Bater os braços deco
 - **Mergulho:** quem está em mergulho e encosta em outro jogador com carga derruba toda a carga dele.
 - **Árvore:** bater com força (a partir de 6 m/s contra a superfície) reduz a velocidade e derruba um caju. Não existe
   morte.
-- **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho ou pela árvore caem até o chão ou uma copa e ficam
+- **Avião no teto:** o voo tem teto em 420 m. Quem passa de 410 m chama um avião, que aparece a 700 m, à frente do
+  pássaro e um pouco acima, com o ronco do motor crescendo. Não há aviso na tela: o jogador vê e ouve o avião. Ele voa a
+  95 m/s, o dobro do pássaro mais rápido, sempre apontando para o alvo, então sempre chega, depois de uns 6 a 8 s. Ele
+  não desce abaixo de 360 m: quem mergulha antes vê o avião passar por cima e ir embora. Se acertar, o pássaro é jogado
+  para baixo a 140 m/s e continua despencando durante a tontura (cai mais de 200 m), a tela treme, fica 3 s sem controle
+  do voo e toda a carga cai no mundo. A câmera continua em primeira pessoa, e as asas se debatem, cada uma num tempo,
+  sem conseguir bater, até a tontura passar.
+  Depois de cada avião, o mesmo jogador espera 25 s para chamar outro.
+- **Cajus caindo:** os cajus derrubados pelo caçador, pelo mergulho, pelo avião ou pela árvore caem até o chão ou uma copa e ficam
   30 s no mundo. Qualquer um pega, como caju comum. Quem derrubou espera 2 s para pegar o próprio caju de volta.
 - **Cajus roubados valem moeda, mas não somam no record.** Isso impede dois jogadores de inflarem o total trocando cajus.
 - Um ninho só existe no mundo enquanto o dono está conectado, então ninguém é roubado offline. Se o dono sai, quem
   estava roubando decola.
 - **Quem decide:** o host confirma cada roubo (o ladrão precisa estar no poleiro, o ninho precisa ter moedas fora do
   Cofre e o intervalo mínimo é de 3 s), detecta os mergulhos e escolhe o id de cada caju caído. O cliente só derruba a
-  própria carga, na batida em árvore. O perfil é local, então cada computador desconta a moeda do próprio dono.
+  própria carga, na batida em árvore.
+- **Avião em rede:** o dono do pássaro pede o avião ao chegar ao teto. O host confere a altura (com folga de 40 m) e o
+  intervalo de 20 s por alvo, numera o avião, escolhe o ponto de partida e confirma para todos. Cada computador simula o
+  mesmo avião a partir desse ponto, perseguindo a posição que conhece do alvo, então todos veem o avião e a batida. Só o
+  dono decide a batida, com a posição real do próprio pássaro: aplica o tranco na hora e avisa o host, que confere o
+  número do avião e derruba a carga do alvo para todos. O perfil é local, então cada computador desconta a moeda do próprio dono.
 
 ### 3.4 Pontuação e record
 
@@ -155,6 +176,50 @@ irregular, para não cortar, e aplica:
 Microfone, codificação, mixagem e saída rodam em uma thread de áudio própria, separada do jogo, para um quadro lento não
 cortar a voz. O indicador de fala abre o bico do pássaro. Fones são recomendados para evitar eco.
 
+### 3.7 Limite do mapa: a baleia gigante
+
+O mapa é um círculo de 1150 m de raio, todo cercado de mar. Não existe parede: quem passa do limite sobre o mar é
+abocanhado por uma baleia gigante, que o cospe de volta para a ilha.
+
+- **Aviso (de 1050 a 1150 m):** a sombra da baleia ronda por baixo da água, perto do pássaro, cada vez maior. Sobem bolhas,
+  ela espirra pelo espiráculo (um sopro forte com garoa caindo) e um ronco grave e áspero fica mais alto. Não há aviso
+  na tela, só esses sinais no mundo. Dá tempo de virar.
+- **Câmera:** do salto até o fim do arremesso, a câmera sai para a terceira pessoa. Com o pássaro na boca, ela fica de
+  lado, entre a baleia e a ilha. Num salto alto ela se afasta (até uns 3 vezes) e olha para baixo enquanto a baleia
+  sobe, para mostrar o arco, e volta a se aproximar quando a baleia chega e cai com o pássaro. No arremesso, segue atrás
+  e acima do pássaro. Depois volta suavemente para a primeira pessoa.
+- **Salto e mordida:** passou de 1150 m, a baleia salta do mar de boca aberta, vindo de fora do mapa, cantando um gemido
+  grave. O salto é balístico: sai de 20 m de fundo, sobe em arco freando e chega ao ápice exatamente na altura do
+  pássaro, onde fecha a boca, em qualquer altura até o teto de 420 m. O pássaro não é puxado: ele perde o embalo em
+  cerca de meio segundo e paira virado para a baleia, com um ajuste suave de poucos metros ao longo do salto para ficar
+  entre as mandíbulas. Saltos maiores levam mais tempo: cerca de 1 s até 75 m de altura e 3,7 s do teto (a gravidade do
+  salto cai de 100 para 65 m/s² nos saltos altos, para que se veja o arco).
+- **Queda e mastigada:** a baleia cai de volta com o pássaro na boca. O corpo bate na água e freia a cabeça até a altura de
+  mastigar; o splash (espuma, gotas e, nas quedas altas, uma coluna de água e um ronco por baixo) cresce com a velocidade
+  da pancada. Ela mastiga 1,4 s com a cabeça fora da água. A câmera treme na mordida, na pancada e a cada mastigada, e os
+  comandos não respondem. Do teto, a sequência até a cuspida leva uns 9 s; de baixo, uns 3,5 s.
+- **Cuspida:** depois de voltar para a água, a baleia cospe o pássaro com força para o centro da ilha, a 115 m/s e
+  subindo. Cuspir de volta no mar, e não no ar, mantém a mastigada visível, faz a cuspida sair sempre da mesma altura
+  (o arremesso chega sempre ao mesmo ponto, venha o pássaro de onde vier) e evita jogá-lo de volta perto do teto, onde
+  chamaria o avião. Ele voa arremessado por
+  2,5 s sem perder velocidade nem responder aos comandos, avança mais de 200 m para dentro do limite e só então o jogador
+  volta a controlar o voo, ainda rápido, chegando a uns 450 m da borda.
+  Preso na boca e, mais ainda, durante o arremesso, as asas se debatem: cada uma tenta bater num tempo próprio e falha,
+  e o vento joga as pontas para trás. Todos na sala veem o mesmo, porque o movimento sai só do tempo do ataque.
+- **Carga:** os cajus caem no mar com a mordida e se perdem. Diferente da carga derrubada por mergulho ou por árvore
+  (seção 3.3), eles não ficam no mundo: o mar está fora do mapa e ninguém consegue alcançá-los. A perda também impede que a
+  baleia vire um atalho gratuito, já que a cuspida leva o pássaro rápido até o meio da ilha.
+- **Cooldown e garantias:** depois de cuspir, a baleia espera 8 s antes de atacar o mesmo pássaro de novo, e a autoridade
+  só aceita outra mordida depois que o pássaro voltou para dentro do raio de aviso. Nesse intervalo o vento antigo volta a
+  empurrar o pássaro para a ilha, e uma parede invisível a 1330 m impede que alguém se perca no mar.
+- **Quem decide:** o dono do pássaro pede a mordida (evento `WhaleBite`) quando passa do limite. A autoridade (o host, ou a
+  `LocalAuthority` no jogo sozinho) confere se o pássaro está mesmo além do limite, se ainda não foi mordido nesta saída e
+  quantos cajus ele levava, e envia o evento a todos. O evento leva o alvo e a posição da mordida. Cada computador anima a
+  mesma baleia a partir do instante em que recebe o evento, sem mais nada pela rede: a pose depende só da posição e do
+  tempo, e a duração de cada fase sai da altura da mordida (`whaleTimeline`), que o host também usa para proteger o
+  pássaro durante a sequência. O dono controla o próprio pássaro durante a sequência, preso na boca e depois arremessado. Os outros desenham o
+  pássaro entre as mandíbulas enquanto ele está preso.
+
 ## 4. Arquitetura
 
 ```
@@ -172,16 +237,18 @@ Thread de áudio   -> VoiceChat (SDL2 + Opus)
 | `world/` | `World`, `Island`, `CashewTree` |
 | `entity/` | `PlayerBird`, `FlightModel` |
 | `game/` | `GameplaySession`, `CashewField`, `CashewCollector`, `NestMenu` |
+| `events/` | `BoundaryWhale` (baleia do limite do mapa) e `WhaleGate` (regra da autoridade para a mordida) |
 | `save/` | `Profile`, `ProfileStore`, `WorldStore`, `RecordManager` |
 | `ui/` | `GameUi`, `ScreenFlow`, `CalibrationTracker`, `SoundManager` |
 | `procedural/` | `buildBirdMesh` e `buildBirdFlightParts` |
 | `ai/` | `NpcEcosystem` |
+| `events/` | `SkyPlane`, `SkyPlaneLedger` e `SkyPlaneEvent`: o avião do teto, com modelo e sons próprios |
 | `net/` | `UdpSession`, `Protocol`, `HostAuthority`, `ClientAuthority`, `RemoteTrack` e `NetMatch` (implementa `NetSession`) |
 | `gfx/` | `Renderer`, `Shader`, `Mesh`, `Camera3D`, `BirdViewModel` |
 | `shared/` | Contratos entre as frentes e `LocalAuthority` |
 | `voice/` | `VoiceChat`, `SpeechDetector`, `PitchShifter`, `VoiceEncoder`, `VoiceDecoder`, `VoiceMixer` |
 
-**Rede:** o host decide cajus, NPCs, roubos e colisões. Cada cliente simula o próprio voo para responder sem atraso. O
+**Rede:** o host decide cajus, NPCs, roubos, colisões e as mordidas da baleia. Cada cliente simula o próprio voo para responder sem atraso. O
 host envia o estado 20 vezes por segundo e os clientes interpolam os outros pássaros.
 
 ## 5. Requisitos do enunciado
@@ -194,10 +261,10 @@ host envia o estado 20 vezes por segundo e os clientes interpolam os outros pás
 | 4 | Pontuação, record e arquivo | Seção 3.4, com `record.txt` | Atendido |
 | 5 | Imagens com fundo transparente | Caju, ícones de upgrades e HUD em PNG com alfa | Atendido |
 | 6 | OpenCV, YOLO ou OpenPose | YOLOv8n-pose executado pelo OpenCV DNN | Atendido |
-| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Em validação |
+| 7 | Jogabilidade | Calibração, zonas mortas e suavização dos gestos | Atendido |
 | 8 | Vídeo espelhado | Imagem e gestos tratados em modo espelho | Atendido |
-| 9 | Detecção em todo o vídeo | Teste de cobertura nas bordas durante a calibração | Falta validar com a webcam |
-| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Falta validar o áudio |
+| 9 | Detecção em todo o vídeo | Calibração exige ombros e mãos visíveis e a mão nas quatro bordas, com o jogador perto da câmera (seção 3.1) | Atendido |
+| 10 | Som em eventos | Coleta, entrega, roubo, alarme, upgrade, record e voo (vento de fundo, chiado leve pela velocidade, sopro grave na subida, assobio de mergulho, sopro a cada batida de asa e mar perto da costa), avião no teto (motor que se aproxima, com volume pela distância e efeito Doppler, e estrondo da batida) e baleia do limite (sons longos e graves em camadas: ronco áspero e espirro no aviso, canto de baleia no salto, splash pesado com cauda de água, mordida com estalo, mastigadas, cuspida com sopro forte). Os NPCs cantam só quando estão a menos de 80 m, com canto próprio por porte | Atendido |
 | Instrução 4 | Indicar uso de IA | [`USO_DE_IA.md`](USO_DE_IA.md) | Atendido |
 
 ## 6. Cronograma
@@ -208,11 +275,11 @@ As tarefas, os responsáveis e as dependências estão em [`DIVISAO_TRABALHO.md`
 |---|---|---|
 | **M0** Prova técnica | Concluído | Nada |
 | **M1** Voo | Concluído | Nada |
-| **M2** Ciclo de jogo | Concluído na `main` | Validar no jogo real |
-| **M3** Multiplayer | Salas de até 6 jogadores, roubo e mergulho, testados em loopback | Teste completo no hotspot |
+| **M2** Ciclo de jogo | Concluído e validado no jogo real | Nada |
+| **M3** Multiplayer | Salas de até 6 jogadores, roubo e mergulho, testados entre computadores | Nada |
 | **M4** Pássaros | Gerador, ecossistema e NPCs em rede | Nada |
 | **M5** Voz | Voz por proximidade com Doppler e redução de ruído | Nada |
-| **M6** Fechamento | README, créditos e uso de IA escritos | Teste integrado, UML e apresentação |
+| **M6** Fechamento | Teste integrado feito. README, créditos e uso de IA escritos | Diagrama UML |
 
 Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alarme e cofre do ninho, sons de ambiente.
 
@@ -230,13 +297,7 @@ Se o prazo apertar, os cortes seguem esta ordem: filtro de voz, caçadores, alar
 
 ## 8. Pendências
 
-O tema "Outro" foi aprovado pelo professor. A apresentação usará computadores próprios, conectados ao hotspot de um
-celular.
+O tema "Outro" foi aprovado pelo professor. O jogo integrado, a N5 e os testes de rede entre computadores já foram
+validados (ver [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md)).
 
-1. Validar o jogo integrado com janela visível, webcam e som.
-2. Concluir o teste de rede entre dois computadores, incluindo o hotspot. Ver
-   [`RESULTADOS_TESTE_REDE.md`](RESULTADOS_TESTE_REDE.md).
-3. Validar a N5 (roubo, mergulho e cajus caindo) com dois computadores.
-4. Produzir o diagrama UML. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já
-   estão escritos.
-5. Fazer o teste integrado e ensaiar a apresentação.
+1. Produzir o diagrama UML. O README, os [créditos](CREDITOS.md) e o [uso de IA](USO_DE_IA.md) já estão escritos.

@@ -1,4 +1,6 @@
 #pragma once
+#include "events/SkyPlane.h"
+#include "events/WhaleGate.h"
 #include "shared/CashewSpill.h"
 #include "shared/GameAuthority.h"
 #include <array>
@@ -20,4 +22,6 @@ private:
     std::vector<PlayerPublicState> players_;
     std::array<int, kMaxPlayers> carried_{};   // Carga segundo os eventos confirmados.
     CashewSpill spill_;
+    SkyPlaneLedger skyPlanes_;   // Sem relogio: o intervalo entre avioes fica com quem pede.
+    WhaleGate whales_;   // Baleia do limite do mapa: uma mordida por saida.
 };

@@ -9,6 +9,7 @@ void LocalAuthority::request(const GameEvent& event) {
     pending_.push_back(confirmed);
     if (confirmed.type == GameEventType::CashewDropped)
         for (const GameEvent& spilled : spill_.spill(confirmed)) pending_.push_back(spilled);
+    if (confirmed.type == GameEventType::PlaneStruck) request(SkyPlaneLedger::cargoDropFor(confirmed));
 }
 
 // So acompanha a carga: as outras regras ficam com quem pede, como sempre foi no jogo sozinho.
@@ -32,6 +33,23 @@ bool LocalAuthority::accept(GameEvent& event) {
             event.value = static_cast<uint8_t>(std::min<int>(event.value, carried_[event.target]));
             carried_[event.target] -= event.value;
             return event.value > 0;
+        case GameEventType::PlaneLaunched: {
+            const auto target = std::find_if(players_.begin(), players_.end(),
+                                             [&](const PlayerPublicState& p) { return p.id == event.target; });
+            return skyPlanes_.acceptLaunch(event, 0, target != players_.end() ? &*target : nullptr, false);
+        }
+        case GameEventType::PlaneStruck:
+            return skyPlanes_.acceptStrike(event, 0, false);
+        case GameEventType::WhaleBite: {
+            // Os cajus caem no mar com a mordida e se perdem.
+            std::optional<glm::vec3> known;
+            for (const PlayerPublicState& p : players_)
+                if (p.id == event.target) known = p.position;
+            if (!whales_.accept(event, known)) return false;
+            event.value = static_cast<uint8_t>(std::min(carried_[event.target], 255));
+            carried_[event.target] = 0;
+            return true;
+        }
         default:
             return true;
     }
@@ -48,6 +66,7 @@ void LocalAuthority::publishLocalPlayer(const PlayerPublicState& state) {
                                     [&](const PlayerPublicState& p) { return p.id == state.id; });
     if (found != players_.end()) *found = state;
     else players_.push_back(state);
+    whales_.observe(state.id, state.position);
 }
 
 void LocalAuthority::removePlayer(PlayerId id) {
@@ -55,4 +74,5 @@ void LocalAuthority::removePlayer(PlayerId id) {
                                   [&](const PlayerPublicState& p) { return p.id == id; }),
                    players_.end());
     if (id < kMaxPlayers) carried_[id] = 0;
+    whales_.forget(id);
 }

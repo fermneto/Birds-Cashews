@@ -7,6 +7,9 @@
 namespace {
 constexpr float kCoinsVisibleSeconds = 3.5f, kCoinsFadeSeconds = 0.5f;
 constexpr float kMinComposeSeconds = 1.0f / 30.0f;
+// Pausa curta para ver tudo marcado antes de sair sozinho. Fica acima dos 0,7 s do gesto do menu,
+// assim um braco que terminou erguido dispara o gesto ainda nesta tela, onde ele e ignorado.
+constexpr float kCalibrationFinishSeconds = 1.0f;
  
 // Usada so quando ninguem informa a rede, como em ferramentas que nao jogam em sala.
 class OfflineNetSession : public NetSession {
@@ -59,6 +62,7 @@ void GameUi::enterScreen(UiScreen screen) {
     rooms_.clearError();
     raisedArm_ = ArmSide::None;
     armProgress_ = 0;
+    repeat_.reset();   // Na tela nova, o braco ainda erguido nao continua passando opcoes.
     cursor_.select(0);
     if (screen == UiScreen::MainMenu) {
         const RecordManager record(savesDir_);
@@ -73,6 +77,7 @@ void GameUi::enterScreen(UiScreen screen) {
     if (screen == UiScreen::Calibration) {
         tracker_.reset();
         calibrationFrame_.release();
+        calibrationDoneFor_ = 0;
     }
     refreshRows();
 }
@@ -175,14 +180,24 @@ void GameUi::handleEvent(const SDL_Event& event) {
     }
 }
 
-void GameUi::updateMenus(const FlightControls& controls) {
+void GameUi::updateMenus(const FlightControls& controls, float seconds) {
     raisedArm_ = controls.raisedArm;
     armProgress_ = controls.menuProgress;
+    // Quem concluiu a calibracao com a mao no alto nao escolhe nada sem querer na tela seguinte.
+    if (waitArmsDown_) {
+        if (controls.raisedArm != ArmSide::None || controls.menuPressed != ArmSide::None) return;
+        waitArmsDown_ = false;
+    }
     const bool calibrating = flow_.current() == UiScreen::Calibration && poseSource_;
     const bool gestureAllowed = !calibrating || tracker_.acceptsGesture(controls);
-    const NavAction action = navFromControls(controls);
-    if (action == NavAction::None || !gestureAllowed) return;
-    if (activeField() && !isBodyGesture(controls)) return;
+    if (!gestureAllowed) {
+        repeat_.reset();
+        return;
+    }
+    // A repeticao so nasce de braco erguido, entao so o Q digitado precisa ser barrado no campo.
+    const NavAction action = repeat_.update(controls, seconds);
+    if (action == NavAction::None) return;
+    if (activeField() && controls.menuPressed != ArmSide::None && !isBodyGesture(controls)) return;
     apply(action);
 }
 
@@ -281,15 +296,24 @@ void GameUi::updateCalibration(float seconds) {
     if (!poseSource_) return;
     cv::Mat frame;
     Pose pose;
-    if (poseSource_->latestPose(frame, pose)) {
+    const bool fresh = poseSource_->latestPose(frame, pose);
+    if (fresh) {
         calibrationFrame_ = frame;
         calibrationPose_ = pose;
         calibrationSerial_++;
     }
     if (calibrationFrame_.empty()) return;
     const int before = tracker_.marksDone();
-    tracker_.update(calibrationPose_, calibrationFrame_.size(), seconds);
+    tracker_.update(calibrationPose_, calibrationFrame_.size(), seconds, fresh);
     if (tracker_.marksDone() > before) sound_.play(UiSound::Mark);
+
+    // Com as cinco marcas, segue sozinho: nao precisa baixar os bracos e confirmar com o gesto.
+    if (!tracker_.complete()) return;
+    calibrationDoneFor_ += seconds;
+    if (calibrationDoneFor_ < kCalibrationFinishSeconds) return;
+    waitArmsDown_ = true;
+    flow_.calibrationFinished();
+    syncScreen();
 }
 
 // Depois de mudar, o saldo fica visivel por alguns segundos e some aos poucos.
@@ -363,7 +387,6 @@ HudScene GameUi::hudScene() const {
     scene.view = &gameplay_->view();
     scene.bannerOpacity = banner_.opacity();
     scene.bannerScale = banner_.scale();
-    scene.bodyLost = poseSource_ && !poseSource_->bodyDetected();
     scene.showPreview = showsCornerPreview();
     scene.coinsOpacity = coinsOpacity();
     return scene;
@@ -379,6 +402,7 @@ void GameUi::redraw() {
         scene.frame = calibrationFrame_;
         scene.pose = calibrationPose_;
         scene.tracker = &tracker_;
+        scene.doneText = flow_.playPending() ? "Pronto! Começando o jogo..." : "Pronto! Voltando ao menu...";
         scene.rows = calibrationRows();
         scene.selected = cursor_.index();
         scene.gesture = {raisedArm_, armProgress_, !poseSource_ || tracker_.complete()};
@@ -404,8 +428,9 @@ std::string GameUi::frameKey() const {
         << v.recordHolder << ',' << v.leadingRecord << ',' << v.perchedOnNest << ',' << v.cargoLostNow << ',' << v.nearBoundary << ',' << quantized(coinsOpacity(), 20.0f) << ',' << std::lround(v.nestDistance) << ','
         << quantized(v.nestBearing, 60.0f) << ',' << quantized(banner_.opacity(), 30.0f) << ','
         << quantized(banner_.scale(), 60.0f) << ',' << (poseSource_ && !poseSource_->bodyDetected()) << ','
-        << static_cast<int>(v.cargoLossCause) << ',' << v.knockedRivalNow << ',' << v.alarmNow << ','
-        << quantized(v.thiefBearing, 60.0f) << ',' << std::lround(v.thiefDistance);
+        << static_cast<int>(v.cargoLossCause) << ',' << v.knockedRivalNow << ',' << v.alarmNow << ',' << v.whaleNow << ','
+        << quantized(v.thiefBearing, 60.0f) << ',' << std::lround(v.thiefDistance) << ',' << v.planeIncoming << ','
+        << v.planeHitNow;
     const RobView& rob = v.robbery;
     key << '|' << rob.active << ',' << quantized(rob.progress, 60.0f) << ',' << static_cast<int>(rob.blocked) << ',' << rob.stolenNow;
     const NestMenuView& menu = v.menu;

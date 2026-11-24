@@ -8,6 +8,26 @@ constexpr float kTau = 6.2831853f;
 float approach(float value, float target, float rate, float dt) {
     return value + (target - value) * std::min(1.0f, rate * dt);
 }
+
+// Arremessado, o passaro tenta bater as asas e falha: cada asa num tempo, batidas curtas que perdem o ritmo,
+// abertura que fecha e abre e o vento jogando as pontas para tras.
+WingPose flailPose(float t) {
+    const float left = 0.30f + 0.60f * std::sin(t * 14.0f + 0.9f * std::sin(t * 3.7f)) * (0.6f + 0.4f * std::sin(t * 5.1f));
+    const float right = 0.30f + 0.60f * std::sin(t * 15.3f + 1.7f + 0.9f * std::sin(t * 4.1f)) * (0.6f + 0.4f * std::sin(t * 4.4f + 1.0f));
+    WingPose pose;
+    pose.lift = 0.5f * (left + right) + 0.08f * std::sin(t * 19.0f) * (0.5f + 0.5f * std::sin(t * 2.3f));
+    pose.tilt = 0.5f * (right - left);
+    pose.spread = 0.75f + 0.20f * std::sin(t * 9.0f);
+    pose.sweep = 0.45f + 0.25f * std::sin(t * 6.3f + 0.5f);
+    return pose;
+}
+
+void blendFlail(WingPose& pose, const WingPose& flail, float amount) {
+    pose.lift += (flail.lift - pose.lift) * amount;
+    pose.tilt += (flail.tilt - pose.tilt) * amount;
+    pose.spread += (flail.spread - pose.spread) * amount;
+    pose.sweep += (flail.sweep - pose.sweep) * amount;
+}
 }
 
 WingPose BirdMotion::advance(const BirdInstance& bird, float beatRate, float time) {
@@ -44,6 +64,7 @@ WingPose BirdMotion::advance(const BirdInstance& bird, float beatRate, float tim
     s.flap = approach(s.flap, flapTarget, 5.0f, dt);
     s.fold = approach(s.fold, foldTarget, 4.0f, dt);
     s.perch = approach(s.perch, perchTarget, 3.0f, dt);
+    s.flail = bird.flail > s.flail ? approach(s.flail, bird.flail, 10.0f, dt) : approach(s.flail, bird.flail, 3.0f, dt);
     s.phase = std::fmod(s.phase + dt * beatRate * (0.35f + 0.65f * s.flap), kTau);
 
     WingPose pose;
@@ -59,6 +80,7 @@ WingPose BirdMotion::advance(const BirdInstance& bird, float beatRate, float tim
     pose.lift += (-0.25f - pose.lift) * s.perch;
     pose.spread += (0.30f - pose.spread) * s.perch;
     pose.sweep += (0.95f - pose.sweep) * s.perch;
+    if (s.flail > 0.001f) blendFlail(pose, flailPose(time + personal * 7.0f), s.flail);
     return pose;
 }
 

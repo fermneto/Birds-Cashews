@@ -6,6 +6,7 @@
 #include "ui/FakeNetSession.h"
 #include "ui/UiShowcase.h"
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <unistd.h>
 #include <algorithm>
 #include <cmath>
@@ -137,6 +138,63 @@ void testNavigationMapping(TestRun& t) {
     t.check("nav: cursor acompanha a lista menor", cursor.index() == 1);
 }
 
+FlightControls raised(ArmSide side) {
+    FlightControls controls;
+    controls.raisedArm = side;
+    return controls;
+}
+
+// Conta quantas vezes a acao sai em uma sequencia de quadros com o mesmo braco erguido.
+int countRepeats(GestureRepeat& repeat, ArmSide side, NavAction action, float seconds, float frame) {
+    int count = 0;
+    for (float time = 0; time < seconds - 1e-4f; time += frame)
+        count += repeat.update(raised(side), frame) == action ? 1 : 0;
+    return count;
+}
+
+void testGestureRepeat(TestRun& t) {
+    constexpr float kFrame = 1.0f / 60.0f;
+    GestureRepeat repeat;
+    t.check("repeticao: gesto esquerdo avanca na hora", repeat.update(pressed(ArmSide::Left), kFrame) == NavAction::Next);
+    t.check("repeticao: nada antes do atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kDelay - 0.05f, kFrame) == 0);
+    t.check("repeticao: braco mantido avanca de novo apos o atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, 0.1f, kFrame) == 1);
+    t.check("repeticao: segue no ritmo do intervalo",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kInterval * 3, kFrame) == 3);
+
+    repeat.update(FlightControls{}, kFrame);
+    t.check("repeticao: abaixar o braco para de avancar",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, 2.0f, kFrame) == 0);
+    repeat.update(pressed(ArmSide::Left), kFrame);
+    t.check("repeticao: abaixar zera o atraso",
+            countRepeats(repeat, ArmSide::Left, NavAction::Next, GestureRepeat::kDelay - 0.05f, kFrame) == 0);
+
+    GestureRepeat confirm;
+    t.check("repeticao: gesto direito confirma uma vez", confirm.update(pressed(ArmSide::Right), kFrame) == NavAction::Confirm);
+    t.check("repeticao: braco direito mantido nao confirma de novo",
+            countRepeats(confirm, ArmSide::Right, NavAction::Confirm, 3.0f, kFrame) == 0);
+
+    GestureRepeat swap;
+    swap.update(pressed(ArmSide::Left), kFrame);
+    t.check("repeticao: trocar de braco nao repete o esquerdo",
+            countRepeats(swap, ArmSide::Right, NavAction::Next, 2.0f, kFrame) == 0);
+
+    GestureRepeat keyboard;
+    keyboard.update(pressed(ArmSide::Left, false), kFrame);
+    t.check("repeticao: Q do teclado avanca uma unica vez",
+            countRepeats(keyboard, ArmSide::None, NavAction::Next, 2.0f, kFrame) == 0);
+
+    TempDir dir("repeticao");
+    DemoGameplaySource demo;
+    GameUi ui(testConfig(dir), demo);
+    ui.updateMenus(pressed(ArmSide::Left), kFrame);
+    for (int i = 0; i < 27; ++i) ui.updateMenus(raised(ArmSide::Left), kFrame);
+    t.check("repeticao: menu avanca so uma vez no primeiro meio segundo", ui.selectedRow() == 1);
+    for (int i = 0; i < 6; ++i) ui.updateMenus(raised(ArmSide::Left), kFrame);
+    t.check("repeticao: menu avanca de novo com o braco mantido", ui.selectedRow() == 2);
+}
+
 void testTextField(TestRun& t) {
     TextField field(6);
     field.insert("ação");
@@ -158,18 +216,18 @@ void testUiNavigation(TestRun& t) {
     TempDir dir("nav");
     DemoGameplaySource demo;
     GameUi ui(testConfig(dir), demo);
-    ui.updateMenus(pressed(ArmSide::Left));
+    ui.updateMenus(pressed(ArmSide::Left), 0);
     t.check("ui: gesto esquerdo move a opcao", ui.selectedRow() == 1);
     sendKey(ui, SDLK_UP);
     t.check("ui: seta move a opcao", ui.selectedRow() == 0);
     sendKeys(ui, SDLK_DOWN, 4);
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("ui: gesto direito confirma", ui.screen() == UiScreen::Profile);
 
     sendText(ui, "Qe");
-    ui.updateMenus(pressed(ArmSide::Left, false));
+    ui.updateMenus(pressed(ArmSide::Left, false), 0);
     t.check("ui: Q digitado fica no campo", ui.selectedRow() == 0 && ui.rows()[0].value == "Qe");
-    ui.updateMenus(pressed(ArmSide::Left));
+    ui.updateMenus(pressed(ArmSide::Left), 0);
     t.check("ui: gesto sai do campo de texto", ui.selectedRow() == 1);
     sendKey(ui, SDLK_ESCAPE);
     t.check("ui: Esc volta ao menu", ui.screen() == UiScreen::MainMenu);
@@ -230,42 +288,123 @@ void testCalibrationRegions(TestRun& t) {
     t.check("calibracao: direita", CalibrationTracker::inRegion(CalRegion::Right, {0.9f, 0.5f}));
     t.check("calibracao: alto", CalibrationTracker::inRegion(CalRegion::Top, {0.5f, 0.1f}));
     t.check("calibracao: baixo", CalibrationTracker::inRegion(CalRegion::Bottom, {0.5f, 0.9f}));
+    t.check("calibracao: mao na cintura de quem esta perto marca baixo", CalibrationTracker::inRegion(CalRegion::Bottom, {0.5f, 0.78f}));
     t.check("calibracao: centro nao marca", !CalibrationTracker::inRegion(CalRegion::Left, {0.5f, 0.5f})
                                                 && !CalibrationTracker::inRegion(CalRegion::Top, {0.5f, 0.5f}));
     t.check("calibracao: fora do quadro nao marca", !CalibrationTracker::inRegion(CalRegion::Left, {-0.1f, 0.5f}));
+    t.check("calibracao: faixa alcanca os bracos abertos", CalibrationTracker::inRegion(CalRegion::Left, {0.22f, 0.5f})
+                                                         && CalibrationTracker::inRegion(CalRegion::Right, {0.78f, 0.5f}));
 
     const cv::Size frame(640, 480);
-    Pose body = ScriptedPoseSource::standingPose();
-    t.check("calibracao: corpo inteiro aceito", CalibrationTracker::isFullBody(body, frame));
-    Pose noFeet = body;
-    noFeet.joints[LAnkle].conf = 0.1f;
-    t.check("calibracao: sem o tornozelo nao e corpo inteiro", !CalibrationTracker::isFullBody(noFeet, frame));
+    Pose body = ScriptedPoseSource::upperBodyPose();
+    t.check("calibracao: perto da camera, sem pernas, e aceito", CalibrationTracker::showsControlJoints(body, frame));
+    Pose noHips = body;
+    noHips.joints[LHip].conf = noHips.joints[RHip].conf = 0;
+    noHips.joints[Nose].conf = 0;
+    t.check("calibracao: quadris e rosto nao sao exigidos", CalibrationTracker::showsControlJoints(noHips, frame));
+    Pose noHand = body;
+    noHand.joints[LWrist].conf = 0.1f;
+    t.check("calibracao: sem um punho nao conta", !CalibrationTracker::showsControlJoints(noHand, frame));
     Pose cut = body;
-    cut.joints[RAnkle].pos.y = 479.0f;
-    t.check("calibracao: ponto colado na borda nao conta", !CalibrationTracker::isFullBody(cut, frame));
-    t.check("calibracao: pose invalida nao conta", !CalibrationTracker::isFullBody(Pose{}, frame));
+    cut.joints[RShoulder].pos.x = 639.0f;
+    t.check("calibracao: ponto colado na borda nao conta", !CalibrationTracker::showsControlJoints(cut, frame));
+    t.check("calibracao: pose invalida nao conta", !CalibrationTracker::showsControlJoints(Pose{}, frame));
+
+    CalibrationTracker resting;
+    for (int sample = 0; sample < 5; sample++) resting.update(body, frame, 0.1f);
+    t.check("calibracao: postura de repouso nao marca borda", resting.bodyConfirmed() && resting.marksDone() == 1);
+}
+
+Pose withBothWrists(Pose pose, cv::Point2f left, cv::Point2f right) {
+    pose.joints[LWrist].pos = left;
+    pose.joints[RWrist].pos = right;
+    return pose;
+}
+
+// Um ponto no pixel (x, y) da webcam precisa cair sobre o mesmo pixel da imagem mostrada,
+// inclusive quando a webcam nao entrega 4:3 e a imagem ganha faixas.
+void testCalibrationVideoMapping(TestRun& t) {
+    const cv::Rect area(28, 72, 816, 612);
+    for (const cv::Size& size : {cv::Size(640, 480), cv::Size(1280, 720), cv::Size(320, 240)}) {
+        const std::string name = std::to_string(size.width) + "x" + std::to_string(size.height);
+        const cv::Rect video = fitVideo(size, area);
+        const double frameAspect = static_cast<double>(size.width) / size.height;
+        t.check("calibracao: video " + name + " mantem a proporcao",
+                std::abs(static_cast<double>(video.width) / video.height - frameAspect) < 0.01 && (area & video) == video);
+
+        cv::Mat frame(size, CV_8UC3, cv::Scalar::all(0));
+        const int side = std::max(4, size.width / 40);
+        const cv::Rect target(size.width * 3 / 4, size.height / 6, side, side);
+        cv::rectangle(frame, target, cv::Scalar(255, 255, 255), cv::FILLED);
+        Canvas canvas(kUiWidth, kUiHeight);
+        canvas.video(frame, video);
+        const cv::Point2f center(target.x + side * 0.5f, target.y + side * 0.5f);
+        const cv::Point shown = videoPoint(center, size, video);
+        const cv::Vec4b pixel = canvas.pixels().at<cv::Vec4b>(shown);
+        t.check("calibracao: ponto " + name + " cai sobre o alvo na tela", pixel[0] > 200 && pixel[1] > 200 && pixel[2] > 200);
+        const cv::Point corner = videoPoint({0, 0}, size, video), end = videoPoint(cv::Point2f(size), size, video);
+        t.check("calibracao: cantos " + name + " coincidem com a imagem", corner == video.tl() && end == video.br());
+    }
 }
 
 void testCalibrationTracker(TestRun& t) {
     const cv::Size frame(640, 480);
-    const Pose body = ScriptedPoseSource::standingPose();
+    const Pose body = ScriptedPoseSource::upperBodyPose();
+    const Pose left = ScriptedPoseSource::withWrist(body, {40, 240});
     CalibrationTracker tracker;
-    tracker.update(ScriptedPoseSource::withWrist(body, {40, 240}), frame, 0.05f);
+    tracker.update(left, frame, 0.05f);
     t.check("calibracao: toque rapido nao marca", !tracker.reached(CalRegion::Left));
-    tracker.update(ScriptedPoseSource::withWrist(body, {40, 240}), frame, 0.3f);
+    tracker.update(left, frame, 0.3f);
     t.check("calibracao: mao mantida marca a regiao", tracker.reached(CalRegion::Left));
     tracker.update(body, frame, 1.0f);
     t.check("calibracao: marca continua depois de sair", tracker.reached(CalRegion::Left) && tracker.bodyConfirmed());
     t.check("calibracao: incompleta nao aceita gesto", !tracker.acceptsGesture(pressed(ArmSide::Right)));
 
     for (const cv::Point2f& wrist : {cv::Point2f(600, 240), cv::Point2f(320, 30), cv::Point2f(320, 450)})
-        tracker.update(ScriptedPoseSource::withWrist(body, wrist), frame, 0.3f);
+        for (int sample = 0; sample < 2; sample++) tracker.update(ScriptedPoseSource::withWrist(body, wrist), frame, 0.1f);
     t.check("calibracao: completa com as cinco marcas", tracker.complete() && tracker.marksDone() == 5);
     t.check("calibracao: braco ainda erguido nao confirma", !tracker.acceptsGesture(pressed(ArmSide::Right)));
     tracker.acceptsGesture(FlightControls{});
     t.check("calibracao: depois de baixar o braco aceita gesto", tracker.acceptsGesture(pressed(ArmSide::Right)));
     tracker.reset();
     t.check("calibracao: reiniciar limpa as marcas", tracker.marksDone() == 0);
+
+    // Um unico quadro ruidoso, repetido enquanto o detector nao entrega outro, nao marca nada.
+    tracker.update(left, frame, 0.05f);
+    tracker.update(left, frame, 1.0f, false);
+    t.check("calibracao: uma pose so nao marca", !tracker.reached(CalRegion::Left) && !tracker.bodyConfirmed());
+
+    tracker.reset();
+    tracker.update(left, frame, 0.1f);
+    tracker.update(body, frame, 0.1f);
+    tracker.update(left, frame, 0.06f);
+    t.check("calibracao: falha curta do detector nao recomeca", tracker.reached(CalRegion::Left));
+
+    tracker.reset();
+    tracker.update(left, frame, 0.1f);
+    tracker.update(body, frame, 0.5f);
+    tracker.update(left, frame, 0.06f);
+    t.check("calibracao: ausencia longa recomeca a contagem", !tracker.reached(CalRegion::Left));
+
+    tracker.reset();
+    const Pose open = withBothWrists(body, {40, 240}, {600, 240});
+    tracker.update(open, frame, 0.1f);
+    tracker.update(open, frame, 0.1f);
+    t.check("calibracao: duas maos marcam esquerda e direita juntas",
+            tracker.reached(CalRegion::Left) && tracker.reached(CalRegion::Right));
+    const Pose upDown = withBothWrists(body, {320, 30}, {320, 450});
+    tracker.update(upDown, frame, 0.1f);
+    tracker.update(upDown, frame, 0.1f);
+    t.check("calibracao: em qualquer ordem e rapido", tracker.complete());
+}
+
+// Como a webcam, entrega uma pose nova a cada quadro.
+void feedPose(GameUi& ui, ScriptedPoseSource& camera, const Pose& pose, float seconds) {
+    constexpr float kFrame = 1.0f / 30.0f;
+    for (float time = 0; time < seconds; time += kFrame) {
+        camera.setPose(pose);
+        ui.update(kFrame);
+    }
 }
 
 void testCalibrationScreen(TestRun& t) {
@@ -277,14 +416,29 @@ void testCalibrationScreen(TestRun& t) {
     sendKeys(ui, SDLK_DOWN, 3);
     sendKey(ui, SDLK_RETURN);
     t.check("calibracao: tela abre pelo menu", ui.screen() == UiScreen::Calibration && !ui.showsCornerPreview());
-    ui.updateMenus(pressed(ArmSide::Right));
+    ui.updateMenus(pressed(ArmSide::Right), 0);
     t.check("calibracao: gesto nao sai antes de concluir", ui.screen() == UiScreen::Calibration);
-    camera.setPose(ScriptedPoseSource::withWrist(ScriptedPoseSource::standingPose(), {40, 240}));
-    ui.update(0.5f);
+    const Pose body = ScriptedPoseSource::upperBodyPose();
+    feedPose(ui, camera, ScriptedPoseSource::withWrist(body, {40, 240}), 0.3f);
     t.check("calibracao: tela le a webcam simulada", ui.calibration().reached(CalRegion::Left));
     t.check("calibracao: Enter ainda pode pular", ui.rows()[0].label == "Pular calibração");
     sendKey(ui, SDLK_RETURN);
     t.check("calibracao: pular volta ao menu", ui.screen() == UiScreen::MainMenu);
+
+    // Ombros e maos no quadro e as duas maos abertas, depois no alto e embaixo: tudo em menos de dois segundos.
+    sendKeys(ui, SDLK_DOWN, 3);
+    sendKey(ui, SDLK_RETURN);
+    feedPose(ui, camera, withBothWrists(body, {40, 240}, {600, 240}), 0.5f);
+    feedPose(ui, camera, withBothWrists(body, {320, 30}, {320, 450}), 0.3f);
+    t.check("calibracao: completa mostra o resultado antes de sair",
+            ui.calibration().complete() && ui.screen() == UiScreen::Calibration);
+    feedPose(ui, camera, ScriptedPoseSource::withWrist(body, {400, 30}), 1.0f);
+    t.check("calibracao: concluida volta sozinha ao menu", ui.screen() == UiScreen::MainMenu);
+    ui.updateMenus(pressed(ArmSide::Right), 0);
+    t.check("calibracao: braco ainda erguido nao escolhe no menu", ui.screen() == UiScreen::MainMenu);
+    ui.updateMenus(FlightControls{}, 0);
+    ui.updateMenus(pressed(ArmSide::Right), 0);
+    t.check("calibracao: depois de baixar o braco o menu responde", ui.screen() != UiScreen::MainMenu);
 }
 
 void testProfiles(TestRun& t) {
@@ -575,7 +729,9 @@ void testSounds(TestRun& t) {
         const auto [low, high] = std::minmax_element(samples.begin(), samples.end());
         const bool audible = !samples.empty() && *high > 1500 && *low < -1500;
         const bool notClipped = !samples.empty() && *high < 32767 && *low > -32767;
-        const bool shortEnough = samples.size() < static_cast<size_t>(SoundManager::sampleRate());
+        // Os sons da baleia sao longos de proposito (canto, splash com cauda de agua); os outros ficam abaixo de 1 s.
+        const bool whale = i >= static_cast<int>(UiSound::WhaleSpout) && i <= static_cast<int>(UiSound::WhaleSong);
+        const bool shortEnough = samples.size() < static_cast<size_t>(SoundManager::sampleRate() * (whale ? 4 : 1));
         t.check("som: efeito " + std::to_string(i) + " audivel, sem saturar e curto", audible && notClipped && shortEnough);
     }
     const GameplayFeedback all[] = {GameplayFeedback::CashewCollected, GameplayFeedback::CashewDelivered, GameplayFeedback::UpgradeBought,
@@ -710,6 +866,7 @@ int runUiSelfTest() {
     testFlowPause(t);
     testFlowExit(t);
     testNavigationMapping(t);
+    testGestureRepeat(t);
     testTextField(t);
     testUiNavigation(t);
     testUiPauseSaves(t);
@@ -719,6 +876,7 @@ int runUiSelfTest() {
     testFlapSound(t);
     testCalibrationRegions(t);
     testCalibrationTracker(t);
+    testCalibrationVideoMapping(t);
     testCalibrationScreen(t);
     testProfiles(t);
     testProfileScreen(t);

@@ -1,26 +1,32 @@
 #pragma once
 #include "entity/FlightControls.h"
+#include "vision/GestureRecognizer.h"
 #include "vision/Pose.h"
 #include <array>
 
 enum class CalRegion { Left, Right, Top, Bottom };
 constexpr int kCalRegionCount = 4;
 
-// Faixa de cada regiao, como fracao do quadro espelhado.
-constexpr float kCalRegionBand = 0.2f;
+// Faixa de cada regiao, como fracao do quadro espelhado. Os bracos abertos chegam perto de 20% das
+// laterais, entao a faixa precisa ser um pouco maior que isso. A mesma faixa serve embaixo: com o
+// jogador perto da camera, as maos baixadas na cintura ja ficam no quarto inferior da imagem.
+constexpr float kCalRegionBand = 0.25f;
 
-// Confere se o jogador e detectado em todo o video: corpo inteiro e maos nas quatro bordas.
+// Confere se o jogador e detectado em todo o video: os pontos do controle (ombros e punhos)
+// dentro do quadro e as maos nas quatro bordas. Pernas e quadris nao sao exigidos.
+// As marcas sao independentes: valem em qualquer ordem e as duas maos podem marcar ao mesmo tempo.
 class CalibrationTracker {
 public:
     void reset();
-    void update(const Pose& mirroredPose, cv::Size frame, float seconds);
+    // newSample indica uma pose nova do detector; sem ela, a pose anterior continua valendo.
+    void update(const Pose& mirroredPose, cv::Size frame, float seconds, bool newSample = true);
 
     static bool inRegion(CalRegion region, cv::Point2f normalized);
-    static bool isFullBody(const Pose& pose, cv::Size frame);
+    static bool showsControlJoints(const Pose& pose, cv::Size frame);
 
     bool bodyVisibleNow() const { return bodyNow_; }
-    bool bodyConfirmed() const { return bodyConfirmed_; }
-    bool reached(CalRegion region) const { return reached_[static_cast<size_t>(region)]; }
+    bool bodyConfirmed() const { return body_.done; }
+    bool reached(CalRegion region) const { return regions_[static_cast<size_t>(region)].done; }
     int marksDone() const;
     bool complete() const;
 
@@ -29,11 +35,15 @@ public:
     bool acceptsGesture(const FlightControls& controls);
 
 private:
-    void updateBody(const Pose& pose, cv::Size frame, float seconds);
-    void updateRegions(const Pose& pose, cv::Size frame, float seconds);
+    // Tempo e amostras seguidas de uma condicao. Uma falha curta do detector nao zera a contagem.
+    struct Hold {
+        float held = 0, missing = 0;
+        int samples = 0;
+        bool done = false;
+        void step(bool inside, float seconds, bool newSample, float needed, int minSamples);
+    };
 
-    std::array<bool, kCalRegionCount> reached_{};
-    std::array<float, kCalRegionCount> held_{};
-    float bodyHeld_ = 0;
-    bool bodyNow_ = false, bodyConfirmed_ = false, armsLowered_ = false;
+    std::array<Hold, kCalRegionCount> regions_{};
+    Hold body_;
+    bool bodyNow_ = false, armsLowered_ = false;
 };

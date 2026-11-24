@@ -1,5 +1,8 @@
 #include "core/Game.h"
 #include "core/BirdShots.h"
+#include "events/SkyPlaneModel.h"
+#include "events/SkyPlaneShots.h"
+#include "events/SkyPlaneSound.h"
 #include "game/CashewModel.h"
 #include "game/NameTags.h"
 #include "game/NestModel.h"
@@ -73,6 +76,7 @@ Game::Game(const GameOptions& options)
     renderer_.setCashewMeshes(buildCashewMesh(), buildCashewFarMesh(), buildCashewStems(cashews_));
     renderer_.setNestBeaconMesh(buildNestBeaconMesh());
     renderer_.setRivalBeaconMesh(buildRivalBeaconMesh());
+    renderer_.setSkyPlaneMeshes(buildSkyPlaneMesh(), buildSkyPlanePropeller());
     player_.spawn(world_.spawnPoint(), 0.0f);
     window_.drawableSize(width_, height_);
     renderer_.resize(width_, height_);
@@ -221,8 +225,49 @@ void Game::advance(float frameSeconds) {
     updateCashews(frameSeconds);
     updateNpcs(frameSeconds);
     player_.animate(frameSeconds);
+    updateChaseCamera(frameSeconds);
     time_ += frameSeconds;
     telemetryTimer_ += frameSeconds;
+}
+
+// Enquanto a baleia ataca, a camera sai do passaro: de lado, para ver o salto e a mordida, e atras dele
+// no arremesso. Depois volta suavemente para a primeira pessoa. Num salto alto ela se afasta e olha para
+// baixo enquanto a baleia sobe, para ver o arco, e volta a se aproximar conforme a baleia chega e cai com ele.
+void Game::updateChaseCamera(float frameSeconds) {
+    const BoundaryWhale& whale = session_->whale();
+    const FlightModel& flight = player_.flight();
+    const glm::vec3 bird = flight.position();
+    glm::vec3 forward = flight.heading();
+    forward.y = 0;
+    forward = glm::length(forward) > 0.01f ? glm::normalize(forward) : glm::vec3(0, 0, -1);
+    glm::vec3 eye(0), look = forward * 10.0f;
+    if (whale.holdsLocal()) {
+        const glm::vec2 flat(bird.x, bird.z);
+        const glm::vec2 in = glm::length(flat) > 1.0f ? -glm::normalize(flat) : glm::vec2(0, -1);
+        const glm::vec3 inward(in.x, 0, in.y), side(-in.y, 0, in.x);
+        const WhaleAttack* attack = whale.localAttack();
+        const glm::vec3 mouth = attack ? whale::poseAt(attack->bite, attack->age).mouth : bird;
+        const float below = std::max(0.0f, bird.y - mouth.y);   // Quanto a baleia ainda tem de subir.
+        const float zoom = 1.0f + std::clamp((below - 20.0f) / 110.0f, 0.0f, 2.2f) + std::clamp((bird.y - 60.0f) / 300.0f, 0.0f, 0.8f);
+        const float down = 3.0f + std::max(0.2f * std::min(below, 400.0f), 0.12f * std::clamp(bird.y - 20.0f, 0.0f, 300.0f));
+        eye = (inward * 34.0f + side * 26.0f + glm::vec3(0, 10, 0)) * zoom;
+        look = -inward * 10.0f + glm::vec3(0, -down, 0);
+    } else if (whale.busy()) {
+        const glm::vec3 side(-forward.z, 0, forward.x);
+        eye = -forward * 30.0f + side * 9.0f + glm::vec3(0, 24, 0);
+        look = forward * 22.0f;
+    }
+    const bool wanted = whale.busy();
+    if (!wanted && !chaseOn_) return;
+    if (wanted && !chaseOn_) {   // Comeca dentro do passaro e se afasta.
+        chaseOn_ = true;
+        chaseEye_ = glm::vec3(0);
+        chaseLook_ = forward * 10.0f;
+    }
+    const float follow = 1.0f - std::exp(-(wanted ? 2.5f : 5.0f) * frameSeconds);
+    chaseEye_ += (eye - chaseEye_) * follow;
+    chaseLook_ += (look - chaseLook_) * follow;
+    if (!wanted && glm::length(chaseEye_) < 0.8f) chaseOn_ = false;
 }
 
 void Game::refreshPreview() {
@@ -238,7 +283,7 @@ void Game::updateScreens(float frameSeconds) {
     if (ui_->playing()) {
         advance(frameSeconds);
     } else {
-        ui_->updateMenus(input_->poll());
+        ui_->updateMenus(input_->poll(), frameSeconds);
         // Em sala o mundo nao para: eventos, cajus e NPCs seguem enquanto o jogador esta nos menus.
         if (match_.online()) {
             updateCashews(frameSeconds);
@@ -287,10 +332,28 @@ void Game::updateFlightSounds(float frameSeconds) {
     listener.playing = ui_->playing() && !session_->perched();
     ui_->setAmbience(ambientMixFor(listener));
     const float flap = player_.takeFlap();
+    // Aviao do teto: motor com Doppler pela distancia e velocidade, e o estrondo de cada batida.
+    const PlaneEngineMix engine = planeEngineFor(listener.position, flight.velocity(), session_->skyPlane().planes());
+    ui_->setPlaneEngine(ui_->playing() ? engine.volume : 0.0f, engine.rate);
+    const std::vector<glm::vec3> impacts = session_->skyPlane().takeImpacts();
+    playWhaleCues(listener.position);
     if (!ui_->playing()) return;
+    for (const glm::vec3& impact : impacts) ui_->playSound(UiSound::PlaneCrash, planeImpactVolume(listener.position, impact));
     if (flap > 0) ui_->playSound(UiSound::Flap, 0.45f + 0.45f * flap);
     for (const ChirpRequest& chirp : chorus_.update(frameSeconds, listener.position, singingBirds()))
         ui_->playSound(chirp.sound, chirp.volume);
+}
+
+// A baleia e ouvida por todos na sala, mais baixo quanto mais longe. Nos menus os sons sao descartados.
+void Game::playWhaleCues(glm::vec3 listener) {
+    const std::vector<WhaleCue> cues = session_->whale().drainCues();
+    if (!ui_->playing()) return;
+    for (const WhaleCue& cue : cues) {
+        const float distance = glm::length(cue.position - listener);
+        const float volume = cue.volume * std::clamp(1.0f - (distance - 60.0f) / 840.0f, 0.0f, 1.0f);   // Ouvida de longe: e gigante.
+        const UiSound sound = static_cast<UiSound>(static_cast<int>(UiSound::WhaleSpout) + static_cast<int>(cue.kind));
+        ui_->playSound(sound, volume);
+    }
 }
 
 void Game::presentUi(float frameSeconds) {
@@ -302,6 +365,15 @@ Camera3D Game::buildCamera() const {
     const FlightModel& flight = player_.flight();
     const float shake = player_.animation().shake, kick = player_.animation().kick;
     Camera3D camera;
+    if (chaseOn_) {
+        camera.position = flight.position() + chaseEye_;
+        const glm::vec3 view = chaseLook_ - chaseEye_;
+        camera.yaw = std::atan2(view.x, -view.z);
+        camera.pitch = std::atan2(view.y, glm::length(glm::vec2(view.x, view.z))) + shake * 0.03f * std::sin(time_ * 47.0f);
+        camera.roll = shake * 0.03f * std::sin(time_ * 61.0f);
+        camera.aspect = static_cast<float>(width_) / static_cast<float>(std::max(height_, 1));
+        return camera;
+    }
     camera.position = flight.position() + glm::vec3(0, kick * 0.2f, 0);
     camera.yaw = flight.yaw();
     camera.pitch = flight.pitch() + kick * 0.05f + shake * 0.04f * std::sin(time_ * 47.0f);
@@ -339,6 +411,8 @@ void Game::prepareNest(const Camera3D& camera) {
     renderer_.setRivalBeacons(std::move(beacons));
 }
 
+void Game::prepareWhales() { renderer_.setWhaleScene(session_->whale().scene()); }
+
 // NPCs e outros jogadores sao passaros procedurais pela semente. No cliente os NPCs vem do host.
 void Game::prepareBirds() {
     std::vector<BirdInstance> birds;
@@ -356,11 +430,29 @@ void Game::prepareBirds() {
     } else {
         for (size_t i = 0; i < npcs_.birds().size(); i++) addNpc(npcPublicState(npcs_.birds()[i]), i);
     }
+    if (chaseOn_) {   // Em terceira pessoa o proprio passaro aparece na cena.
+        const FlightModel& flight = player_.flight();
+        const Profile* profile = session_->profile();
+        BirdInstance self{profile ? profile->birdSeed() : options_.seed, flight.position(), flight.yaw(),
+                          flight.pitch(), flight.roll(), kBirdScale, FlightMode::Glide};
+        self.key = 999u;
+        self.flail = session_->whale().flailOf(session_->localPlayer());
+        birds.push_back(self);
+    }
     if (match_.online()) {
         for (const PlayerPublicState& other : session_->authority().players())
             if (other.id != match_.localPlayer() && other.id != kNoPlayer) {
                 BirdInstance bird{other.birdSeed, other.position, other.yaw, other.pitch, other.roll, kBirdScale, other.mode};
                 bird.key = 1000u + other.id;
+                bird.flail = session_->whale().flailOf(other.id);
+                // Preso na boca da baleia, o passaro e desenhado entre as mandibulas, sem esperar o estado dele.
+                whale::HeldBird held;
+                if (session_->whale().heldPose(other.id, held)) {
+                    bird.position = held.position;
+                    bird.yaw = held.yaw;
+                    bird.pitch = held.pitch;
+                    bird.roll = 0;
+                }
                 birds.push_back(bird);
             }
     }
@@ -398,8 +490,11 @@ void Game::renderFrame() {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareWhales();
     prepareBirds();
     prepareNameTags(camera);
+    showSkyPlanes(renderer_, session_->skyPlane().planes(), time_);
+    renderer_.setViewModelVisible(!chaseOn_);
     renderer_.render(camera, player_.animation(), time_);
     window_.swap();
 }
@@ -408,8 +503,10 @@ cv::Mat Game::captureFrame(float time) {
     const Camera3D camera = buildCamera();
     prepareCashews(camera);
     prepareNest(camera);
+    prepareWhales();
     prepareBirds();
     prepareNameTags(camera);
+    showSkyPlanes(renderer_, session_->skyPlane().planes(), time);
     return renderer_.capture(camera, player_.animation(), time);
 }
 
@@ -476,6 +573,11 @@ int Game::renderTest(const std::string& outputDir) {
     captureUiShots(outputDir);
     captureLiveNestShots(outputDir);
     captureRivalNestShots(outputDir);
+    captureSkyPlaneShots(outputDir, [&](glm::vec3 eye, glm::vec3 target) {
+        aimAt(eye, target);
+        return captureFrame(3.0f);
+    }, *session_);
+    captureWhaleShots(outputDir);
     return 0;
 }
 
@@ -567,6 +669,69 @@ void Game::aimAt(glm::vec3 eye, glm::vec3 target) {
     player_.applyControls(FlightControls{});
     player_.setBeakTarget(BeakSource::Cashew, session_->collector().beakTarget(eye));
     for (int i = 0; i < 40; i++) player_.animate(1.0f / 60.0f);
+}
+
+// Fotografa a baleia do limite atacando outro jogador, o passaro local preso na boca e o aviso no mar.
+// Tambem o salto mais alto possivel, ate o teto do voo: de perto, pela camera do jogo, e de longe, para ver o arco.
+void Game::captureWhaleShots(const std::string& outputDir) {
+    BoundaryWhale& whale = session_->whale();
+    glm::vec3 bite(0, 30, 1160);
+    const auto start = [&](PlayerId target, float age) {
+        whale = BoundaryWhale(session_->localPlayer());
+        GameEvent event;
+        event.type = GameEventType::WhaleBite;
+        event.actor = event.target = target;
+        event.position = bite;
+        whale.handle(event, player_.flight());
+        whale.update(age, player_, world_, session_->authority(), false);
+    };
+    const WhaleTimeline low = whaleTimeline(bite.y);
+    const struct { const char* name; float age; } moments[] = {{"baleia_1_salto", 0.75f * low.bite},
+                                                               {"baleia_2_mordida", low.bite + 0.1f},
+                                                               {"baleia_3_mastiga", low.fallEnd + 0.6f},
+                                                               {"baleia_4_cospe", low.spit + 0.15f}};
+    for (const auto& moment : moments) {
+        aimAt(bite + glm::vec3(75, 4, -70), bite + glm::vec3(0, -4, 12));
+        start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
+        cv::imwrite(outputDir + "/" + moment.name + ".png", captureFrame(3.0f));
+    }
+    // O passaro local preso e depois arremessado, visto pela camera em terceira pessoa ja assentada.
+    const auto thirdPerson = [&](const char* name, float age) {
+        aimAt(bite, bite + glm::vec3(0, 0, -10));
+        start(session_->localPlayer(), age);
+        whale.stepBird(player_);
+        whale.stepBird(player_);
+        chaseOn_ = false;
+        for (int i = 0; i < 240; i++) updateChaseCamera(1.0f / 60.0f);
+        renderer_.setViewModelVisible(false);
+        cv::imwrite(outputDir + "/" + name + ".png", captureFrame(3.0f));
+        renderer_.setViewModelVisible(true);
+        chaseOn_ = false;
+    };
+    thirdPerson("baleia_5_na_boca", low.fallEnd + 0.5f);
+    thirdPerson("baleia_7_arremesso", low.spit + 0.2f);
+    bite = glm::vec3(0, FlightModel::kCeiling - 5.0f, 1160);
+    const WhaleTimeline high = whaleTimeline(bite.y);
+    thirdPerson("baleia_8_alto_sobe", 0.7f * high.bite);
+    thirdPerson("baleia_9_alto_mordida", high.bite + 0.05f);
+    thirdPerson("baleia_10_alto_queda", high.bite + 0.6f * (high.brake - high.bite));
+    thirdPerson("baleia_11_alto_splash", high.brake + 0.25f);
+    const struct { const char* name; float age; } far[] = {{"baleia_12_alto_arco", 0.75f * high.bite},
+                                                           {"baleia_13_alto_cai", high.bite + 0.5f * (high.brake - high.bite)},
+                                                           {"baleia_14_alto_splash_longe", high.brake + 0.35f}};
+    for (const auto& moment : far) {
+        aimAt(glm::vec3(330, 110, 860), glm::vec3(0, 190, 1170));
+        start(static_cast<PlayerId>(session_->localPlayer() + 1), moment.age);
+        renderer_.setViewModelVisible(false);
+        cv::imwrite(outputDir + "/" + moment.name + ".png", captureFrame(3.0f));
+        renderer_.setViewModelVisible(true);
+    }
+    whale = BoundaryWhale(session_->localPlayer());
+    aimAt(glm::vec3(0, 45, 1105), glm::vec3(0, 0, 1180));
+    for (int i = 0; i < 150; i++) whale.update(1.0f / 60.0f, player_, world_, session_->authority(), false);
+    cv::imwrite(outputDir + "/baleia_6_aviso.png", captureFrame(3.0f));
+    whale = BoundaryWhale(session_->localPlayer());
+    player_.spawn(world_.spawnPoint(), 0.0f);
 }
 
 // Fotografa um caju de varias distancias e confere a coleta e o indicador de carga.

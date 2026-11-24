@@ -263,7 +263,8 @@ void testRivalRoster(TestRun& run, const World& world) {
     const float ownScale = glm::length(glm::vec3(nestBeaconTransform(own, 0, camera, 0.0f)[0]));
     const float rivalScale = glm::length(glm::vec3(rivalBeaconTransform(own, 0, camera, 0.0f)[0]));
     bool bluer = true;
-    for (const Vertex& vertex : buildRivalBeaconMesh().vertices()) bluer = bluer && vertex.color.b > vertex.color.r;
+    const MeshBuilder beacon = buildRivalBeaconMesh();   // Guardado: o laco sobre um temporario leria memoria liberada.
+    for (const Vertex& vertex : beacon.vertices()) bluer = bluer && vertex.color.b > vertex.color.r;
     run.check("ninho rival: marcador menor e azul", rivalScale > 0 && rivalScale < ownScale * 0.7f && bluer);
 }
 
@@ -271,7 +272,8 @@ void testVisualGrowth(TestRun& run) {
     const auto extent = [](int level) {
         NestSite site;
         float widest = 0;
-        for (const Vertex& vertex : buildNestMesh(site, level).vertices())
+        const MeshBuilder mesh = buildNestMesh(site, level);
+        for (const Vertex& vertex : mesh.vertices())
             widest = std::max(widest, glm::length(glm::vec2(vertex.position.x, vertex.position.z)));
         return widest;
     };
@@ -835,7 +837,7 @@ void testVictim(TestRun& run, const World& world) {
         RobRig rob(world, dir.path(), 0);
         Rig& rig = *rob.rig;
         rig.session.publishLocalPlayer();
-        const PlayerPublicState& me = rob.authority->players().front();
+        const PlayerPublicState me = rob.authority->players().front();   // Copia: players() devolve um vetor temporario.
         run.check("cofre: publica as moedas que podem ser roubadas e a Defesa", me.nestStock == 2 && me.nestDefense == 3);
         rob.authority->request(robbedBy(kRivalId));
         rig.tick();

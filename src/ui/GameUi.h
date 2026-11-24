@@ -28,6 +28,7 @@ public:
     // Som de ambiente: o Game informa a cada quadro o que o passaro deve ouvir.
     void setAmbience(const AmbientMix& mix) { sound_.setAmbience(mix); }
     void playSound(UiSound sound, float volume) { sound_.play(sound, volume); }   // Batidas de asa e cantos.
+    void setPlaneEngine(float volume, float rate) { sound_.setPlaneEngine(volume, rate); }   // Aviao do teto.
 
     void attachPoseSource(PoseSource* source) { poseSource_ = source; }
     // O Game recria a sessao ao entrar ou sair de uma sala; a interface passa a mostrar a nova.
@@ -35,7 +36,8 @@ public:
 
     void handleEvent(const SDL_Event& event);
     void closeWindow();
-    void updateMenus(const FlightControls& controls);   // Fora do jogo, quem le os comandos e a interface.
+    // Fora do jogo, quem le os comandos e a interface. O tempo do quadro marca a repeticao do braco erguido.
+    void updateMenus(const FlightControls& controls, float seconds);
     void update(float seconds);
 
     // Redesenha a camada so quando algo mudou. Retorna true se ela precisa ser reenviada ao Renderer.
@@ -100,6 +102,7 @@ private:
     ScreenFlow flow_;
     UiScreen shown_ = UiScreen::MainMenu;
     MenuCursor cursor_;
+    GestureRepeat repeat_;
     ProfilePicker profiles_;
     RoomsModel rooms_;
     TextField profileName_{32}, roomName_{32}, hostAddress_{21};
@@ -108,6 +111,8 @@ private:
     cv::Mat calibrationFrame_;
     Pose calibrationPose_;
     uint64_t calibrationSerial_ = 0;
+    float calibrationDoneFor_ = 0;
+    bool waitArmsDown_ = false;     // Depois da calibracao, gestos so valem com os bracos baixados.
     ArmSide raisedArm_ = ArmSide::None;
     float armProgress_ = 0;
     std::string error_, recordFooter_, lastKey_;

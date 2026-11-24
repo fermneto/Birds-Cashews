@@ -1,5 +1,7 @@
 #pragma once
 #include "entity/PlayerBird.h"
+#include "events/SkyPlane.h"
+#include "events/BoundaryWhale.h"
 #include "game/CashewCollector.h"
 #include "game/NestMenu.h"
 #include "game/NestSite.h"
@@ -43,11 +45,16 @@ public:
     const RivalNests& rivalNests() const { return rivals_; }   // Ninhos dos outros jogadores conectados.
     const CashewCollector& collector() const { return collector_; }
     const Profile* profile() const { return profile_ ? &*profile_ : nullptr; }
+    const SkyPlaneEvent& skyPlane() const { return skyPlane_; }   // Avioes do teto, para desenho e som.
+    SkyPlaneEvent& skyPlane() { return skyPlane_; }
+    BoundaryWhale& whale() { return whale_; }               // Baleia do limite do mapa: desenho e sons.
+    const BoundaryWhale& whale() const { return whale_; }
 
 private:
     void handleEvent(const GameEvent& event);
     void handleRobbery(const GameEvent& event);
     void handleCargoDrop(const GameEvent& event, int carriedBefore);
+    void handleWhaleBite(const GameEvent& event, int carriedBefore);
     void sufferRobbery(const GameEvent& event);
     void checkTreeHit();
     void robTick(float dt);
@@ -99,4 +106,6 @@ private:
     glm::vec3 landingFrom_{0};
     float landingYaw_ = 0, landingPitch_ = 0, landingRoll_ = 0;
     int nestRevision_ = 0, appliedSizeLevel_ = 0;
+    SkyPlaneEvent skyPlane_;
+    BoundaryWhale whale_;
 };

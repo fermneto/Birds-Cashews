@@ -9,6 +9,7 @@ constexpr float kBaseFov = 72.0f, kMinFov = 64.0f, kMaxFov = 112.0f;
 constexpr float kFovPerSpeed = 0.85f, kDiveFovBonus = 6.0f;
 constexpr float kFovOpenRate = 7.0f, kFovCloseRate = 3.5f;
 constexpr float kBeakOpenRate = 12.0f, kBeakCloseRate = 5.0f;
+constexpr float kOuterRadius = World::kBoundaryRadius + 180.0f;   // Ninguem passa disso, nem esperando a baleia.
 }
 
 void PlayerBird::spawn(glm::vec3 position, float yaw) { flight_.place(position, yaw, FlightModel::kCruiseSpeed); }
@@ -31,14 +32,19 @@ void PlayerBird::applyControls(const FlightControls& controls) {
     }
 }
 
-// Alem do limite, o vento vira o passaro de volta para a ilha.
+// Alem do limite quem age e a baleia (events/BoundaryWhale). O vento continua como reserva, para quando
+// ela ainda nao respondeu ou acabou de atacar, e uma parede invisivel garante que ninguem se perde no mar.
 void PlayerBird::enforceBoundary(float dt) {
-    const glm::vec3 p = flight_.position();
+    glm::vec3& p = flight_.position();
     const float radius = glm::length(glm::vec2(p.x, p.z));
     nearBoundary_ = radius > World::kWarningRadius;
     if (radius <= World::kBoundaryRadius) return;
     const float strength = std::clamp((radius - World::kBoundaryRadius) / 120.0f, 0.15f, 1.0f);
     flight_.steerToward(std::atan2(-p.x, p.z), 2.5f * strength, dt);
+    if (radius > kOuterRadius) {
+        p.x *= kOuterRadius / radius;
+        p.z *= kOuterRadius / radius;
+    }
 }
 
 void PlayerBird::step(const World& world, float dt) {
@@ -92,11 +98,23 @@ void PlayerBird::animate(float dt) {
     if (flapTimer_ > 0)
         angle += 36.0f * std::sin(6.2831853f * (1.0f - flapTimer_ / kFlapDuration)) * controls_.flapStrength;
     const float blend = 1.0f - std::exp(-18.0f * dt);
-    const float left = controls_.bodyControlled ? -4.0f + controls_.leftWingHeight * 57.0f : angle;
-    const float right = controls_.bodyControlled ? -4.0f + controls_.rightWingHeight * 57.0f : angle;
+    float left = controls_.bodyControlled ? -4.0f + controls_.leftWingHeight * 57.0f : angle;
+    float right = controls_.bodyControlled ? -4.0f + controls_.rightWingHeight * 57.0f : angle;
+    float wingSweep = sweep;
+    // Arremessado, cada asa tenta bater num tempo proprio e falha, e o vento joga as duas para tras.
+    flailBlend_ += (flail_ - flailBlend_) * (1.0f - std::exp(-(flail_ > flailBlend_ ? 10.0f : 3.0f) * dt));
+    if (flailBlend_ > 0.001f) {
+        flailTime_ += dt;
+        const float t = flailTime_;
+        const float flailLeft = 8.0f + 42.0f * std::sin(t * 13.0f + 0.8f * std::sin(t * 3.1f)) * (0.6f + 0.4f * std::sin(t * 5.3f));
+        const float flailRight = 8.0f + 42.0f * std::sin(t * 14.7f + 1.9f + 0.8f * std::sin(t * 3.9f)) * (0.6f + 0.4f * std::sin(t * 4.6f));
+        left += (flailLeft - left) * flailBlend_;
+        right += (flailRight - right) * flailBlend_;
+        wingSweep += (28.0f + 18.0f * std::sin(t * 5.7f) - wingSweep) * flailBlend_;
+    }
     animation_.leftWingAngle += (left - animation_.leftWingAngle) * blend;
     animation_.rightWingAngle += (right - animation_.rightWingAngle) * blend;
-    animation_.wingSweep += (sweep - animation_.wingSweep) * blend;
+    animation_.wingSweep += (wingSweep - animation_.wingSweep) * blend;
     animation_.shake *= std::exp(-5.0f * dt);
     animation_.kick *= std::exp(-6.0f * dt);
     const float speed = glm::length(flight_.velocity());

@@ -45,8 +45,8 @@ float GestureRecognizer::bodyScale(const Pose& pose) {
 }
 
 bool GestureRecognizer::extract(const Pose& pose, Features& f) {
-    for (int joint : {LShoulder, RShoulder, LWrist, RWrist})
-        if (!pose.has(joint, kMinConfidence)) return false;
+    for (int joint : kControlJoints)
+        if (!pose.has(joint, kControlMinConfidence)) return false;
 
     const float scale = bodyScale(pose);
     if (scale < 8.0f) return false;

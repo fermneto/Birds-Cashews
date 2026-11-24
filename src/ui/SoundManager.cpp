@@ -1,4 +1,6 @@
 #include "ui/SoundManager.h"
+#include "events/SkyPlaneSound.h"
+#include "ui/WhaleSounds.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -89,6 +91,14 @@ std::vector<Tone> tonesFor(UiSound sound) {
         case UiSound::ChirpCaw: return {{0, 0.22f, 520, 430, 0.3f, Wave::Square}, {0, 0.22f, 780, 640, 0.15f, Wave::Triangle},
                                         {0.3f, 0.18f, 500, 420, 0.25f, Wave::Square}};
         case UiSound::Flap:
+        case UiSound::PlaneCrash:
+        case UiSound::WhaleSpout:
+        case UiSound::WhaleSplash:
+        case UiSound::WhaleBite:
+        case UiSound::WhaleChew:
+        case UiSound::WhaleSpit:
+        case UiSound::WhaleRumble:
+        case UiSound::WhaleSong:
         case UiSound::Count: break;
     }
     return {};
@@ -134,6 +144,9 @@ int SoundManager::sampleRate() { return kSampleRate; }
 
 std::vector<int16_t> SoundManager::synthesize(UiSound sound) {
     std::vector<float> mix = sound == UiSound::Flap ? flapWhoosh() : std::vector<float>{};
+    if (sound == UiSound::PlaneCrash) mix = synthesizePlaneImpact(kSampleRate);
+    if (sound >= UiSound::WhaleSpout && sound <= UiSound::WhaleSong)
+        mix = synthesizeWhaleSound(static_cast<WhaleSound>(static_cast<int>(sound) - static_cast<int>(UiSound::WhaleSpout)), kSampleRate);
     for (const Tone& tone : tonesFor(sound)) addTone(mix, tone);
     std::vector<int16_t> samples(mix.size());
     std::transform(mix.begin(), mix.end(), samples.begin(), [](float value) {
@@ -146,6 +159,7 @@ SoundManager::SoundManager(Output output) : mixBuffer_(kBufferSamples * 4, 0) {
     if (output == Output::Silent) return;
     for (size_t i = 0; i < bank_.size(); i++) bank_[i] = synthesize(static_cast<UiSound>(i));
     for (int i = 0; i < kAmbientLayers; i++) ambientLoops_[i] = synthesizeAmbientLoop(static_cast<AmbientLayer>(i), kSampleRate);
+    engineLoop_ = synthesizePlaneEngineLoop(kSampleRate);
     openDevice();
 }
 
@@ -230,6 +244,7 @@ void SoundManager::mix(int16_t* output, int count) {
     const int samples = std::min(count, static_cast<int>(mixBuffer_.size()));
     std::fill(mixBuffer_.begin(), mixBuffer_.begin() + samples, 0);
     mixAmbience(samples);
+    mixPlaneEngine(samples);
     for (Voice& voice : voices_) {
         if (!voice.samples) continue;
         const size_t left = voice.samples->size() - voice.position;
@@ -240,4 +255,28 @@ void SoundManager::mix(int16_t* output, int count) {
     }
     for (int i = 0; i < samples; i++) output[i] = static_cast<int16_t>(std::clamp(mixBuffer_[i], -32768, 32767));
     std::fill(output + samples, output + count, static_cast<int16_t>(0));
+}
+
+void SoundManager::setPlaneEngine(float volume, float rate) {
+    engineTarget_.store(std::clamp(volume, 0.0f, 1.0f), std::memory_order_relaxed);
+    engineRateTarget_.store(std::clamp(rate, 0.5f, 2.0f), std::memory_order_relaxed);
+}
+
+// O loop e lido em velocidade variavel, com interpolacao linear. Volume e velocidade andam aos poucos, sem estalos.
+void SoundManager::mixPlaneEngine(int count) {
+    if (engineLoop_.empty()) return;
+    const float target = engineTarget_.load(std::memory_order_relaxed);
+    const float rateTarget = engineRateTarget_.load(std::memory_order_relaxed);
+    if (target <= 0.0f && engineGain_ < 1e-4f) return;
+    const double size = static_cast<double>(engineLoop_.size());
+    for (int i = 0; i < count; i++) {
+        engineGain_ += (target - engineGain_) * kAmbientFollow * 4.0f;
+        engineRate_ += (rateTarget - engineRate_) * 0.0005f;
+        const size_t index = static_cast<size_t>(enginePosition_);
+        const float fraction = static_cast<float>(enginePosition_ - static_cast<double>(index));
+        const float a = engineLoop_[index], b = engineLoop_[(index + 1) % engineLoop_.size()];
+        mixBuffer_[i] += static_cast<int>((a + (b - a) * fraction) * engineGain_);
+        enginePosition_ += engineRate_;
+        if (enginePosition_ >= size) enginePosition_ -= size;
+    }
 }

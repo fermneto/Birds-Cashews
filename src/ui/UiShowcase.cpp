@@ -5,9 +5,12 @@
 namespace {
 constexpr float kFrame = 1.0f / 30.0f;
 
+// Como a webcam, entrega uma pose nova a cada quadro.
 void hold(GameUi& ui, ScriptedPoseSource& camera, const Pose& pose, float seconds) {
-    camera.setPose(pose);
-    for (float t = 0; t < seconds; t += kFrame) ui.update(kFrame);
+    for (float t = 0; t < seconds; t += kFrame) {
+        camera.setPose(pose);
+        ui.update(kFrame);
+    }
 }
 
 void showCalibration(GameUi& ui, ScriptedPoseSource& camera, const std::function<void(const std::string&)>& shot) {
@@ -20,13 +23,13 @@ void showCalibration(GameUi& ui, ScriptedPoseSource& camera, const std::function
     ui.attachPoseSource(&camera);
     sendKeys(ui, SDLK_DOWN, 3);
     sendKey(ui, SDLK_RETURN);
-    Pose legsHidden = ScriptedPoseSource::standingPose();
-    legsHidden.joints[LAnkle].conf = legsHidden.joints[RAnkle].conf = 0;
-    hold(ui, camera, ScriptedPoseSource::withWrist(legsHidden, {60, 240}), 0.4f);
-    hold(ui, camera, ScriptedPoseSource::withWrist(legsHidden, {320, 40}), 0.4f);
+    Pose handHidden = ScriptedPoseSource::upperBodyPose();
+    handHidden.joints[LWrist].conf = 0;
+    hold(ui, camera, ScriptedPoseSource::withWrist(handHidden, {60, 240}), 0.4f);
+    hold(ui, camera, ScriptedPoseSource::withWrist(handHidden, {320, 40}), 0.4f);
     shot("ui_04_calibracao_parcial");
 
-    const Pose body = ScriptedPoseSource::standingPose();
+    const Pose body = ScriptedPoseSource::upperBodyPose();
     hold(ui, camera, body, 0.7f);
     for (const cv::Point2f& wrist : {cv::Point2f(60, 240), cv::Point2f(580, 240), cv::Point2f(320, 40), cv::Point2f(320, 440)})
         hold(ui, camera, ScriptedPoseSource::withWrist(body, wrist), 0.4f);
@@ -142,13 +145,14 @@ void ScriptedPoseSource::setPose(const Pose& pose) {
     fresh_ = true;
 }
 
-Pose ScriptedPoseSource::standingPose() {
+Pose ScriptedPoseSource::upperBodyPose() {
     Pose pose;
     pose.valid = true;
     const cv::Point2f points[JointCount] = {
-        {320, 90}, {312, 82}, {328, 82}, {302, 88}, {338, 88}, {280, 140}, {360, 140}, {262, 200}, {378, 200},
-        {250, 255}, {390, 255}, {292, 270}, {348, 270}, {288, 350}, {352, 350}, {284, 430}, {356, 430}};
-    for (int i = 0; i < JointCount; i++) pose.joints[i] = {points[i], 0.9f};
+        {320, 120}, {306, 106}, {334, 106}, {290, 116}, {350, 116}, {220, 240}, {420, 240}, {172, 300}, {468, 300},
+        {188, 330}, {452, 330}, {250, 470}, {390, 470}, {250, 620}, {390, 620}, {250, 760}, {390, 760}};
+    for (int i = 0; i < JointCount; i++) pose.joints[i] = {points[i], i >= LKnee ? 0.05f : 0.9f};
+    pose.joints[LHip].conf = pose.joints[RHip].conf = 0.45f;
     return pose;
 }
 
@@ -181,9 +185,9 @@ void runUiShowcase(GameUi& ui, DemoGameplaySource& demo, ScriptedPoseSource& cam
     FlightControls raised;
     raised.raisedArm = ArmSide::Right;
     raised.menuProgress = 0.6f;
-    ui.updateMenus(raised);
+    ui.updateMenus(raised, 0);
     shot("ui_02_menu_gesto");
-    ui.updateMenus(FlightControls{});
+    ui.updateMenus(FlightControls{}, 0);
 
     showCalibration(ui, camera, shot);
     showProfiles(ui, shot);

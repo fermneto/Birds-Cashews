@@ -387,6 +387,27 @@ void testHunterAnimation(TestRun& test, const World& world) {
     test.check(withValue("NPCs: a asa do cacador nunca salta entre quadros (maior passo em rad)", biggestJump), biggestJump < 0.3f);
 }
 
+// Arremessado, o passaro se debate: as asas sobem e descem cada uma num tempo, sem saltar entre quadros.
+void testFlailingWings(TestRun& test) {
+    BirdMotion motion;
+    BirdInstance bird{12345u, glm::vec3(0, 80, 0), 0, 0, 0, kBirdScale, FlightMode::Glide};
+    bird.key = 77;
+    float low = 1e9f, high = -1e9f, tilt = 0, jump = 0;
+    WingPose last;
+    for (int frame = 0; frame < 120; ++frame) {
+        bird.flail = frame < 10 ? 0.0f : 1.0f;
+        const WingPose pose = motion.advance(bird, 6.0f, frame * kFrame);
+        if (frame > 0) jump = std::max(jump, std::abs(pose.lift + pose.tilt - last.lift - last.tilt));
+        last = pose;
+        if (frame < 40) continue;
+        low = std::min(low, pose.lift);
+        high = std::max(high, pose.lift);
+        tilt = std::max(tilt, std::abs(pose.tilt));
+    }
+    test.check("asas: arremessado, se debate com as asas em tempos diferentes",
+               high - low > 0.4f && tilt > 0.2f && jump < 0.35f);
+}
+
 // Todo papel em voo mexe as asas a cada segundo; pousado, recolhe e fica quieto.
 void testAllAnimations(TestRun& test, const World& world) {
     NpcEcosystem ecosystem(world, kSeed);
@@ -446,5 +467,6 @@ int runNpcSelfTest() {
     testWholeIsland(test, world);
     testHunterAnimation(test, world);
     testAllAnimations(test, world);
+    testFlailingWings(test);
     return test.failures;
 }

@@ -32,9 +32,10 @@ abaixo.
 
 ## Situação
 
-O jogo está em desenvolvimento. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer e voz já estão na
-`main`, assim como o roubo de ninhos, a colisão em mergulho e os cajus caindo no mundo. Falta validar tudo junto com
-dois computadores. A situação de cada tarefa está em [`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
+O jogo está completo e validado. Voo pelo corpo, cajus, ninho, upgrades, menus, record, NPCs, multiplayer, voz, roubo
+de ninhos, colisão em mergulho e cajus caindo no mundo estão na `main` e foram testados com janela, webcam, som e dois
+computadores em rede. Falta só o diagrama UML de classes. A situação de cada tarefa está em
+[`docs/DIVISAO_TRABALHO.md`](docs/DIVISAO_TRABALHO.md).
 
 ## Dependências
 
@@ -111,10 +112,25 @@ As regras completas estão em [`docs/PLANO.md`](docs/PLANO.md).
 - Defesa deixa o roubo mais lento, o Cofre guarda parte das moedas e o Alarme mostra na bússola quem está roubando.
 - Mergulhe em quem carrega cajus para derrubar toda a carga. Bater com força numa árvore derruba um caju.
 - Cajus derrubados caem até o chão e ficam 30 s para quem chegar primeiro.
+- Quem sobe até o teto (cerca de 410 m) chama um avião. Ele aparece ao longe, com o ronco do motor crescendo, e vem
+  direto em você. Não há aviso na tela: desça antes que ele chegue. Se acertar, você despenca mais de 200 m, fica tonto
+  por um instante e perde a carga.
+
+### Limite do mapa
+
+A ilha é cercada de mar. Perto do limite aparecem a sombra de uma baleia gigante debaixo da água, bolhas, espirros e um
+ronco grave: é hora de voltar. Não há aviso na tela. Quem passa do limite é abocanhado pela baleia, que salta em arco
+até a altura do pássaro, até mesmo no teto de voo (quanto mais alto, mais longo o salto), cai de volta no mar com ele,
+mastiga um pouco e cospe o pássaro com força para o meio da ilha. Durante o ataque a câmera sai para a terceira pessoa, para você ver a
+baleia e o arremesso, e volta para a primeira pessoa quando o voo é devolvido. Os cajus da carga caem no mar e se perdem.
+Todos na sala veem a baleia.
 
 ### Com o corpo
 
-Fique de frente para a webcam, com o corpo inteiro no quadro. A tela de calibração confere isso antes de jogar. A imagem
+Fique de frente para a webcam, perto o bastante para aparecer da cintura para cima, com os ombros e as duas mãos no
+quadro. As pernas não são usadas. A tela de calibração confere os ombros e as mãos antes de jogar e pede uma mão em cada
+borda do vídeo (esquerda, direita, alto e baixo), em qualquer ordem e com as duas mãos ao mesmo tempo: abra os braços e
+depois leve uma mão ao alto e baixe a outra até a cintura. Com tudo marcado, ela segue sozinha. A imagem
 é espelhada, como um espelho.
 
 | Gesto | Efeito |
@@ -124,11 +140,11 @@ Fique de frente para a webcam, com o corpo inteiro no quadro. A tela de calibra�
 | Braços erguidos acima dos ombros | Sobe, trocando velocidade por altitude |
 | Braços abaixados junto ao corpo | Mergulha e acelera |
 | Inclinar a linha entre os punhos | Faz a curva, como um avião |
-| Erguer o braço esquerdo por 0,7 s | Nos menus, passa para a próxima opção |
-| Erguer o braço direito por 0,7 s | Nos menus, confirma |
+| Erguer o braço esquerdo por 0,7 s | Nos menus, passa para a próxima opção. Mantido erguido, segue passando a cada 0,4 s após meio segundo |
+| Erguer o braço direito por 0,7 s | Nos menus, confirma. Para confirmar de novo, abaixe e erga outra vez |
 
 No menu do ninho, a primeira escolha é entre comer (braço esquerdo) e investir (braço direito). Dentro de uma lista, o
-braço esquerdo passa para a próxima opção e o direito compra.
+braço esquerdo passa para a próxima opção e o direito compra. Aqui o braço mantido não repete: cada opção pede um gesto.
 
 ### Com o teclado
 

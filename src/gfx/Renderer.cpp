@@ -222,6 +222,7 @@ Renderer::Renderer(const MeshBuilder& worldMesh, const MeshBuilder& cloudMesh, g
     configureTexture(previewTexture_);
     configureTexture(overlayTexture_);
     glEnable(GL_CULL_FACE);
+    whaleView_ = std::make_unique<WhaleView>();
 }
 
 Renderer::~Renderer() {
@@ -306,7 +307,7 @@ void Renderer::drawBird(const BirdInstance& bird, const WingPose& wings) {
         auto shoulder = flyer.rightShoulder;
         shoulder.x *= side;
         auto wing = glm::translate(model, shoulder);
-        wing = glm::rotate(wing, side * wings.lift, glm::vec3(0, 0, 1));
+        wing = glm::rotate(wing, side * (wings.lift + side * wings.tilt), glm::vec3(0, 0, 1));
         wing = glm::rotate(wing, -side * wings.sweep, glm::vec3(0, 1, 0));
         wing = glm::scale(wing, glm::vec3(wings.spread, 1.0f, 1.0f));
         worldShader_.set("uModel", glm::translate(wing, -shoulder));
@@ -571,6 +572,8 @@ void Renderer::render(const Camera3D& camera, const BirdAnimation& animation, fl
     drawCashews();
     drawNest();
     drawRivalNests();
+    drawSkyPlanes();
+    whaleView_->draw(worldShader_, whaleScene_);
     drawWater(camera, time);
     drawWind(animation);
     drawLabels(camera);
@@ -606,4 +609,32 @@ cv::Mat Renderer::capture(const Camera3D& camera, const BirdAnimation& animation
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     cv::flip(image, image, 0);
     return image;
+}
+
+void Renderer::setSkyPlaneMeshes(const MeshBuilder& body, const MeshBuilder& propeller) {
+    skyPlaneBody_ = std::make_unique<Mesh>(body.vertices());
+    skyPlanePropeller_ = std::make_unique<Mesh>(propeller.vertices());
+}
+
+void Renderer::setSkyPlanes(std::vector<glm::mat4> bodies, std::vector<glm::mat4> propellers) {
+    skyPlaneBodies_ = std::move(bodies);
+    skyPlanePropellers_ = std::move(propellers);
+}
+
+// As pecas finas (asas, leme, pas) sao vistas dos dois lados.
+void Renderer::drawSkyPlanes() {
+    if (!skyPlaneBody_ || skyPlaneBodies_.empty()) return;
+    glDisable(GL_CULL_FACE);
+    worldShader_.set("uGlow", 0.12f);
+    for (const glm::mat4& transform : skyPlaneBodies_) {
+        worldShader_.set("uModel", transform);
+        skyPlaneBody_->draw();
+    }
+    for (const glm::mat4& transform : skyPlanePropellers_) {
+        worldShader_.set("uModel", transform);
+        skyPlanePropeller_->draw();
+    }
+    worldShader_.set("uGlow", 0.0f);
+    worldShader_.set("uModel", glm::mat4(1.0f));
+    glEnable(GL_CULL_FACE);
 }
